@@ -3,26 +3,65 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-slate-50 text-ink antialiased font-sans;
+  background-image: radial-gradient(80% 40% at 50% 0%, rgba(37, 71, 235, 0.05), transparent);
+  background-repeat: no-repeat;
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-white hover:bg-brand-dark;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-white hover:bg-brand-dark shadow-card hover:shadow-lift active:scale-[0.98];
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-white border border-slate-300 text-slate-700 hover:bg-slate-100;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white border border-slate-200 text-ink-secondary hover:border-slate-300 hover:text-ink shadow-card active:scale-[0.98];
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand;
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-card placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand-300 transition-shadow;
   }
   .card {
-    @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-card;
   }
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none;
   }
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted;
+  }
+}
+
+/* Live pulse dot for the wordmark and partner portal */
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #10b981;
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.35);
+  animation: live-pulse 2s ease-out infinite;
+}
+@keyframes live-pulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  70% { transform: scale(1.4); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Status progress bar segments */
+.seg {
+  @apply h-1.5 flex-1 rounded-full bg-slate-100 transition-colors;
+}
+.seg-filled {
+  @apply bg-brand;
+}
+.seg-done {
+  @apply bg-emerald-500;
 }

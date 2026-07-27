@@ -34,22 +34,22 @@ export function PartnerSubmitForm({ token }: { token: string }) {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="btn-primary w-full">
+      <button onClick={() => setOpen(true)} className="btn-primary w-full !py-3">
         + Send a new referral
       </button>
     );
   }
 
   return (
-    <form onSubmit={submit} className="card p-4 space-y-3">
+    <form onSubmit={submit} className="card p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">New referral</h2>
-        <button type="button" className="text-sm text-slate-500" onClick={() => setOpen(false)}>
+        <button type="button" className="text-sm text-ink-muted hover:text-ink" onClick={() => setOpen(false)}>
           Cancel
         </button>
       </div>
       {done ? (
-        <p className="text-green-700 font-semibold text-center py-4">Sent ✔ — thank you!</p>
+        <p className="text-emerald-700 font-semibold text-center py-6">Sent ✓ — thank you!</p>
       ) : (
         <>
           <input
@@ -67,16 +67,13 @@ export function PartnerSubmitForm({ token }: { token: string }) {
               value={form.client_phone}
               onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
             />
-            <label className="text-sm text-slate-600">
-              <span className="sr-only">Closing date</span>
-              <input
-                type="date"
-                className="input"
-                value={form.closing_date}
-                onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
-                title="Closing date (if known)"
-              />
-            </label>
+            <input
+              type="date"
+              className="input"
+              value={form.closing_date}
+              onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
+              title="Closing date (if known)"
+            />
           </div>
           <input
             className="input"

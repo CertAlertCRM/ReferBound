@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { STATUSES, STATUS_LABELS } from "@/lib/config";
-import { StatusBadge, AtRiskBadge } from "./components";
+import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
 
 type Referral = {
   id: string;
@@ -50,7 +50,6 @@ export default function Dashboard() {
   const [showAdd, setShowAdd] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // quick-add form state + log-time capture
   const formOpenedAt = useRef<number>(0);
   const [form, setForm] = useState({
     client_name: "",
@@ -118,94 +117,104 @@ export default function Dashboard() {
     return { risk, active, done, lost };
   }, [referrals]);
 
-  return (
-    <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Referrals</h1>
-        <nav className="flex gap-2">
-          <Link href="/partners" className="btn-ghost">Partners</Link>
-          <Link href="/stats" className="btn-ghost">Stats</Link>
-          <button onClick={openAdd} className="btn-primary">+ Log lead</button>
-        </nav>
-      </header>
+  const inProgress = groups.risk.length + groups.active.length;
 
-      {showAdd && (
-        <form onSubmit={saveLead} className="card p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">New referral</h2>
-            <button type="button" className="text-sm text-slate-500" onClick={() => setShowAdd(false)}>
-              Cancel
-            </button>
+  return (
+    <>
+      <TopNav active="referrals" />
+      <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Summary strip */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex gap-5 text-sm text-ink-secondary">
+            <span><strong className="text-ink text-base">{inProgress}</strong> in progress</span>
+            <span><strong className="text-ink text-base">{groups.risk.length}</strong> closing soon</span>
+            <span><strong className="text-ink text-base">{groups.done.length}</strong> bound</span>
           </div>
-          <input
-            className="input"
-            placeholder="Client name *"
-            value={form.client_name}
-            onChange={(e) => setForm({ ...form, client_name: e.target.value })}
-            autoFocus
-            required
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select
-              className="input"
-              value={form.partner_id}
-              onChange={(e) => setForm({ ...form, partner_id: e.target.value })}
-              required
-            >
-              <option value="">Referred by… *</option>
-              {partners.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+          <button onClick={openAdd} className="btn-primary">+ Log lead</button>
+        </div>
+
+        {showAdd && (
+          <form onSubmit={saveLead} className="card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">New referral</h2>
+              <button type="button" className="text-sm text-ink-muted hover:text-ink" onClick={() => setShowAdd(false)}>
+                Cancel
+              </button>
+            </div>
             <input
               className="input"
-              placeholder="Client phone"
-              value={form.client_phone}
-              onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
+              placeholder="Client name *"
+              value={form.client_name}
+              onChange={(e) => setForm({ ...form, client_name: e.target.value })}
+              autoFocus
+              required
             />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="text-sm text-slate-600">
-              Closing date
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select
+                className="input"
+                value={form.partner_id}
+                onChange={(e) => setForm({ ...form, partner_id: e.target.value })}
+                required
+              >
+                <option value="">Referred by… *</option>
+                {partners.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
               <input
-                type="date"
-                className="input mt-1"
-                value={form.closing_date}
-                onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
+                className="input"
+                placeholder="Client phone"
+                value={form.client_phone}
+                onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
               />
-            </label>
-            <label className="text-sm text-slate-600">
-              Notes
-              <input
-                className="input mt-1"
-                placeholder="Optional"
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-            </label>
-          </div>
-          <button className="btn-primary w-full" disabled={saving}>
-            {saving ? "Saving…" : "Save lead"}
-          </button>
-          <p className="text-xs text-slate-400">Log time is measured automatically for the pilot.</p>
-        </form>
-      )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="section-label">Closing date</span>
+                <input
+                  type="date"
+                  className="input mt-1.5"
+                  value={form.closing_date}
+                  onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
+                />
+              </label>
+              <label className="block">
+                <span className="section-label">Notes</span>
+                <input
+                  className="input mt-1.5"
+                  placeholder="Optional"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </label>
+            </div>
+            <button className="btn-primary w-full" disabled={saving}>
+              {saving ? "Saving…" : "Save lead"}
+            </button>
+            <p className="text-xs text-ink-muted text-center">Log time is measured automatically for the pilot.</p>
+          </form>
+        )}
 
-      {loading ? (
-        <p className="text-slate-500">Loading…</p>
-      ) : referrals.length === 0 ? (
-        <div className="card p-8 text-center text-slate-500">
-          No referrals yet. Add your partners, then log your first lead.
-        </div>
-      ) : (
-        <>
-          <Section title="⚠ Closing soon — not bound" items={groups.risk} advance={advance} busyId={busyId} highlight />
-          <Section title="Active" items={groups.active} advance={advance} busyId={busyId} />
-          <Section title="Bound & delivered" items={groups.done} advance={advance} busyId={busyId} />
-          <Section title="Not written" items={groups.lost} advance={advance} busyId={busyId} />
-        </>
-      )}
-    </main>
+        {loading ? (
+          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+        ) : referrals.length === 0 ? (
+          <div className="card p-10 text-center space-y-2">
+            <p className="font-semibold">No referrals yet</p>
+            <p className="text-sm text-ink-secondary">
+              Add your partners first, then log your first lead — it takes seconds.
+            </p>
+            <Link href="/partners" className="btn-ghost inline-flex mt-2">Set up partners →</Link>
+          </div>
+        ) : (
+          <>
+            <Section title="Closing soon — not bound" items={groups.risk} advance={advance} busyId={busyId} highlight />
+            <Section title="Active" items={groups.active} advance={advance} busyId={busyId} />
+            <Section title="Bound & delivered" items={groups.done} advance={advance} busyId={busyId} />
+            <Section title="Not written" items={groups.lost} advance={advance} busyId={busyId} />
+          </>
+        )}
+      </main>
+    </>
   );
 }
 
@@ -224,46 +233,53 @@ function Section({
 }) {
   if (items.length === 0) return null;
   return (
-    <section className="space-y-2">
-      <h2 className={`text-sm font-semibold uppercase tracking-wide ${highlight ? "text-red-600" : "text-slate-500"}`}>
-        {title} ({items.length})
+    <section className="space-y-2.5">
+      <h2 className={`section-label ${highlight ? "!text-red-600" : ""}`}>
+        {title} · {items.length}
       </h2>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {items.map((r) => {
           const ns = nextStatus(r.status);
           const days = daysUntil(r.closing_date);
           return (
-            <div key={r.id} className={`card p-4 flex items-center gap-3 ${highlight ? "border-red-200" : ""}`}>
-              <div className="flex-1 min-w-0">
-                <Link href={`/deal/${r.id}`} className="font-semibold hover:text-brand truncate block">
-                  {r.client_name}
-                </Link>
-                <div className="text-xs text-slate-500 flex flex-wrap gap-x-2 gap-y-1 mt-1 items-center">
-                  <span>{r.partners?.name ?? "—"}</span>
-                  {r.closing_date && (
-                    <span>
-                      · closes {r.closing_date}
-                      {days !== null && days >= 0 && ` (${days}d)`}
-                    </span>
-                  )}
-                  {r.source === "partner" && <span className="badge bg-purple-100 text-purple-700">from partner</span>}
-                  {r.documents?.length > 0 && <span>· {r.documents.length} doc(s)</span>}
+            <div
+              key={r.id}
+              className={`card p-4 hover:shadow-lift transition-shadow ${highlight ? "border-red-200" : ""}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/deal/${r.id}`} className="font-semibold hover:text-brand truncate">
+                      {r.client_name}
+                    </Link>
+                    <StatusBadge status={r.status} />
+                    {atRisk(r) && <AtRiskBadge />}
+                    {r.source === "partner" && (
+                      <span className="badge bg-brand-light text-brand-700">via portal</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-ink-muted mt-1">
+                    {r.partners?.name ?? "—"}
+                    {r.closing_date && (
+                      <> · closes {r.closing_date}{days !== null && days >= 0 ? ` (${days}d)` : ""}</>
+                    )}
+                    {r.documents?.length > 0 && <> · {r.documents.length} doc{r.documents.length > 1 ? "s" : ""}</>}
+                  </p>
                 </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <StatusBadge status={r.status} />
-                  {atRisk(r) && <AtRiskBadge />}
-                </div>
+                {ns && r.status !== "lost" && (
+                  <button
+                    onClick={() => advance(r)}
+                    disabled={busyId === r.id}
+                    className="btn-ghost shrink-0 !px-3 !py-1.5 text-xs"
+                    title={`Advance to ${STATUS_LABELS[ns]}`}
+                  >
+                    {busyId === r.id ? "…" : `→ ${STATUS_LABELS[ns]}`}
+                  </button>
+                )}
               </div>
-              {ns && r.status !== "lost" && (
-                <button
-                  onClick={() => advance(r)}
-                  disabled={busyId === r.id}
-                  className="btn-ghost shrink-0 text-xs"
-                  title={`Advance to ${STATUS_LABELS[ns]}`}
-                >
-                  {busyId === r.id ? "…" : `→ ${STATUS_LABELS[ns]}`}
-                </button>
-              )}
+              <div className="mt-3">
+                <StatusProgress status={r.status} />
+              </div>
             </div>
           );
         })}

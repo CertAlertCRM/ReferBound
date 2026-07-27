@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { STATUS_LABELS } from "@/lib/config";
+import { TopNav } from "../components";
 
 type Stats = {
   total: number;
@@ -25,18 +25,20 @@ export default function StatsPage() {
 
   if (!stats) {
     return (
-      <main className="max-w-2xl mx-auto p-6">
-        <p className="text-slate-500">Loading…</p>
-      </main>
+      <>
+        <TopNav active="stats" />
+        <main className="max-w-2xl mx-auto p-6">
+          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+        </main>
+      </>
     );
   }
 
   const tiles: { label: string; value: string; hint?: string }[] = [
-    { label: "Total referrals", value: String(stats.total) },
     {
       label: "Avg time to log a lead",
       value: stats.avgLogSeconds !== null ? `${stats.avgLogSeconds}s` : "—",
-      hint: "Measured from opening the form to saving",
+      hint: "From opening the form to saving",
     },
     {
       label: "Avg time to bound",
@@ -48,44 +50,63 @@ export default function StatsPage() {
           : "—",
     },
     {
-      label: "Bound rate (of closed)",
+      label: "Bound rate of closed",
       value: stats.conversionRate !== null ? `${stats.conversionRate}%` : "—",
     },
-    { label: "Submitted via partner portal", value: String(stats.fromPartnerPortal) },
+    { label: "Total referrals", value: String(stats.total) },
+    { label: "Sent via partner portal", value: String(stats.fromPartnerPortal) },
     { label: "Status updates logged", value: String(stats.statusUpdates) },
     {
       label: "Partner emails sent",
-      value: `${stats.emailsSent}`,
-      hint: stats.emailsLogged > stats.emailsSent ? `${stats.emailsLogged - stats.emailsSent} logged but not sent (email not configured?)` : undefined,
+      value: String(stats.emailsSent),
+      hint:
+        stats.emailsLogged > stats.emailsSent
+          ? `${stats.emailsLogged - stats.emailsSent} logged, not sent (email not configured)`
+          : undefined,
     },
   ];
 
+  const pipelineTotal = Object.values(stats.byStatus).reduce((a, b) => a + b, 0) || 1;
+
   return (
-    <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
-      <Link href="/" className="text-sm text-brand">← Back to referrals</Link>
-      <h1 className="text-2xl font-bold">Pilot metrics</h1>
+    <>
+      <TopNav active="stats" />
+      <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Pilot metrics</h1>
+          <p className="text-sm text-ink-secondary mt-1">The numbers that answer whether this is working.</p>
+        </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {tiles.map((t) => (
-          <div key={t.label} className="card p-4">
-            <p className="text-2xl font-bold">{t.value}</p>
-            <p className="text-xs text-slate-500 mt-1">{t.label}</p>
-            {t.hint && <p className="text-[10px] text-slate-400 mt-1">{t.hint}</p>}
-          </div>
-        ))}
-      </div>
-
-      <section className="card p-4">
-        <h2 className="font-semibold text-sm uppercase tracking-wide text-slate-500 mb-2">Pipeline</h2>
-        <ul className="space-y-1 text-sm">
-          {Object.entries(stats.byStatus).map(([k, v]) => (
-            <li key={k} className="flex justify-between">
-              <span>{STATUS_LABELS[k] ?? k}</span>
-              <span className="font-semibold">{v}</span>
-            </li>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {tiles.map((t) => (
+            <div key={t.label} className="card p-4">
+              <p className="text-[26px] leading-8 font-semibold tracking-tight">{t.value}</p>
+              <p className="text-xs text-ink-secondary mt-1">{t.label}</p>
+              {t.hint && <p className="text-[10px] text-ink-muted mt-1">{t.hint}</p>}
+            </div>
           ))}
-        </ul>
-      </section>
-    </main>
+        </div>
+
+        <section className="card p-5">
+          <h2 className="section-label mb-3">Pipeline</h2>
+          <ul className="space-y-2.5">
+            {Object.entries(stats.byStatus).map(([k, v]) => (
+              <li key={k}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-ink-secondary">{STATUS_LABELS[k] ?? k}</span>
+                  <span className="font-semibold">{v}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-brand"
+                    style={{ width: `${Math.max(4, (v / pipelineTotal) * 100)}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </main>
+    </>
   );
 }
