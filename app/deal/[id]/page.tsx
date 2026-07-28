@@ -43,6 +43,9 @@ export default function DealPage() {
   const dealDirty = premium !== dealBaseline.premium || lines !== dealBaseline.lines;
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [showAllMsgs, setShowAllMsgs] = useState(false);
+  const [extracting, setExtracting] = useState<string | null>(null);
+  const [extractResult, setExtractResult] = useState<{ filled: string[]; mismatches: string[]; summary: string | null } | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docKind, setDocKind] = useState("eoi");
@@ -85,6 +88,38 @@ export default function DealPage() {
     });
     setDealSaving(false);
     load();
+  }
+
+  async function extractDoc(docId: string) {
+    setExtracting(docId);
+    setExtractResult(null);
+    const res = await fetch(`/api/referrals/${id}/docs/extract`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: docId }),
+    });
+    setExtracting(null);
+    if (res.ok) {
+      setExtractResult(await res.json());
+      load();
+    } else {
+      alert((await res.json()).error ?? "Extraction failed");
+    }
+  }
+
+  async function draftReply() {
+    setDrafting(true);
+    const res = await fetch(`/api/referrals/${id}/draft-reply`, { method: "POST" });
+    setDrafting(false);
+    if (res.ok) setReply((await res.json()).draft ?? "");
+    else alert((await res.json()).error ?? "Couldn't draft — write it manually");
+  }
+
+  function askForMissing(missing: string[]) {
+    if (!r) return;
+    setReply(
+      `Hi! To get ${r.client_name}'s quote moving, could you send over their ${missing.join(" and ")}? Thanks!`
+    );
   }
 
   async function sendReply(e: React.FormEvent) {
@@ -161,6 +196,13 @@ export default function DealPage() {
 
   const hasEoi = r.documents.some((d) => d.kind === "eoi");
 
+  // Quote-readiness: the fields an agent actually needs before quoting.
+  const missing: string[] = [];
+  if (!r.client_dob) missing.push("date of birth");
+  if (!r.property_address) missing.push("property address");
+  if (!r.client_phone) missing.push("phone number");
+  const activeDeal = !["bound", "docs_delivered", "lost"].includes(r.status);
+
   return (
     <>
       <TopNav active="referrals" />
@@ -193,6 +235,26 @@ export default function DealPage() {
             )}
           </div>
           {r.notes && <p className="text-sm text-ink-muted border-t border-slate-100 pt-3">“{r.notes}”</p>}
+
+          {activeDeal && (
+            <div className="border-t border-slate-100 pt-3 flex items-center gap-3 flex-wrap">
+              {missing.length === 0 ? (
+                <span className="badge bg-emerald-50 text-emerald-700">✓ Ready to quote — all key info in</span>
+              ) : (
+                <>
+                  <span className="badge bg-amber-50 text-amber-700">
+                    Missing: {missing.join(", ")}
+                  </span>
+                  <button
+                    onClick={() => askForMissing(missing)}
+                    className="text-xs font-semibold text-brand hover:text-brand-dark"
+                  >
+                    ✨ Draft an ask to {r.partners?.name ?? "partner"} ↓
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </header>
 
         {/* Status controls */}
@@ -254,16 +316,39 @@ export default function DealPage() {
                       <span className="badge bg-brand-light text-brand-700 ml-2">from partner</span>
                     )}
                   </span>
-                  <a
-                    className="text-brand font-medium text-xs hover:text-brand-dark"
-                    href={`/api/docs/${d.id}/download`}
-                    target="_blank"
-                  >
-                    Download
-                  </a>
+                  <span className="flex items-center gap-3 shrink-0">
+                    <button
+                      className="text-brand font-medium text-xs hover:text-brand-dark disabled:opacity-50"
+                      onClick={() => extractDoc(d.id)}
+                      disabled={extracting !== null}
+                      title="AI reads this document and fills in any missing client or policy details"
+                    >
+                      {extracting === d.id ? "Reading…" : "✨ Extract"}
+                    </button>
+                    <a
+                      className="text-brand font-medium text-xs hover:text-brand-dark"
+                      href={`/api/docs/${d.id}/download`}
+                      target="_blank"
+                    >
+                      Download
+                    </a>
+                  </span>
                 </li>
               ))}
             </ul>
+          )}
+          {extractResult && (
+            <div className="text-xs rounded-lg bg-brand-light/60 border border-brand-100 px-3 py-2.5 space-y-1">
+              {extractResult.summary && <p className="text-ink-secondary">📄 {extractResult.summary}</p>}
+              {extractResult.filled.length > 0 ? (
+                <p className="text-emerald-700 font-medium">✓ Filled: {extractResult.filled.join(", ")}</p>
+              ) : (
+                <p className="text-ink-muted">Nothing new to fill — existing info left untouched.</p>
+              )}
+              {extractResult.mismatches.map((m, i) => (
+                <p key={i} className="text-amber-700">⚠ {m}</p>
+              ))}
+            </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <select className="input" value={docKind} onChange={(e) => setDocKind(e.target.value)}>
@@ -348,6 +433,15 @@ export default function DealPage() {
               onChange={(e) => setReply(e.target.value)}
               maxLength={2000}
             />
+            <button
+              type="button"
+              onClick={draftReply}
+              disabled={drafting}
+              className="btn-ghost shrink-0"
+              title="Draft an update from this deal's real status and activity — you edit before sending"
+            >
+              {drafting ? "…" : "✨ Draft"}
+            </button>
             <button className="btn-primary shrink-0" disabled={replySending || !reply.trim()}>
               {replySending ? "…" : "Send"}
             </button>

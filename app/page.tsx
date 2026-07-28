@@ -14,6 +14,8 @@ type Referral = {
   source: string;
   created_at: string;
   premium: number | null;
+  client_dob: string | null;
+  property_address: string | null;
   partners: { name: string } | null;
   documents: { id: string; kind: string }[];
 };
@@ -346,6 +348,12 @@ function Section({
                     {r.source === "partner" && (
                       <span className="badge bg-brand-light text-brand-700">via portal</span>
                     )}
+                    {!["bound", "docs_delivered", "lost"].includes(r.status) &&
+                      (!r.client_dob || !r.property_address) && (
+                        <span className="badge bg-amber-50 text-amber-700" title="Missing DOB or property address — open the deal to request or extract it">
+                          missing info
+                        </span>
+                      )}
                   </div>
                   <p className="text-xs text-ink-muted mt-1">
                     {r.partners?.name ?? "—"}
