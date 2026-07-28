@@ -6,7 +6,7 @@ import { APP_CONFIG, STATUS_LABELS } from "@/lib/config";
 
 type SendArgs = {
   referralId?: string;
-  kind: "status_update" | "docs_ready" | "new_partner_lead" | "at_risk";
+  kind: "status_update" | "docs_ready" | "new_partner_lead" | "at_risk" | "monthly_summary";
   to: string[];
   subject: string;
   html: string;
@@ -99,6 +99,38 @@ export function newPartnerLeadEmail(clientName: string, partnerName: string, app
     <h2 style="margin:0 0 12px">New referral from ${partnerName}</h2>
     <p style="font-size:16px"><strong>${clientName}</strong> was just submitted through the partner portal.</p>
     <p><a href="${appUrl}" style="color:#1d4ed8">Open your dashboard</a> to start the quote.</p>
+  `);
+}
+
+export function monthlySummaryEmail(
+  partnerName: string,
+  agentName: string,
+  monthLabel: string,
+  stats: { referred: number; bound: number; inProgress: number; allTimeBound: number },
+  portalUrl: string
+) {
+  return wrap(`
+    <h2 style="margin:0 0 12px">${monthLabel} — your referrals with ${agentName}</h2>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <tr>
+        <td style="padding:12px;text-align:center;background:#eef4ff;border-radius:8px">
+          <div style="font-size:24px;font-weight:700">${stats.referred}</div>
+          <div style="font-size:12px;color:#555">referred this month</div>
+        </td>
+        <td style="width:8px"></td>
+        <td style="padding:12px;text-align:center;background:#ecfdf5;border-radius:8px">
+          <div style="font-size:24px;font-weight:700">${stats.bound}</div>
+          <div style="font-size:12px;color:#555">bound this month</div>
+        </td>
+        <td style="width:8px"></td>
+        <td style="padding:12px;text-align:center;background:#f8fafc;border-radius:8px">
+          <div style="font-size:24px;font-weight:700">${stats.inProgress}</div>
+          <div style="font-size:12px;color:#555">in progress now</div>
+        </td>
+      </tr>
+    </table>
+    <p style="font-size:15px">${stats.allTimeBound} of your referred clients are covered all-time. Thank you for trusting ${agentName} with them — it never goes unnoticed.</p>
+    <p><a href="${portalUrl}" style="color:#1d4ed8">See every referral live in your portal</a></p>
   `);
 }
 

@@ -108,6 +108,15 @@ create table if not exists agent_profile (
 );
 alter table agent_profile enable row level security;
 
+-- Early-access waitlist (see migration_04)
+create table if not exists waitlist (
+  id uuid primary key default gen_random_uuid(),
+  email text unique not null,
+  source text,
+  created_at timestamptz not null default now()
+);
+alter table waitlist enable row level security;
+
 -- Private storage bucket for EOI / RCE / dec page uploads
 insert into storage.buckets (id, name, public)
 values ('docs', 'docs', false)

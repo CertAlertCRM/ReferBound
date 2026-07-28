@@ -7,11 +7,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PREFIXES = [
   "/login",
+  "/welcome",
   "/p/",
   "/api/login",
   "/api/p/",
   "/api/cron/",
   "/api/docs/",
+  "/api/waitlist",
   "/_next",
   "/favicon.ico",
 ];
@@ -31,7 +33,17 @@ export async function middleware(req: NextRequest) {
   }
   const passcode = process.env.AGENT_PASSCODE || "";
   const cookie = req.cookies.get("rl_agent")?.value;
-  if (!passcode || !cookie || cookie !== (await expectedToken(passcode))) {
+  const authed = !!passcode && !!cookie && cookie === (await expectedToken(passcode));
+
+  // Root is dual-purpose: the agent's dashboard when signed in, the public
+  // marketing/landing page for everyone else (URL stays "/" either way).
+  if (pathname === "/" && !authed) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/welcome";
+    return NextResponse.rewrite(url);
+  }
+
+  if (!authed) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }

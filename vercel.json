@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/at-risk",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-summary",
+      "schedule": "0 14 1 * *"
     }
   ]
 }

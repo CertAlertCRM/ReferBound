@@ -6,6 +6,8 @@ import { isAgentAuthed } from "@/lib/auth";
 import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
 import { PartnerSubmitForm } from "./submit-form";
+import { AutoRefresh } from "./auto-refresh";
+import { DOCS_BUCKET } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -66,11 +68,19 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   // Prefer the agent's saved profile for partner-facing names; fall back to env config.
   const { data: prof } = await db()
     .from("agent_profile")
-    .select("display_name, agency_name")
+    .select("display_name, agency_name, phone, email, headshot_path")
     .eq("id", "default")
     .maybeSingle();
   const agencyName = prof?.agency_name || APP_CONFIG.agencyName;
   const agentName = prof?.display_name || APP_CONFIG.agentName;
+
+  let headshotUrl: string | null = null;
+  if (prof?.headshot_path) {
+    const { data: signed } = await db()
+      .storage.from(DOCS_BUCKET)
+      .createSignedUrl(prof.headshot_path, 60 * 60);
+    headshotUrl = signed?.signedUrl ?? null;
+  }
 
   // Only the logged-in agent sees this — partners never do.
   const agentView = isAgentAuthed();
@@ -87,19 +97,40 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           </Link>
         </div>
       )}
+      <AutoRefresh />
       {/* Hero header */}
       <header className="card overflow-hidden">
         <div className="bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-6 py-6 text-white">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-100">
-            <span className="live-dot" aria-hidden />
-            Live referral tracking
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-100">
+                <span className="live-dot" aria-hidden />
+                Live referral tracking
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">
+                {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
+              </h1>
+              <p className="text-sm text-brand-100 mt-1.5">
+                Every client you&apos;ve referred to {agentName}, updated in real time. Documents land here the moment policies are bound.
+              </p>
+              {(prof?.phone || prof?.email) && (
+                <p className="text-xs text-brand-100 mt-2.5">
+                  Reach {agentName?.split(" ")[0]} directly:
+                  {prof?.phone && <span className="font-semibold"> {prof.phone}</span>}
+                  {prof?.phone && prof?.email && " · "}
+                  {prof?.email && <span className="font-semibold">{prof.email}</span>}
+                </p>
+              )}
+            </div>
+            {headshotUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={headshotUrl}
+                alt={agentName ?? "Agent"}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-white/70 shadow-lg shrink-0"
+              />
+            )}
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">
-            {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
-          </h1>
-          <p className="text-sm text-brand-100 mt-1.5">
-            Every client you&apos;ve referred to {agentName}, updated in real time. Documents land here the moment policies are bound.
-          </p>
         </div>
         <div className="grid grid-cols-3 divide-x divide-slate-100">
           {[
@@ -185,7 +216,16 @@ export default async function PartnerPortal({ params }: { params: { token: strin
       )}
 
       <footer className="text-center text-xs text-ink-muted pt-4 pb-8">
-        Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Live</span></span> · Statuses update in real time
+        <a href="/" className="hover:underline">
+          Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Live</span></span>
+        </a>
+        {" · "}Statuses update in real time
+        <span className="block mt-1">
+          Are you an insurance agent?{" "}
+          <a href="/" className="text-brand font-medium hover:underline">
+            Get this for your partners →
+          </a>
+        </span>
       </footer>
     </main>
   );
