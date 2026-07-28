@@ -7,6 +7,8 @@ import { TopNav } from "../components";
 type Stats = {
   total: number;
   byStatus: Record<string, number>;
+  premiumTotal: number;
+  partnerBreakdown: { name: string; premium: number; referred: number; bound: number }[];
   fromPartnerPortal: number;
   avgLogSeconds: number | null;
   avgHoursToBound: number | null;
@@ -35,6 +37,11 @@ export default function StatsPage() {
   }
 
   const tiles: { label: string; value: string; hint?: string }[] = [
+    {
+      label: "Premium sourced from partners",
+      value: stats.premiumTotal > 0 ? `$${Math.round(stats.premiumTotal).toLocaleString()}` : "—",
+      hint: "Bound deals with a premium recorded on the deal page",
+    },
     {
       label: "Avg time to log a lead",
       value: stats.avgLogSeconds !== null ? `${stats.avgLogSeconds}s` : "—",
@@ -86,6 +93,25 @@ export default function StatsPage() {
             </div>
           ))}
         </div>
+
+        {stats.partnerBreakdown.length > 0 && (
+          <section className="card p-5">
+            <h2 className="section-label mb-3">By partner</h2>
+            <ul className="space-y-2 text-sm">
+              {stats.partnerBreakdown.map((p) => (
+                <li key={p.name} className="flex justify-between items-baseline">
+                  <span className="text-ink">{p.name}</span>
+                  <span className="text-ink-secondary text-xs">
+                    {p.referred} referred · {p.bound} bound ·{" "}
+                    <span className="font-semibold text-ink">
+                      {p.premium > 0 ? `$${Math.round(p.premium).toLocaleString()}` : "$0"}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="card p-5">
           <h2 className="section-label mb-3">Pipeline</h2>

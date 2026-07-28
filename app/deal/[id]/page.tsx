@@ -8,6 +8,7 @@ import { StatusBadge, StatusProgress, TopNav } from "../../components";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
+type Msg = { id: string; sender: string; body: string; created_at: string };
 type Referral = {
   id: string;
   client_name: string;
@@ -29,6 +30,12 @@ export default function DealPage() {
   const router = useRouter();
   const [r, setR] = useState<Referral | null>(null);
   const [activity, setActivity] = useState<Activity[]>([]);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [reply, setReply] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [premium, setPremium] = useState("");
+  const [lines, setLines] = useState("");
+  const [dealSaving, setDealSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docKind, setDocKind] = useState("eoi");
@@ -39,15 +46,50 @@ export default function DealPage() {
   const [showLost, setShowLost] = useState(false);
 
   async function load() {
-    const [res, actRes] = await Promise.all([
+    const [res, actRes, msgRes] = await Promise.all([
       fetch(`/api/referrals`),
       fetch(`/api/referrals/${id}/activity`),
+      fetch(`/api/referrals/${id}/messages`),
     ]);
     if (res.ok) {
-      const all: Referral[] = (await res.json()).referrals ?? [];
-      setR(all.find((x) => x.id === id) ?? null);
+      const all: (Referral & { premium?: number | null; policy_lines?: string | null })[] =
+        (await res.json()).referrals ?? [];
+      const found = all.find((x) => x.id === id) ?? null;
+      setR(found);
+      if (found) {
+        setPremium(found.premium != null ? String(found.premium) : "");
+        setLines(found.policy_lines ?? "");
+      }
     }
     if (actRes.ok) setActivity((await actRes.json()).activity ?? []);
+    if (msgRes.ok) setMsgs((await msgRes.json()).messages ?? []);
+  }
+
+  async function saveDealValue(e: React.FormEvent) {
+    e.preventDefault();
+    setDealSaving(true);
+    await fetch(`/api/referrals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ premium, policy_lines: lines }),
+    });
+    setDealSaving(false);
+    load();
+  }
+
+  async function sendReply(e: React.FormEvent) {
+    e.preventDefault();
+    setReplySending(true);
+    const res = await fetch(`/api/referrals/${id}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: reply }),
+    });
+    setReplySending(false);
+    if (res.ok) {
+      setReply("");
+      load();
+    } else alert((await res.json()).error ?? "Failed to send");
   }
   useEffect(() => {
     load();
@@ -231,6 +273,85 @@ export default function DealPage() {
           <p className="text-xs text-ink-muted">
             Partners can download these from their portal once the deal is bound / delivered. The expiration
             date powers renewal-time EOI refresh reminders later — worth filling in for EOI and dec pages.
+          </p>
+        </section>
+
+        {/* Messages with partner */}
+        <section className="card p-6 space-y-3.5">
+          <h2 className="section-label">Messages with {r.partners?.name ?? "partner"}</h2>
+          {msgs.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              No messages yet. Anything you send lands in their portal and their inbox.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {msgs.map((m) => (
+                <div
+                  key={m.id}
+                  className={`text-sm rounded-xl px-3.5 py-2.5 max-w-[85%] ${
+                    m.sender === "agent" ? "bg-brand-light ml-auto" : "bg-slate-100"
+                  }`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5">
+                    {m.sender === "agent" ? "You" : r.partners?.name ?? "Partner"} ·{" "}
+                    {new Date(m.created_at).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                  {m.body}
+                </div>
+              ))}
+            </div>
+          )}
+          <form onSubmit={sendReply} className="flex gap-2">
+            <input
+              className="input"
+              placeholder="Send an update or answer a question…"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              maxLength={2000}
+            />
+            <button className="btn-primary shrink-0" disabled={replySending || !reply.trim()}>
+              {replySending ? "…" : "Send"}
+            </button>
+          </form>
+        </section>
+
+        {/* Deal value */}
+        <section className="card p-6 space-y-3.5">
+          <h2 className="section-label">Deal value</h2>
+          <form onSubmit={saveDealValue} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="block">
+              <span className="text-xs text-ink-muted">Annual premium ($)</span>
+              <input
+                className="input mt-1"
+                placeholder="2400"
+                inputMode="decimal"
+                value={premium}
+                onChange={(e) => setPremium(e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-ink-muted">Lines written</span>
+              <input
+                className="input mt-1"
+                placeholder="Home + Auto"
+                value={lines}
+                onChange={(e) => setLines(e.target.value)}
+              />
+            </label>
+            <div className="flex items-end">
+              <button className="btn-ghost w-full" disabled={dealSaving}>
+                {dealSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </form>
+          <p className="text-xs text-ink-muted">
+            Feeds your Stats page — premium sourced per partner is the number that proves what each
+            relationship is worth. Never shown to partners.
           </p>
         </section>
 

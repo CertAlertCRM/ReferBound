@@ -108,6 +108,19 @@ create table if not exists agent_profile (
 );
 alter table agent_profile enable row level security;
 
+-- Referral message threads + premium tracking (see migration_05)
+create table if not exists messages (
+  id uuid primary key default gen_random_uuid(),
+  referral_id uuid not null references referrals(id) on delete cascade,
+  sender text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_messages_ref on messages(referral_id, created_at);
+alter table messages enable row level security;
+alter table referrals add column if not exists premium numeric;
+alter table referrals add column if not exists policy_lines text;
+
 -- Early-access waitlist (see migration_04)
 create table if not exists waitlist (
   id uuid primary key default gen_random_uuid(),

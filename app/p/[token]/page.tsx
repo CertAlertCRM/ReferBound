@@ -7,6 +7,7 @@ import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@
 import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
 import { PartnerSubmitForm } from "./submit-form";
 import { AutoRefresh } from "./auto-refresh";
+import { ReferralMessages } from "./referral-messages";
 import { DOCS_BUCKET } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,22 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const refs = referrals ?? [];
   const active = refs.filter((r) => !SAFE_STATUSES.includes(r.status) && r.status !== "lost");
   const bound = refs.filter((r) => SAFE_STATUSES.includes(r.status));
+
+  // Message threads for this partner's referrals, grouped per referral.
+  const refIds = refs.map((r) => r.id);
+  const { data: allMessages } = refIds.length
+    ? await db()
+        .from("messages")
+        .select("id, referral_id, sender, body, created_at")
+        .in("referral_id", refIds)
+        .order("created_at", { ascending: true })
+    : { data: [] as any[] };
+  const messagesByRef = new Map<string, any[]>();
+  for (const m of allMessages ?? []) {
+    const list = messagesByRef.get(m.referral_id) ?? [];
+    list.push(m);
+    messagesByRef.set(m.referral_id, list);
+  }
 
   // Prefer the agent's saved profile for partner-facing names; fall back to env config.
   const { data: prof } = await db()
@@ -191,7 +208,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                   </p>
                 )}
 
-                {docs.length > 0 && (
+                {docs.length === 0 ? null : (
                   <div className="mt-3.5 flex flex-wrap gap-2">
                     {docs.map((d) => (
                       <a
@@ -209,6 +226,14 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                     ))}
                   </div>
                 )}
+
+                <ReferralMessages
+                  token={partner.token}
+                  referralId={r.id}
+                  messages={messagesByRef.get(r.id) ?? []}
+                  agentName={agentName}
+                  partnerName={partner.name}
+                />
               </div>
             );
           })}

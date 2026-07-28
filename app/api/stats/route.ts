@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 export async function GET() {
   const s = db();
   const [{ data: referrals }, { data: events }, { data: emails }] = await Promise.all([
-    s.from("referrals").select("id, status, source, log_seconds, created_at"),
+    s.from("referrals").select("id, status, source, log_seconds, created_at, premium, partner_id, partners(name)"),
     s.from("status_events").select("referral_id, status, created_at"),
     s.from("email_log").select("kind, sent, created_at"),
   ]);
@@ -38,9 +38,30 @@ export async function GET() {
   const lost = byStatus["lost"] ?? 0;
   const closed = bound + lost;
 
+  // Premium sourced (bound/delivered deals with a premium recorded), per partner.
+  const SAFE = new Set(["bound", "docs_delivered"]);
+  let premiumTotal = 0;
+  const byPartner = new Map<string, { name: string; premium: number; referred: number; bound: number }>();
+  for (const r of refs as any[]) {
+    const name = r.partners?.name ?? "Unknown";
+    const row = byPartner.get(name) ?? { name, premium: 0, referred: 0, bound: 0 };
+    row.referred++;
+    if (SAFE.has(r.status)) {
+      row.bound++;
+      if (typeof r.premium === "number") {
+        row.premium += r.premium;
+        premiumTotal += r.premium;
+      }
+    }
+    byPartner.set(name, row);
+  }
+  const partnerBreakdown = [...byPartner.values()].sort((a, b) => b.premium - a.premium);
+
   return NextResponse.json({
     total: refs.length,
     byStatus,
+    premiumTotal,
+    partnerBreakdown,
     fromPartnerPortal: refs.filter((r) => r.source === "partner").length,
     avgLogSeconds: avgLog !== null ? Math.round(avgLog * 10) / 10 : null,
     avgHoursToBound: avgHoursToBound !== null ? Math.round(avgHoursToBound * 10) / 10 : null,

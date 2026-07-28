@@ -15,8 +15,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const f of ["client_name", "client_phone", "client_email", "closing_date", "notes", "lost_reason"]) {
+  for (const f of ["client_name", "client_phone", "client_email", "closing_date", "notes", "lost_reason", "policy_lines"]) {
     if (f in body) patch[f] = body[f] === "" ? null : body[f];
+  }
+  if ("premium" in body) {
+    const n = Number(String(body.premium).replace(/[^0-9.]/g, ""));
+    patch.premium = Number.isFinite(n) && n > 0 ? n : null;
   }
 
   let statusChanged = false;

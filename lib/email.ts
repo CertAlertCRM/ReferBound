@@ -6,7 +6,14 @@ import { APP_CONFIG, STATUS_LABELS } from "@/lib/config";
 
 type SendArgs = {
   referralId?: string;
-  kind: "status_update" | "docs_ready" | "new_partner_lead" | "at_risk" | "monthly_summary";
+  kind:
+    | "status_update"
+    | "docs_ready"
+    | "new_partner_lead"
+    | "at_risk"
+    | "monthly_summary"
+    | "message"
+    | "agent_digest";
   to: string[];
   subject: string;
   html: string;
@@ -131,6 +138,47 @@ export function monthlySummaryEmail(
     </table>
     <p style="font-size:15px">${stats.allTimeBound} of your referred clients are covered all-time. Thank you for trusting ${agentName} with them — it never goes unnoticed.</p>
     <p><a href="${portalUrl}" style="color:#1d4ed8">See every referral live in your portal</a></p>
+  `);
+}
+
+export function messageEmail(
+  fromName: string,
+  clientName: string,
+  body: string,
+  linkUrl: string,
+  linkLabel: string
+) {
+  const safeBody = body.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return wrap(`
+    <h2 style="margin:0 0 12px">${fromName} — about ${clientName}</h2>
+    <blockquote style="margin:0;padding:12px 16px;background:#f8fafc;border-left:3px solid #2547eb;border-radius:6px;font-size:15px">${safeBody}</blockquote>
+    <p style="margin-top:16px"><a href="${linkUrl}" style="color:#1d4ed8">${linkLabel}</a></p>
+  `);
+}
+
+export function agentDigestEmail(
+  stale: { name: string; status: string; days: number }[],
+  closingSoon: { name: string; closing: string; status: string }[],
+  appLink: string
+) {
+  const staleHtml = stale.length
+    ? `<h3 style="margin:16px 0 6px;font-size:14px">Needs a touch (no update in 3+ days)</h3>
+       <ul style="margin:0;padding-left:18px;font-size:14px">${stale
+         .map((s) => `<li><strong>${s.name}</strong> — ${s.status}, ${s.days}d since last update</li>`)
+         .join("")}</ul>`
+    : "";
+  const closingHtml = closingSoon.length
+    ? `<h3 style="margin:16px 0 6px;font-size:14px;color:#b91c1c">Closing soon, not bound</h3>
+       <ul style="margin:0;padding-left:18px;font-size:14px">${closingSoon
+         .map((c) => `<li><strong>${c.name}</strong> — closes ${c.closing} (${c.status})</li>`)
+         .join("")}</ul>`
+    : "";
+  return wrap(`
+    <h2 style="margin:0 0 4px">Your ReferLive morning check</h2>
+    <p style="font-size:14px;color:#555;margin:0">Fresh statuses are what keep your partners trusting the portal.</p>
+    ${closingHtml}
+    ${staleHtml}
+    <p style="margin-top:16px"><a href="${appLink}" style="color:#1d4ed8">Open your dashboard</a></p>
   `);
 }
 
