@@ -95,6 +95,19 @@ alter table documents add column if not exists carrier_name text;
 alter table documents add column if not exists effective_start date;
 alter table documents add column if not exists effective_end date;
 
+-- Agent profile (see migration_03)
+create table if not exists agent_profile (
+  id text primary key default 'default',
+  display_name text,
+  agency_name text,
+  office text,
+  phone text,
+  email text,
+  headshot_path text,
+  updated_at timestamptz not null default now()
+);
+alter table agent_profile enable row level security;
+
 -- Private storage bucket for EOI / RCE / dec page uploads
 insert into storage.buckets (id, name, public)
 values ('docs', 'docs', false)

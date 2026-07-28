@@ -46,6 +46,8 @@ function nextStatus(status: string): string | null {
 export default function Dashboard() {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -61,9 +63,18 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const [rRes, pRes] = await Promise.all([fetch("/api/referrals"), fetch("/api/partners")]);
+    const [rRes, pRes, profRes] = await Promise.all([
+      fetch("/api/referrals"),
+      fetch("/api/partners"),
+      fetch("/api/profile"),
+    ]);
     if (rRes.ok) setReferrals((await rRes.json()).referrals ?? []);
     if (pRes.ok) setPartners((await pRes.json()).partners ?? []);
+    if (profRes.ok) {
+      const { profile, headshotUrl } = await profRes.json();
+      setProfileName(profile?.display_name ?? null);
+      setHeadshotUrl(headshotUrl ?? null);
+    }
     setLoading(false);
   }
   useEffect(() => {
@@ -123,6 +134,26 @@ export default function Dashboard() {
     <>
       <TopNav active="referrals" />
       <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Greeting */}
+        {(profileName || headshotUrl) && (
+          <div className="flex items-center gap-3">
+            {headshotUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={headshotUrl}
+                alt=""
+                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-card"
+              />
+            ) : null}
+            <div>
+              <p className="text-lg font-bold tracking-tight leading-tight">
+                Welcome back{profileName ? `, ${profileName.split(" ")[0]}` : ""}
+              </p>
+              <p className="text-xs text-ink-muted">Here&apos;s where your referrals stand.</p>
+            </div>
+          </div>
+        )}
+
         {/* Summary strip */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-5 text-sm text-ink-secondary">

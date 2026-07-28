@@ -69,7 +69,7 @@ export function Wordmark({ size = "text-lg" }: { size?: string }) {
   );
 }
 
-export function TopNav({ active }: { active?: "referrals" | "partners" | "stats" }) {
+export function TopNav({ active }: { active?: "referrals" | "partners" | "stats" | "profile" }) {
   const tab = (href: string, key: string, label: string) => (
     <Link
       href={href}
@@ -90,6 +90,7 @@ export function TopNav({ active }: { active?: "referrals" | "partners" | "stats"
           {tab("/", "referrals", "Referrals")}
           {tab("/partners", "partners", "Partners")}
           {tab("/stats", "stats", "Stats")}
+          {tab("/profile", "profile", "Profile")}
         </nav>
       </div>
     </header>

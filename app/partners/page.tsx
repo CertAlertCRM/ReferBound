@@ -17,6 +17,10 @@ export default function PartnersPage() {
   const [emails, setEmails] = useState("");
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmails, setEditEmails] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   async function load() {
     const res = await fetch("/api/partners");
@@ -46,6 +50,28 @@ export default function PartnersPage() {
     await navigator.clipboard.writeText(`${window.location.origin}/p/${p.token}`);
     setCopied(p.id);
     setTimeout(() => setCopied(null), 1500);
+  }
+
+  function startEdit(p: Partner) {
+    setEditingId(p.id);
+    setEditName(p.name);
+    setEditEmails(p.emails.join(", "));
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    setEditSaving(true);
+    const res = await fetch(`/api/partners/${editingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName, emails: editEmails }),
+    });
+    setEditSaving(false);
+    if (res.ok) {
+      setEditingId(null);
+      load();
+    } else alert((await res.json()).error ?? "Failed to save");
   }
 
   return (
@@ -82,23 +108,64 @@ export default function PartnersPage() {
         <div className="space-y-3">
           {partners.map((p) => (
             <div key={p.id} className="card p-5">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <p className="font-semibold">{p.name}</p>
-                  <p className="text-xs text-ink-muted mt-0.5">
-                    {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
-                    {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
+              {editingId === p.id ? (
+                <form onSubmit={saveEdit} className="space-y-3">
+                  <label className="block">
+                    <span className="section-label">Partner name</span>
+                    <input
+                      className="input mt-1.5"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="section-label">Notification emails (comma-separated)</span>
+                    <input
+                      className="input mt-1.5"
+                      value={editEmails}
+                      onChange={(e) => setEditEmails(e.target.value)}
+                      placeholder="lo@lender.com, processor@lender.com"
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={editSaving}>
+                      {editSaving ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost !px-3 !py-1.5 text-xs"
+                      onClick={() => setEditingId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-xs text-ink-muted">
+                    The magic link stays the same — edits here don&apos;t break anything you&apos;ve already sent.
                   </p>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
+                      {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => startEdit(p)}>
+                      Edit
+                    </button>
+                    <a className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.token}`} target="_blank">
+                      View portal
+                    </a>
+                    <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
+                      {copied === p.id ? "Copied ✓" : "Copy magic link"}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <a className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.token}`} target="_blank">
-                    View portal
-                  </a>
-                  <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
-                    {copied === p.id ? "Copied ✓" : "Copy magic link"}
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           ))}
           {partners.length === 0 && (

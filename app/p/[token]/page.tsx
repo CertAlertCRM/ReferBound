@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/lib/db";
+import { isAgentAuthed } from "@/lib/auth";
 import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
 import { PartnerSubmitForm } from "./submit-form";
@@ -61,8 +63,30 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const active = refs.filter((r) => !SAFE_STATUSES.includes(r.status) && r.status !== "lost");
   const bound = refs.filter((r) => SAFE_STATUSES.includes(r.status));
 
+  // Prefer the agent's saved profile for partner-facing names; fall back to env config.
+  const { data: prof } = await db()
+    .from("agent_profile")
+    .select("display_name, agency_name")
+    .eq("id", "default")
+    .maybeSingle();
+  const agencyName = prof?.agency_name || APP_CONFIG.agencyName;
+  const agentName = prof?.display_name || APP_CONFIG.agentName;
+
+  // Only the logged-in agent sees this — partners never do.
+  const agentView = isAgentAuthed();
+
   return (
     <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
+      {agentView && (
+        <div className="card px-4 py-2.5 flex items-center justify-between bg-brand-light/60 border-brand-200">
+          <p className="text-xs font-medium text-brand-800">
+            You&apos;re viewing this portal as the agent — this bar is invisible to your partner.
+          </p>
+          <Link href="/" className="text-xs font-semibold text-brand hover:text-brand-dark shrink-0">
+            ← Back to dashboard
+          </Link>
+        </div>
+      )}
       {/* Hero header */}
       <header className="card overflow-hidden">
         <div className="bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-6 py-6 text-white">
@@ -71,10 +95,10 @@ export default async function PartnerPortal({ params }: { params: { token: strin
             Live referral tracking
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">
-            {partner.name} <span className="font-normal text-brand-200">×</span> {APP_CONFIG.agencyName}
+            {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
           </h1>
           <p className="text-sm text-brand-100 mt-1.5">
-            Every client you&apos;ve referred to {APP_CONFIG.agentName}, updated in real time. Documents land here the moment policies are bound.
+            Every client you&apos;ve referred to {agentName}, updated in real time. Documents land here the moment policies are bound.
           </p>
         </div>
         <div className="grid grid-cols-3 divide-x divide-slate-100">
@@ -132,7 +156,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
                 {risk && (
                   <p className="mt-3 text-xs font-medium text-red-700 bg-red-50 rounded-lg px-3 py-2">
-                    ⚠ Closing soon and insurance is not yet bound — {APP_CONFIG.agentName} is on it.
+                    ⚠ Closing soon and insurance is not yet bound — {agentName} is on it.
                   </p>
                 )}
 
