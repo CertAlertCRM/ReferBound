@@ -121,6 +121,16 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   // Only the logged-in agent sees this — partners never do.
   const agentView = isAgentAuthed();
 
+  // Active work floats to the top (at-risk first); finished business collapses.
+  const isClosedRef = (r: any) => SAFE_STATUSES.includes(r.status) || r.status === "lost";
+  const openRefs = refs
+    .filter((r) => !isClosedRef(r))
+    .sort(
+      (a, b) =>
+        (isAtRisk(b.closing_date, b.status) ? 1 : 0) - (isAtRisk(a.closing_date, a.status) ? 1 : 0)
+    );
+  const closedRefs = refs.filter(isClosedRef);
+
   return (
     <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
       {agentView && (
@@ -207,7 +217,8 @@ export default async function PartnerPortal({ params }: { params: { token: strin
         </div>
       ) : (
         <div className="space-y-3">
-          {refs.map((r) => {
+          {(() => {
+            const renderCard = (r: any) => {
             const risk = isAtRisk(r.closing_date, r.status);
             const days = daysUntil(r.closing_date);
             const style = STATUS_STYLES[r.status] ?? STATUS_STYLES.new;
@@ -300,7 +311,22 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 />
               </div>
             );
-          })}
+            };
+            return (
+              <>
+                {openRefs.map(renderCard)}
+                {closedRefs.length > 0 && (
+                  <details className="pt-1">
+                    <summary className="cursor-pointer list-none card px-4 py-3 flex items-center justify-between hover:shadow-lift transition-shadow">
+                      <span className="section-label">Completed &amp; past · {closedRefs.length}</span>
+                      <span className="text-xs font-semibold text-brand">Show ▾</span>
+                    </summary>
+                    <div className="space-y-3 mt-3">{closedRefs.map(renderCard)}</div>
+                  </details>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

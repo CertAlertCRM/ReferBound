@@ -267,8 +267,8 @@ export default function Dashboard() {
           <>
             <Section title="Closing soon — not bound" items={groups.risk} advance={advance} busyId={busyId} highlight />
             <Section title="Active" items={groups.active} advance={advance} busyId={busyId} />
-            <Section title="Bound & delivered" items={groups.done} advance={advance} busyId={busyId} />
-            <Section title="Not written" items={groups.lost} advance={advance} busyId={busyId} />
+            <Section title="Bound & delivered" items={groups.done} advance={advance} busyId={busyId} collapsible />
+            <Section title="Not written" items={groups.lost} advance={advance} busyId={busyId} collapsible />
           </>
         )}
       </main>
@@ -282,18 +282,43 @@ function Section({
   advance,
   busyId,
   highlight,
+  collapsible,
 }: {
   title: string;
   items: Referral[];
   advance: (r: Referral) => void;
   busyId: string | null;
   highlight?: boolean;
+  collapsible?: boolean;
 }) {
+  const [open, setOpen] = useState(!collapsible);
   if (items.length === 0) return null;
+  if (collapsible && !open) {
+    return (
+      <section>
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full card px-4 py-3 flex items-center justify-between text-left hover:shadow-lift transition-shadow"
+        >
+          <span className="section-label">
+            {title} · {items.length}
+          </span>
+          <span className="text-xs font-semibold text-brand">Show ▾</span>
+        </button>
+      </section>
+    );
+  }
   return (
     <section className="space-y-2.5">
-      <h2 className={`section-label ${highlight ? "!text-red-600" : ""}`}>
-        {title} · {items.length}
+      <h2 className={`section-label ${highlight ? "!text-red-600" : ""} flex items-center justify-between`}>
+        <span>
+          {title} · {items.length}
+        </span>
+        {collapsible && (
+          <button onClick={() => setOpen(false)} className="text-brand normal-case tracking-normal font-semibold">
+            Hide ▴
+          </button>
+        )}
       </h2>
       <div className="space-y-2.5">
         {items.map((r) => {

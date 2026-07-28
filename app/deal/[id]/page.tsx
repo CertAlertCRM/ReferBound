@@ -40,6 +40,7 @@ export default function DealPage() {
   const [lines, setLines] = useState("");
   const [dealSaving, setDealSaving] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
+  const [showAllMsgs, setShowAllMsgs] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docKind, setDocKind] = useState("eoi");
@@ -296,7 +297,15 @@ export default function DealPage() {
             </p>
           ) : (
             <div className="space-y-2.5">
-              {msgs.map((m) => (
+              {msgs.length > 3 && !showAllMsgs && (
+                <button
+                  onClick={() => setShowAllMsgs(true)}
+                  className="text-xs font-semibold text-brand hover:text-brand-dark"
+                >
+                  Show earlier messages ({msgs.length - 3})
+                </button>
+              )}
+              {(showAllMsgs ? msgs : msgs.slice(-3)).map((m) => (
                 <div
                   key={m.id}
                   className={`text-sm rounded-xl px-3.5 py-2.5 max-w-[85%] ${
