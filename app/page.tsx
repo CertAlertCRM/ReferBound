@@ -143,7 +143,7 @@ export default function Dashboard() {
               <img
                 src={headshotUrl}
                 alt=""
-                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-card"
+                className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-card"
               />
             ) : null}
             <div>

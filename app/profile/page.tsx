@@ -103,10 +103,10 @@ export default function ProfilePage() {
                 <img
                   src={headshotUrl}
                   alt="Headshot"
-                  className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                  className="w-28 h-28 rounded-full object-cover border-2 border-slate-200"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-full bg-brand-light text-brand-700 flex items-center justify-center text-2xl font-bold">
+                <div className="w-28 h-28 rounded-full bg-brand-light text-brand-700 flex items-center justify-center text-3xl font-bold">
                   {(form.display_name || "?").charAt(0).toUpperCase()}
                 </div>
               )}

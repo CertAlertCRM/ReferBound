@@ -164,11 +164,11 @@ export default function PartnersPage() {
                       <img
                         src={p.logoUrl}
                         alt=""
-                        className="w-11 h-11 rounded-lg object-contain bg-white border border-slate-200 p-1"
+                        className="w-16 h-16 rounded-lg object-contain bg-white border border-slate-200 p-1.5"
                       />
                     ) : (
                       <label
-                        className="w-11 h-11 rounded-lg border border-dashed border-slate-300 text-ink-muted flex items-center justify-center text-[9px] font-semibold cursor-pointer hover:border-brand hover:text-brand text-center leading-tight"
+                        className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex items-center justify-center text-[10px] font-semibold cursor-pointer hover:border-brand hover:text-brand text-center leading-tight"
                         title="Upload this partner's logo"
                       >
                         + logo

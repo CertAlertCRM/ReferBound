@@ -148,7 +148,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 <img
                   src={partnerLogoUrl}
                   alt={partner.name}
-                  className="mt-3 h-10 max-w-[180px] object-contain object-left bg-white rounded-lg px-2.5 py-1.5"
+                  className="mt-4 h-16 sm:h-20 max-w-[300px] object-contain object-left bg-white rounded-xl px-4 py-2.5 shadow-lg"
                 />
               )}
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">
@@ -171,7 +171,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
               <img
                 src={headshotUrl}
                 alt={agentName ?? "Agent"}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-white/70 shadow-lg shrink-0"
+                className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-[3px] border-white shadow-xl shrink-0"
               />
             )}
           </div>
