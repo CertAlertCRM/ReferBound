@@ -45,11 +45,15 @@ export default async function PartnerPortal({ params }: { params: { token: strin
     .single();
   if (!partner) notFound();
 
-  const { data: referrals } = await db()
+  const { data: referrals, error: refError } = await db()
     .from("referrals")
     .select("id, client_name, closing_date, status, created_at, documents(id, kind, file_name)")
     .eq("partner_id", partner.id)
     .order("created_at", { ascending: false });
+
+  if (refError) {
+    console.error("Partner portal referral query failed:", refError);
+  }
 
   const refs = referrals ?? [];
   const active = refs.filter((r) => !SAFE_STATUSES.includes(r.status) && r.status !== "lost");
@@ -87,7 +91,12 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
       <PartnerSubmitForm token={partner.token} />
 
-      {refs.length === 0 ? (
+      {refError ? (
+        <div className="card p-6 border-red-200 text-sm">
+          <p className="font-semibold text-red-700">Couldn&apos;t load referrals</p>
+          <p className="text-ink-secondary mt-1 break-all">{refError.message}</p>
+        </div>
+      ) : refs.length === 0 ? (
         <div className="card p-10 text-center text-ink-muted text-sm">No referrals yet.</div>
       ) : (
         <div className="space-y-3">
