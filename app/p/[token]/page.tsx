@@ -73,7 +73,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
   const { data: referrals, error: refError } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, created_at, updated_at, documents(id, kind, file_name)")
+    .select("id, client_name, closing_date, status, created_at, updated_at, documents(id, kind, file_name, uploaded_by)")
     .eq("partner_id", partner.id)
     .order("created_at", { ascending: false });
 
@@ -211,7 +211,12 @@ export default async function PartnerPortal({ params }: { params: { token: strin
             const risk = isAtRisk(r.closing_date, r.status);
             const days = daysUntil(r.closing_date);
             const style = STATUS_STYLES[r.status] ?? STATUS_STYLES.new;
-            const docs = (r.documents ?? []).filter(() => SAFE_STATUSES.includes(r.status));
+            // Agent-delivered docs unlock once the deal is bound; the partner's
+            // own uploads are always visible to them.
+            const docs = (r.documents ?? []).filter(
+              (d: any) => d.uploaded_by !== "partner" && SAFE_STATUSES.includes(r.status)
+            );
+            const partnerDocs = (r.documents ?? []).filter((d: any) => d.uploaded_by === "partner");
             return (
               <div key={r.id} className={`card p-5 ${risk ? "border-red-200" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
@@ -278,6 +283,12 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                       </a>
                     ))}
                   </div>
+                )}
+
+                {partnerDocs.length > 0 && (
+                  <p className="mt-2.5 text-[10px] text-ink-muted">
+                    📎 You sent: {partnerDocs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", ")}
+                  </p>
                 )}
 
                 <ReferralMessages

@@ -36,13 +36,20 @@ export const STATUS_LABELS: Record<string, string> = {
 // Statuses that count as "insurance is done" for closing-risk purposes
 export const SAFE_STATUSES = ["bound", "docs_delivered"];
 
-// Partner-visible document kinds
+// Document kinds. The first group is what the agent delivers; the second is
+// what partners typically send with a referral.
 export const DOC_KINDS: Record<string, string> = {
   eoi: "Evidence of Insurance (EOI)",
   rce: "Replacement Cost Estimator (RCE)",
   dec: "Declarations Page",
+  loan_1003: "Loan application (1003)",
+  hoi_request: "HOI request",
+  mortgagee: "Mortgagee clause / lender info",
   other: "Other document",
 };
+
+// Kinds shown in the partner's upload picker
+export const PARTNER_DOC_KINDS = ["loan_1003", "hoi_request", "mortgagee", "other"] as const;
 
 // Days before closing to raise the at-risk flag
 export const AT_RISK_DAYS = 7;

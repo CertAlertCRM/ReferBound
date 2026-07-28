@@ -6,14 +6,17 @@ import { useParams, useRouter } from "next/navigation";
 import { STATUSES, STATUS_LABELS, DOC_KINDS } from "@/lib/config";
 import { StatusBadge, StatusProgress, TopNav } from "../../components";
 
-type Doc = { id: string; kind: string; file_name: string; created_at: string };
+type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
 type Msg = { id: string; sender: string; body: string; created_at: string };
 type Referral = {
   id: string;
   client_name: string;
+  coborrower_name: string | null;
   client_phone: string | null;
   client_email: string | null;
+  client_dob: string | null;
+  property_address: string | null;
   closing_date: string | null;
   status: string;
   lost_reason: string | null;
@@ -166,7 +169,11 @@ export default function DealPage() {
           </div>
           <StatusProgress status={r.status} />
           <div className="text-sm text-ink-secondary flex flex-wrap gap-x-5 gap-y-1">
+            {r.coborrower_name && <span>👥 Co-borrower: {r.coborrower_name}</span>}
             {r.client_phone && <span>📞 {r.client_phone}</span>}
+            {r.client_email && <span>✉️ {r.client_email}</span>}
+            {r.client_dob && <span>🎂 DOB {r.client_dob}</span>}
+            {r.property_address && <span>📍 {r.property_address}</span>}
             {r.closing_date && <span>🏠 Closes {r.closing_date}</span>}
             {r.log_seconds !== null && (
               <span className="text-ink-muted text-xs self-center">logged in {r.log_seconds}s</span>
@@ -227,6 +234,9 @@ export default function DealPage() {
                   <span>
                     <span className="font-medium">{DOC_KINDS[d.kind] ?? d.kind}</span>
                     <span className="text-ink-muted"> — {d.file_name}</span>
+                    {d.uploaded_by === "partner" && (
+                      <span className="badge bg-brand-light text-brand-700 ml-2">from partner</span>
+                    )}
                   </span>
                   <a
                     className="text-brand font-medium text-xs hover:text-brand-dark"

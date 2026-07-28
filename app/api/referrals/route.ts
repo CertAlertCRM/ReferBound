@@ -5,7 +5,7 @@ import { logActivity } from "@/lib/activity";
 export async function GET() {
   const { data, error } = await db()
     .from("referrals")
-    .select("*, partners(name), documents(id, kind, file_name)")
+    .select("*, partners(name), documents(id, kind, file_name, uploaded_by)")
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ referrals: data });

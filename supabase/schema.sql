@@ -108,6 +108,12 @@ create table if not exists agent_profile (
 );
 alter table agent_profile enable row level security;
 
+-- Richer partner submissions + partner doc uploads (see migration_07)
+alter table referrals add column if not exists coborrower_name text;
+alter table referrals add column if not exists property_address text;
+alter table referrals add column if not exists client_dob date;
+alter table documents add column if not exists uploaded_by text not null default 'agent';
+
 -- Partner logos (see migration_06)
 alter table partners add column if not exists logo_path text;
 

@@ -23,7 +23,11 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .insert({
       partner_id: partner.id,
       client_name: name,
+      coborrower_name: body?.coborrower_name || null,
       client_phone: body?.client_phone || null,
+      client_email: body?.client_email || null,
+      client_dob: body?.client_dob || null,
+      property_address: body?.property_address || null,
       closing_date: body?.closing_date || null,
       notes: body?.notes || null,
       source: "partner",
@@ -36,7 +40,9 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   await logActivity(
     referral.id,
     "referral_submitted",
-    `Referral submitted by ${partner.name} via portal`,
+    `Referral submitted by ${partner.name} via portal${
+      referral.property_address ? ` — ${referral.property_address}` : ""
+    }`,
     "partner"
   );
 
@@ -49,5 +55,5 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     html: newPartnerLeadEmail(referral.client_name, partner.name, appUrl()),
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, referral_id: referral.id });
 }
