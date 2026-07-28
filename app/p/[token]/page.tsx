@@ -58,7 +58,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   noStore(); // opt this render out of every Next.js cache layer — always live data
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, token, logo_path")
+    .select("id, name, token, logo_path, partner_type")
     .eq("token", params.token)
     .single();
   if (!partner) notFound();
@@ -200,7 +200,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
         </div>
       </header>
 
-      <PartnerSubmitForm token={partner.token} />
+      <PartnerSubmitForm token={partner.token} partnerType={partner.partner_type ?? "lender"} />
 
       {refError ? (
         <div className="card p-6 border-red-200 text-sm">

@@ -51,5 +51,14 @@ export const DOC_KINDS: Record<string, string> = {
 // Kinds shown in the partner's upload picker
 export const PARTNER_DOC_KINDS = ["loan_1003", "hoi_request", "mortgagee", "other"] as const;
 
+// Partner types — drives which submission flow their portal shows.
+export const PARTNER_TYPES: Record<string, string> = {
+  lender: "Lender",
+  realtor: "Realtor",
+  cpa: "CPA / Accountant",
+  friend_family: "Friend / Family",
+  other: "Other",
+};
+
 // Days before closing to raise the at-risk flag
 export const AT_RISK_DAYS = 7;

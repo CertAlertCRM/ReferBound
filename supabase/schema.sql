@@ -114,6 +114,9 @@ alter table referrals add column if not exists property_address text;
 alter table referrals add column if not exists client_dob date;
 alter table documents add column if not exists uploaded_by text not null default 'agent';
 
+-- Partner types (see migration_08)
+alter table partners add column if not exists partner_type text not null default 'lender';
+
 -- Partner logos (see migration_06)
 alter table partners add column if not exists logo_path text;
 

@@ -18,19 +18,67 @@ const EMPTY = {
   notes: "",
 };
 
-export function PartnerSubmitForm({ token }: { token: string }) {
+const EXTRACTABLE = /\.(pdf|png|jpe?g)$/i;
+
+export function PartnerSubmitForm({
+  token,
+  partnerType = "lender",
+}: {
+  token: string;
+  partnerType?: string;
+}) {
+  const isLender = partnerType === "lender";
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [done, setDone] = useState(false);
+  const [prefilling, setPrefilling] = useState(false);
+  const [prefillNote, setPrefillNote] = useState<string | null>(null);
   const router = useRouter();
+
+  async function runPrefill(file: File) {
+    setPrefilling(true);
+    setPrefillNote(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/p/${token}/prefill`, { method: "POST", body: fd });
+    setPrefilling(false);
+    if (!res.ok) {
+      setPrefillNote("Couldn't auto-read that document — no problem, fill in the details below.");
+      return;
+    }
+    const { fields } = await res.json();
+    const filled: string[] = [];
+    setForm((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(EMPTY) as (keyof typeof EMPTY)[]) {
+        const v = fields?.[key];
+        if (v && !next[key]) {
+          next[key] = String(v);
+          filled.push(key.replace(/_/g, " "));
+        }
+      }
+      return next;
+    });
+    setPrefillNote(
+      filled.length > 0
+        ? `✓ Filled from ${file.name}: ${filled.join(", ")} — please double-check before sending.`
+        : `Read ${file.name} but didn't find new details — fill in the form below.`
+    );
+  }
 
   function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
-    setFiles((prev) => [...prev, ...picked.map((file) => ({ file, kind: "loan_1003" }))]);
+    setFiles((prev) => [
+      ...prev,
+      ...picked.map((file) => ({ file, kind: isLender ? "loan_1003" : "other" })),
+    ]);
     e.target.value = "";
+    // Auto-fill from the first readable document if the form is still fresh.
+    const candidate = picked.find((f) => EXTRACTABLE.test(f.name));
+    if (candidate && !form.client_name) runPrefill(candidate);
   }
 
   async function submit(e: React.FormEvent) {
@@ -68,6 +116,7 @@ export function PartnerSubmitForm({ token }: { token: string }) {
     setDone(true);
     setForm({ ...EMPTY });
     setFiles([]);
+    setPrefillNote(null);
     setTimeout(() => {
       setDone(false);
       setOpen(false);
@@ -96,6 +145,61 @@ export function PartnerSubmitForm({ token }: { token: string }) {
         <p className="text-emerald-700 font-semibold text-center py-6">Sent ✓ — thank you!</p>
       ) : (
         <>
+          {/* Docs-first: the fast lane */}
+          <div className="rounded-xl border border-dashed border-brand-200 bg-brand-light/40 p-4 space-y-2">
+            <p className="text-sm font-semibold text-brand-800">
+              ⚡ Fastest way:{" "}
+              {isLender
+                ? "upload the 1003 (or any client doc) and we'll fill this form for you"
+                : "have a document with the client's details? Upload it and we'll fill this form for you"}
+            </p>
+            {files.map((f, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{f.file.name}</span>
+                {isLender && (
+                  <select
+                    className="input !w-auto !py-1.5 text-xs"
+                    value={f.kind}
+                    onChange={(e) =>
+                      setFiles(files.map((x, j) => (j === i ? { ...x, kind: e.target.value } : x)))
+                    }
+                  >
+                    {PARTNER_DOC_KINDS.map((k) => (
+                      <option key={k} value={k}>{DOC_KINDS[k]}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  className="text-xs text-ink-muted hover:text-red-600"
+                  onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <label className="btn-ghost cursor-pointer !py-2 text-xs">
+              {prefilling
+                ? "Reading document…"
+                : files.length > 0
+                ? "+ Add another file"
+                : isLender
+                ? "+ Upload 1003 / HOI request / other docs"
+                : "+ Upload a document (optional)"}
+              <input
+                type="file"
+                className="hidden"
+                multiple
+                onChange={addFiles}
+                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                disabled={prefilling}
+              />
+            </label>
+            {prefillNote && <p className="text-xs text-ink-secondary">{prefillNote}</p>}
+          </div>
+
+          {/* Manual fields — type-aware */}
+          <p className="section-label pt-1">{files.length > 0 ? "Confirm the details" : "Or enter the details"}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               className="input"
@@ -103,14 +207,15 @@ export function PartnerSubmitForm({ token }: { token: string }) {
               value={form.client_name}
               onChange={(e) => setForm({ ...form, client_name: e.target.value })}
               required
-              autoFocus
             />
-            <input
-              className="input"
-              placeholder="Co-borrower name (optional)"
-              value={form.coborrower_name}
-              onChange={(e) => setForm({ ...form, coborrower_name: e.target.value })}
-            />
+            {isLender && (
+              <input
+                className="input"
+                placeholder="Co-borrower name (optional)"
+                value={form.coborrower_name}
+                onChange={(e) => setForm({ ...form, coborrower_name: e.target.value })}
+              />
+            )}
             <input
               className="input"
               type="tel"
@@ -136,19 +241,21 @@ export function PartnerSubmitForm({ token }: { token: string }) {
                 onChange={(e) => setForm({ ...form, client_dob: e.target.value })}
               />
             </label>
-            <label className="block text-xs text-ink-muted">
-              Closing date
-              <input
-                type="date"
-                className="input mt-1"
-                value={form.closing_date}
-                onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
-              />
-            </label>
+            {isLender && (
+              <label className="block text-xs text-ink-muted">
+                Closing date
+                <input
+                  type="date"
+                  className="input mt-1"
+                  value={form.closing_date}
+                  onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
+                />
+              </label>
+            )}
           </div>
           <input
             className="input"
-            placeholder="Property address (street, city, state, zip)"
+            placeholder={isLender ? "Property address (street, city, state, zip)" : "Client address (street, city, state, zip)"}
             autoComplete="street-address"
             value={form.property_address}
             onChange={(e) => setForm({ ...form, property_address: e.target.value })}
@@ -160,45 +267,7 @@ export function PartnerSubmitForm({ token }: { token: string }) {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
 
-          {/* Documents */}
-          <div className="border-t border-slate-100 pt-3 space-y-2">
-            <p className="section-label">Documents (optional)</p>
-            {files.map((f, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate">{f.file.name}</span>
-                <select
-                  className="input !w-auto !py-1.5 text-xs"
-                  value={f.kind}
-                  onChange={(e) =>
-                    setFiles(files.map((x, j) => (j === i ? { ...x, kind: e.target.value } : x)))
-                  }
-                >
-                  {PARTNER_DOC_KINDS.map((k) => (
-                    <option key={k} value={k}>{DOC_KINDS[k]}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="text-xs text-ink-muted hover:text-red-600"
-                  onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <label className="btn-ghost cursor-pointer !py-2 text-xs">
-              + Attach files (1003, HOI request, mortgagee info…)
-              <input
-                type="file"
-                className="hidden"
-                multiple
-                onChange={addFiles}
-                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
-              />
-            </label>
-          </div>
-
-          <button className="btn-primary w-full" disabled={busy || !form.client_name.trim()}>
+          <button className="btn-primary w-full" disabled={busy || prefilling || !form.client_name.trim()}>
             {busy ? progress || "Sending…" : "Send referral"}
           </button>
         </>

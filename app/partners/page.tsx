@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
+import { PARTNER_TYPES } from "@/lib/config";
 
 type Partner = {
   id: string;
@@ -9,6 +10,7 @@ type Partner = {
   token: string;
   emails: string[];
   logoUrl: string | null;
+  partner_type: string;
   referrals: { count: number }[];
 };
 
@@ -16,6 +18,8 @@ export default function PartnersPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [name, setName] = useState("");
   const [emails, setEmails] = useState("");
+  const [ptype, setPtype] = useState("lender");
+  const [editType, setEditType] = useState("lender");
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -37,7 +41,7 @@ export default function PartnersPage() {
     const res = await fetch("/api/partners", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, emails }),
+      body: JSON.stringify({ name, emails, partner_type: ptype }),
     });
     setSaving(false);
     if (res.ok) {
@@ -68,6 +72,7 @@ export default function PartnersPage() {
     setEditingId(p.id);
     setEditName(p.name);
     setEditEmails(p.emails.join(", "));
+    setEditType(p.partner_type ?? "lender");
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -77,7 +82,7 @@ export default function PartnersPage() {
     const res = await fetch(`/api/partners/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -106,12 +111,29 @@ export default function PartnersPage() {
             onChange={(e) => setName(e.target.value)}
             required
           />
-          <input
-            className="input"
-            placeholder="Notification emails, comma-separated"
-            value={emails}
-            onChange={(e) => setEmails(e.target.value)}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block">
+              <span className="section-label">Partner type</span>
+              <select className="input mt-1.5" value={ptype} onChange={(e) => setPtype(e.target.value)}>
+                {Object.entries(PARTNER_TYPES).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="section-label">Notification emails</span>
+              <input
+                className="input mt-1.5"
+                placeholder="Comma-separated"
+                value={emails}
+                onChange={(e) => setEmails(e.target.value)}
+              />
+            </label>
+          </div>
+          <p className="text-xs text-ink-muted">
+            The type shapes their portal: lenders get the closing-date + 1003 flow; everyone else gets
+            a simple client-details form.
+          </p>
           <button className="btn-primary" disabled={saving}>
             {saving ? "Adding…" : "Add partner"}
           </button>
@@ -139,6 +161,14 @@ export default function PartnersPage() {
                       onChange={(e) => setEditEmails(e.target.value)}
                       placeholder="lo@lender.com, processor@lender.com"
                     />
+                  </label>
+                  <label className="block">
+                    <span className="section-label">Partner type</span>
+                    <select className="input mt-1.5" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                      {Object.entries(PARTNER_TYPES).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
                   </label>
                   <div className="flex gap-2">
                     <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={editSaving}>
@@ -176,7 +206,12 @@ export default function PartnersPage() {
                       </label>
                     )}
                     <div>
-                      <p className="font-semibold">{p.name}</p>
+                      <p className="font-semibold">
+                        {p.name}{" "}
+                        <span className="badge bg-slate-100 text-slate-600 align-middle ml-1">
+                          {PARTNER_TYPES[p.partner_type] ?? "Lender"}
+                        </span>
+                      </p>
                       <p className="text-xs text-ink-muted mt-0.5">
                         {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
                         {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
