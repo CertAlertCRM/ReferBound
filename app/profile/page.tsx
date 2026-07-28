@@ -15,24 +15,28 @@ const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "
 
 export default function ProfilePage() {
   const [form, setForm] = useState<Profile>(EMPTY);
+  const [baseline, setBaseline] = useState<Profile>(EMPTY);
   const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [saved, setSaved] = useState(false);
+
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
 
   useEffect(() => {
     fetch("/api/profile").then(async (res) => {
       if (res.ok) {
         const { profile, headshotUrl } = await res.json();
         if (profile) {
-          setForm({
+          const loaded = {
             display_name: profile.display_name ?? "",
             agency_name: profile.agency_name ?? "",
             office: profile.office ?? "",
             phone: profile.phone ?? "",
             email: profile.email ?? "",
-          });
+          };
+          setForm(loaded);
+          setBaseline(loaded);
         }
         setHeadshotUrl(headshotUrl);
       }
@@ -50,8 +54,7 @@ export default function ProfilePage() {
     });
     setSaving(false);
     if (res.ok) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setBaseline({ ...form });
     } else {
       alert((await res.json()).error ?? "Failed to save");
     }
@@ -135,8 +138,8 @@ export default function ProfilePage() {
                 {field("phone", "Phone", "(555) 555-5555")}
                 {field("email", "Email", "you@example.com")}
               </div>
-              <button className="btn-primary" disabled={saving}>
-                {saving ? "Saving…" : saved ? "Saved ✓" : "Save profile"}
+              <button className="btn-primary" disabled={saving || !dirty}>
+                {saving ? "Saving…" : dirty ? "Save profile" : "Saved ✓"}
               </button>
             </form>
           </>

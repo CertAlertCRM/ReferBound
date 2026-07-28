@@ -38,7 +38,9 @@ export default function DealPage() {
   const [replySending, setReplySending] = useState(false);
   const [premium, setPremium] = useState("");
   const [lines, setLines] = useState("");
+  const [dealBaseline, setDealBaseline] = useState({ premium: "", lines: "" });
   const [dealSaving, setDealSaving] = useState(false);
+  const dealDirty = premium !== dealBaseline.premium || lines !== dealBaseline.lines;
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [showAllMsgs, setShowAllMsgs] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,8 +64,11 @@ export default function DealPage() {
       const found = all.find((x) => x.id === id) ?? null;
       setR(found);
       if (found) {
-        setPremium(found.premium != null ? String(found.premium) : "");
-        setLines(found.policy_lines ?? "");
+        const p = found.premium != null ? String(found.premium) : "";
+        const l = found.policy_lines ?? "";
+        setPremium(p);
+        setLines(l);
+        setDealBaseline({ premium: p, lines: l });
       }
     }
     if (actRes.ok) setActivity((await actRes.json()).activity ?? []);
@@ -364,8 +369,8 @@ export default function DealPage() {
               />
             </label>
             <div className="flex items-end">
-              <button className="btn-ghost w-full" disabled={dealSaving}>
-                {dealSaving ? "Saving…" : "Save"}
+              <button className="btn-ghost w-full" disabled={dealSaving || !dealDirty}>
+                {dealSaving ? "Saving…" : dealDirty ? "Save" : "Saved ✓"}
               </button>
             </div>
           </form>
