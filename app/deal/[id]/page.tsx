@@ -7,6 +7,7 @@ import { STATUSES, STATUS_LABELS, DOC_KINDS } from "@/lib/config";
 import { StatusBadge, StatusProgress, TopNav } from "../../components";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string };
+type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
 type Referral = {
   id: string;
   client_name: string;
@@ -27,17 +28,26 @@ export default function DealPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [r, setR] = useState<Referral | null>(null);
+  const [activity, setActivity] = useState<Activity[]>([]);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docKind, setDocKind] = useState("eoi");
+  const [docCarrier, setDocCarrier] = useState("");
+  const [docStart, setDocStart] = useState("");
+  const [docEnd, setDocEnd] = useState("");
   const [lostReason, setLostReason] = useState("");
   const [showLost, setShowLost] = useState(false);
 
   async function load() {
-    const res = await fetch(`/api/referrals`);
-    if (!res.ok) return;
-    const all: Referral[] = (await res.json()).referrals ?? [];
-    setR(all.find((x) => x.id === id) ?? null);
+    const [res, actRes] = await Promise.all([
+      fetch(`/api/referrals`),
+      fetch(`/api/referrals/${id}/activity`),
+    ]);
+    if (res.ok) {
+      const all: Referral[] = (await res.json()).referrals ?? [];
+      setR(all.find((x) => x.id === id) ?? null);
+    }
+    if (actRes.ok) setActivity((await actRes.json()).activity ?? []);
   }
   useEffect(() => {
     load();
@@ -64,6 +74,9 @@ export default function DealPage() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("kind", docKind);
+    fd.append("carrier_name", docCarrier);
+    fd.append("effective_start", docStart);
+    fd.append("effective_end", docEnd);
     const res = await fetch(`/api/referrals/${id}/docs`, { method: "POST", body: fd });
     setUploading(false);
     e.target.value = "";
@@ -184,25 +197,79 @@ export default function DealPage() {
               ))}
             </ul>
           )}
-          <div className="flex items-center gap-2">
-            <select className="input max-w-[260px]" value={docKind} onChange={(e) => setDocKind(e.target.value)}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <select className="input" value={docKind} onChange={(e) => setDocKind(e.target.value)}>
               {Object.entries(DOC_KINDS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
-            <label className="btn-ghost cursor-pointer">
-              {uploading ? "Uploading…" : "Upload file"}
-              <input
-                type="file"
-                className="hidden"
-                onChange={upload}
-                disabled={uploading}
-                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-              />
+            <input
+              className="input"
+              placeholder="Carrier (optional)"
+              value={docCarrier}
+              onChange={(e) => setDocCarrier(e.target.value)}
+            />
+            <label className="block text-xs text-ink-muted">
+              Policy effective date
+              <input type="date" className="input mt-1" value={docStart} onChange={(e) => setDocStart(e.target.value)} />
+            </label>
+            <label className="block text-xs text-ink-muted">
+              Policy expiration date
+              <input type="date" className="input mt-1" value={docEnd} onChange={(e) => setDocEnd(e.target.value)} />
             </label>
           </div>
+          <label className="btn-ghost cursor-pointer">
+            {uploading ? "Uploading…" : "Upload file"}
+            <input
+              type="file"
+              className="hidden"
+              onChange={upload}
+              disabled={uploading}
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+            />
+          </label>
           <p className="text-xs text-ink-muted">
-            Partners can download these from their portal once the deal is bound / delivered.
+            Partners can download these from their portal once the deal is bound / delivered. The expiration
+            date powers renewal-time EOI refresh reminders later — worth filling in for EOI and dec pages.
+          </p>
+        </section>
+
+        {/* Activity timeline */}
+        <section className="card p-6 space-y-3.5">
+          <h2 className="section-label">Activity</h2>
+          {activity.length === 0 ? (
+            <p className="text-sm text-ink-muted">No activity recorded yet.</p>
+          ) : (
+            <ol className="relative space-y-4 before:absolute before:left-[5px] before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
+              {activity.map((a) => (
+                <li key={a.id} className="relative pl-5">
+                  <span
+                    className={`absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-white ${
+                      a.actor === "partner"
+                        ? "bg-brand"
+                        : a.actor === "system"
+                        ? "bg-amber-400"
+                        : "bg-slate-400"
+                    }`}
+                  />
+                  <p className="text-sm text-ink">{a.detail}</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    {new Date(a.created_at).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                    {" · "}
+                    {a.actor}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p className="text-xs text-ink-muted">
+            This timeline is append-only — entries can&apos;t be edited or deleted, so it stands as a
+            permanent record of every touch on this referral.
           </p>
         </section>
 

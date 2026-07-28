@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { AT_RISK_DAYS, SAFE_STATUSES } from "@/lib/config";
 import { sendEmail, atRiskEmail } from "@/lib/email";
 import { appUrl, fmtDate } from "@/lib/helpers";
+import { logActivity } from "@/lib/activity";
 
 // Daily check: any referral closing within AT_RISK_DAYS that isn't bound yet
 // triggers one alert email to the agent + partner (deduped to one per day).
@@ -57,6 +58,12 @@ export async function GET(req: NextRequest) {
       subject: `⚠ ${r.client_name} closes ${fmtDate(r.closing_date)} — insurance not bound`,
       html: atRiskEmail(r.client_name, fmtDate(r.closing_date), r.status, portalUrl),
     });
+    await logActivity(
+      r.id,
+      "at_risk_flagged",
+      `Flagged at-risk: closes ${fmtDate(r.closing_date)}, not yet bound`,
+      "system"
+    );
     sent++;
   }
 

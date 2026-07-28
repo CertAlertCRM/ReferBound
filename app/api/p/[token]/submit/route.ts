@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
+import { logActivity } from "@/lib/activity";
 
 // Partner submits a new referral from their magic-link portal. Three fields.
 
@@ -32,6 +33,12 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await db().from("status_events").insert({ referral_id: referral.id, status: "new" });
+  await logActivity(
+    referral.id,
+    "referral_submitted",
+    `Referral submitted by ${partner.name} via portal`,
+    "partner"
+  );
 
   const agentEmail = process.env.AGENT_EMAIL;
   await sendEmail({

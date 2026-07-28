@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
+import { DOC_KINDS } from "@/lib/config";
+import { logActivity } from "@/lib/activity";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const form = await req.formData().catch(() => null);
@@ -20,11 +22,33 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .upload(path, buf, { contentType: file.type || "application/octet-stream" });
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
+  const carrier_name = String(form.get("carrier_name") || "").trim() || null;
+  const effective_start = String(form.get("effective_start") || "").trim() || null;
+  const effective_end = String(form.get("effective_end") || "").trim() || null;
+
   const { data, error } = await db()
     .from("documents")
-    .insert({ referral_id: params.id, kind, file_name: safeName, storage_path: path })
+    .insert({
+      referral_id: params.id,
+      kind,
+      file_name: safeName,
+      storage_path: path,
+      carrier_name,
+      effective_start,
+      effective_end,
+    })
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logActivity(
+    params.id,
+    "document_uploaded",
+    `${DOC_KINDS[kind] ?? kind} uploaded (${safeName})${carrier_name ? ` — ${carrier_name}` : ""}${
+      effective_end ? `, effective through ${effective_end}` : ""
+    }`,
+    "agent"
+  );
+
   return NextResponse.json({ document: data });
 }

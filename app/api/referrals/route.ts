@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logActivity } from "@/lib/activity";
 
 export async function GET() {
   const { data, error } = await db()
@@ -28,5 +29,6 @@ export async function POST(req: NextRequest) {
   const { data, error } = await db().from("referrals").insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await db().from("status_events").insert({ referral_id: data.id, status: "new" });
+  await logActivity(data.id, "lead_logged", `Lead logged for ${data.client_name}`, "agent");
   return NextResponse.json({ referral: data });
 }

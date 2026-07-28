@@ -52,6 +52,21 @@ export async function sendEmail({ referralId, kind, to, subject, html }: SendArg
     log.error = String(e?.message ?? e);
   }
   await db().from("email_log").insert(log);
+
+  if (log.sent && referralId) {
+    // Best-effort activity entry; inline to avoid a circular import.
+    await db()
+      .from("activity_log")
+      .insert({
+        referral_id: referralId,
+        event_type: "email_sent",
+        detail: `Email sent (${recipients.length} recipient${recipients.length === 1 ? "" : "s"}): ${subject}`,
+        actor: "system",
+      })
+      .then(({ error }) => {
+        if (error) console.error("activity log write failed:", error.message);
+      });
+  }
 }
 
 function wrap(body: string): string {

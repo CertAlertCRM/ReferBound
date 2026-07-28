@@ -78,6 +78,23 @@ alter table status_events enable row level security;
 alter table documents enable row level security;
 alter table email_log enable row level security;
 
+-- Append-only activity timeline per referral (see migration_02)
+create table if not exists activity_log (
+  id bigint generated always as identity primary key,
+  referral_id uuid not null references referrals(id) on delete cascade,
+  event_type text not null,
+  detail text,
+  actor text not null default 'agent',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_activity_ref on activity_log(referral_id, created_at desc);
+alter table activity_log enable row level security;
+
+-- Document metadata (see migration_02)
+alter table documents add column if not exists carrier_name text;
+alter table documents add column if not exists effective_start date;
+alter table documents add column if not exists effective_end date;
+
 -- Private storage bucket for EOI / RCE / dec page uploads
 insert into storage.buckets (id, name, public)
 values ('docs', 'docs', false)

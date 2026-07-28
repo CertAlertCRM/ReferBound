@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { STATUSES } from "@/lib/config";
 import { sendEmail, statusUpdateEmail, docsReadyEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
-import { DOC_KINDS } from "@/lib/config";
+import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
+import { logActivity } from "@/lib/activity";
 
 // Partner is notified on these status changes (bound is handled by docs-ready
 // logic too, but a bound email goes out immediately even before docs upload).
@@ -36,6 +37,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (statusChanged) {
     await db().from("status_events").insert({ referral_id: referral.id, status: referral.status });
+    await logActivity(
+      referral.id,
+      "status_changed",
+      `Status set to “${STATUS_LABELS[referral.status] ?? referral.status}”${
+        referral.status === "lost" && referral.lost_reason ? ` — ${referral.lost_reason}` : ""
+      }`,
+      "agent"
+    );
 
     if (NOTIFY_STATUSES.has(referral.status) && referral.partners) {
       const portalUrl = `${appUrl()}/p/${referral.partners.token}`;

@@ -49,7 +49,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
   const { data: referrals, error: refError } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, created_at, documents(id, kind, file_name)")
+    .select("id, client_name, closing_date, status, created_at, updated_at, documents(id, kind, file_name)")
     .eq("partner_id", partner.id)
     .order("created_at", { ascending: false });
 
@@ -117,6 +117,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                       {r.closing_date && (
                         <> · Closing {fmtDate(r.closing_date)}{days !== null && days >= 0 ? ` (${days}d)` : ""}</>
                       )}
+                      {r.updated_at && <> · Updated {fmtDate(r.updated_at)}</>}
                     </p>
                   </div>
                   <span className={`badge ${style.pill}`}>
