@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DOC_KINDS, PARTNER_DOC_KINDS } from "@/lib/config";
+import { formatPhoneInput } from "@/lib/format";
 
 type PendingFile = { file: File; kind: string };
 
@@ -112,13 +113,16 @@ export function PartnerSubmitForm({ token }: { token: string }) {
             />
             <input
               className="input"
-              placeholder="Client phone"
+              type="tel"
+              inputMode="tel"
+              placeholder="Client phone (804-555-1234)"
               value={form.client_phone}
-              onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
+              onChange={(e) => setForm({ ...form, client_phone: formatPhoneInput(e.target.value) })}
             />
             <input
               className="input"
               type="email"
+              inputMode="email"
               placeholder="Client email"
               value={form.client_email}
               onChange={(e) => setForm({ ...form, client_email: e.target.value })}
@@ -144,7 +148,8 @@ export function PartnerSubmitForm({ token }: { token: string }) {
           </div>
           <input
             className="input"
-            placeholder="Property address"
+            placeholder="Property address (street, city, state, zip)"
+            autoComplete="street-address"
             value={form.property_address}
             onChange={(e) => setForm({ ...form, property_address: e.target.value })}
           />

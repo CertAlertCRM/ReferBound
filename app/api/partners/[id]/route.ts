@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { EMAIL_RE } from "@/lib/format";
 
 // Agent-only (protected by middleware): edit a partner's name / notification emails.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -15,8 +16,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("emails" in body) {
     patch.emails = String(body.emails ?? "")
       .split(/[,;\s]+/)
-      .map((e: string) => e.trim())
-      .filter((e: string) => e.includes("@"));
+      .map((e: string) => e.trim().toLowerCase())
+      .filter((e: string) => EMAIL_RE.test(e));
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });

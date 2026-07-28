@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
+import { EMAIL_RE } from "@/lib/format";
 
 export async function GET() {
   const { data, error } = await db()
@@ -28,8 +29,8 @@ export async function POST(req: NextRequest) {
   if (!body?.name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
   const emails = String(body.emails ?? "")
     .split(/[,;\s]+/)
-    .map((e: string) => e.trim())
-    .filter((e: string) => e.includes("@"));
+    .map((e: string) => e.trim().toLowerCase())
+    .filter((e: string) => EMAIL_RE.test(e));
   const { data, error } = await db()
     .from("partners")
     .insert({ name: body.name.trim(), emails })

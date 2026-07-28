@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { STATUSES, STATUS_LABELS } from "@/lib/config";
+import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
 
 type Referral = {
@@ -221,9 +222,11 @@ export default function Dashboard() {
               </select>
               <input
                 className="input"
-                placeholder="Client phone"
+                type="tel"
+                inputMode="tel"
+                placeholder="Client phone (804-555-1234)"
                 value={form.client_phone}
-                onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
+                onChange={(e) => setForm({ ...form, client_phone: formatPhoneInput(e.target.value) })}
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

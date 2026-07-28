@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { logActivity } from "@/lib/activity";
+import { normalizePhone, normalizeEmail, EMAIL_RE } from "@/lib/format";
 
 // Partner submits a new referral from their magic-link portal. Three fields.
 
@@ -18,14 +19,19 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   const name = String(body?.client_name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Client name is required" }, { status: 400 });
 
+  const email = normalizeEmail(body?.client_email);
+  if (email && !EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: "That client email doesn't look right — check the @ and domain." }, { status: 400 });
+  }
+
   const { data: referral, error } = await db()
     .from("referrals")
     .insert({
       partner_id: partner.id,
       client_name: name,
-      coborrower_name: body?.coborrower_name || null,
-      client_phone: body?.client_phone || null,
-      client_email: body?.client_email || null,
+      coborrower_name: String(body?.coborrower_name ?? "").trim() || null,
+      client_phone: normalizePhone(body?.client_phone),
+      client_email: email,
       client_dob: body?.client_dob || null,
       property_address: body?.property_address || null,
       closing_date: body?.closing_date || null,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
+import { formatPhoneInput } from "@/lib/format";
 
 type Profile = {
   display_name: string | null;
@@ -73,17 +74,27 @@ export default function ProfilePage() {
     else alert((await res.json()).error ?? "Upload failed");
   }
 
-  const field = (key: keyof Profile, label: string, placeholder: string) => (
-    <label className="block">
-      <span className="section-label">{label}</span>
-      <input
-        className="input mt-1.5"
-        placeholder={placeholder}
-        value={form[key] ?? ""}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-      />
-    </label>
-  );
+  const field = (key: keyof Profile, label: string, placeholder: string) => {
+    const isPhone = key === "phone";
+    const isEmail = key === "email";
+    const isOffice = key === "office";
+    return (
+      <label className="block">
+        <span className="section-label">{label}</span>
+        <input
+          className="input mt-1.5"
+          type={isPhone ? "tel" : isEmail ? "email" : "text"}
+          inputMode={isPhone ? "tel" : isEmail ? "email" : undefined}
+          autoComplete={isOffice ? "street-address" : undefined}
+          placeholder={placeholder}
+          value={form[key] ?? ""}
+          onChange={(e) =>
+            setForm({ ...form, [key]: isPhone ? formatPhoneInput(e.target.value) : e.target.value })
+          }
+        />
+      </label>
+    );
+  };
 
   return (
     <>
@@ -135,7 +146,7 @@ export default function ProfilePage() {
               </div>
               {field("office", "Office", "Street, city, state")}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {field("phone", "Phone", "(555) 555-5555")}
+                {field("phone", "Phone", "804-555-1234")}
                 {field("email", "Email", "you@example.com")}
               </div>
               <button className="btn-primary" disabled={saving || !dirty}>

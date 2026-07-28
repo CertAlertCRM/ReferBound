@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
+import { normalizePhone, normalizeEmail } from "@/lib/format";
 
 export async function GET() {
   const { data, error } = await db()
@@ -19,8 +20,8 @@ export async function POST(req: NextRequest) {
   const row = {
     partner_id: body.partner_id,
     client_name: String(body.client_name).trim(),
-    client_phone: body.client_phone || null,
-    client_email: body.client_email || null,
+    client_phone: normalizePhone(body.client_phone),
+    client_email: normalizeEmail(body.client_email),
     closing_date: body.closing_date || null,
     notes: body.notes || null,
     source: "agent",
