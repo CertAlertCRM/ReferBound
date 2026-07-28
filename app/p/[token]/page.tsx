@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/lib/db";
 import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
@@ -38,6 +39,7 @@ function Progress({ status }: { status: string }) {
 }
 
 export default async function PartnerPortal({ params }: { params: { token: string } }) {
+  noStore(); // opt this render out of every Next.js cache layer — always live data
   const { data: partner } = await db()
     .from("partners")
     .select("id, name, token")
