@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, DOCS_BUCKET } from "@/lib/db";
 
 export async function GET() {
   const { data, error } = await db()
     .from("partners")
-    .select("id, name, token, emails, created_at, referrals(count)")
+    .select("id, name, token, emails, logo_path, created_at, referrals(count)")
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ partners: data });
+
+  const partners = await Promise.all(
+    (data ?? []).map(async (p) => {
+      let logoUrl: string | null = null;
+      if (p.logo_path) {
+        const { data: signed } = await db()
+          .storage.from(DOCS_BUCKET)
+          .createSignedUrl(p.logo_path, 60 * 60);
+        logoUrl = signed?.signedUrl ?? null;
+      }
+      return { ...p, logoUrl };
+    })
+  );
+  return NextResponse.json({ partners });
 }
 
 export async function POST(req: NextRequest) {

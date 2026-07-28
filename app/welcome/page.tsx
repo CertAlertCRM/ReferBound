@@ -51,6 +51,46 @@ export default function WelcomePage() {
             founding agents.
           </p>
         </div>
+
+        {/* Product preview — what a partner sees */}
+        <div className="mt-12 max-w-lg mx-auto text-left">
+          <div className="card overflow-hidden shadow-lift">
+            <div className="bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-5 py-4 text-white">
+              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-brand-100">
+                <span className="live-dot" aria-hidden />
+                Live referral tracking
+              </div>
+              <p className="text-base font-bold tracking-tight mt-1.5">
+                Summit Home Loans <span className="font-normal text-brand-200">×</span> Your Agency
+              </p>
+            </div>
+            <div className="p-4 space-y-2.5">
+              {[
+                { name: "Jordan M.", meta: "Closing Aug 14 (9d)", pill: "Bound ✓", pillCls: "bg-emerald-50 text-emerald-700", segs: 6, done: true },
+                { name: "Riley T.", meta: "Closing Aug 22 (17d)", pill: "Quoted", pillCls: "bg-blue-50 text-blue-700", segs: 3 },
+                { name: "Casey B.", meta: "Referred yesterday", pill: "Working on quote", pillCls: "bg-amber-50 text-amber-700", segs: 2 },
+              ].map((d) => (
+                <div key={d.name} className="rounded-xl border border-slate-100 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{d.name}</p>
+                      <p className="text-[10px] text-ink-muted">{d.meta}</p>
+                    </div>
+                    <span className={`badge ${d.pillCls}`}>{d.pill}</span>
+                  </div>
+                  <div className="flex gap-1 mt-2.5">
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <div key={i} className={`seg ${i < d.segs ? (d.done ? "seg-done" : "seg-filled") : ""}`} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="text-center text-xs text-ink-muted mt-3">
+            ↑ What your lending partner sees — live, from one link, no login.
+          </p>
+        </div>
       </section>
 
       {/* Features */}

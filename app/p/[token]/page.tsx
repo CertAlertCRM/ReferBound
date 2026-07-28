@@ -12,6 +12,17 @@ import { DOCS_BUCKET } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({ params }: { params: { token: string } }) {
+  const { data: partner } = await db()
+    .from("partners")
+    .select("name")
+    .eq("token", params.token)
+    .maybeSingle();
+  return {
+    title: partner ? `${partner.name} — Live Referral Portal` : "Referral Portal",
+  };
+}
+
 const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
   new: { pill: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
   quoting: { pill: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
@@ -47,10 +58,18 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   noStore(); // opt this render out of every Next.js cache layer — always live data
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, token")
+    .select("id, name, token, logo_path")
     .eq("token", params.token)
     .single();
   if (!partner) notFound();
+
+  let partnerLogoUrl: string | null = null;
+  if (partner.logo_path) {
+    const { data: signed } = await db()
+      .storage.from(DOCS_BUCKET)
+      .createSignedUrl(partner.logo_path, 60 * 60);
+    partnerLogoUrl = signed?.signedUrl ?? null;
+  }
 
   const { data: referrals, error: refError } = await db()
     .from("referrals")
@@ -124,6 +143,14 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 <span className="live-dot" aria-hidden />
                 Live referral tracking
               </div>
+              {partnerLogoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={partnerLogoUrl}
+                  alt={partner.name}
+                  className="mt-3 h-10 max-w-[180px] object-contain object-left bg-white rounded-lg px-2.5 py-1.5"
+                />
+              )}
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">
                 {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
               </h1>
@@ -171,7 +198,13 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           <p className="text-ink-secondary mt-1 break-all">{refError.message}</p>
         </div>
       ) : refs.length === 0 ? (
-        <div className="card p-10 text-center text-ink-muted text-sm">No referrals yet.</div>
+        <div className="card p-10 text-center">
+          <p className="font-semibold">Your referrals will appear here</p>
+          <p className="text-sm text-ink-secondary mt-1.5 max-w-sm mx-auto">
+            The moment {agentName} logs a client you&apos;ve sent — or you submit one above — it shows
+            up here with live status the whole way to bound.
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {refs.map((r) => {
@@ -200,6 +233,26 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
                 <div className="mt-3.5">
                   <Progress status={r.status} />
+                  {r.status !== "lost" && (
+                    <p className="mt-1.5 text-[10px] text-ink-muted">
+                      {SAFE_STATUSES.includes(r.status) ? (
+                        <span className="text-emerald-600 font-semibold">
+                          {STATUS_LABELS[r.status]} — all set
+                        </span>
+                      ) : (
+                        <>
+                          Now: <span className="font-semibold text-ink-secondary">{STATUS_LABELS[r.status]}</span>
+                          {STATUSES.indexOf(r.status as (typeof STATUSES)[number]) >= 0 &&
+                            STATUSES.indexOf(r.status as (typeof STATUSES)[number]) < STATUSES.length - 1 && (
+                              <>
+                                {" "}· Next:{" "}
+                                {STATUS_LABELS[STATUSES[STATUSES.indexOf(r.status as (typeof STATUSES)[number]) + 1]]}
+                              </>
+                            )}
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 {risk && (

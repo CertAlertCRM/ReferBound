@@ -8,6 +8,7 @@ type Partner = {
   name: string;
   token: string;
   emails: string[];
+  logoUrl: string | null;
   referrals: { count: number }[];
 };
 
@@ -50,6 +51,17 @@ export default function PartnersPage() {
     await navigator.clipboard.writeText(`${window.location.origin}/p/${p.token}`);
     setCopied(p.id);
     setTimeout(() => setCopied(null), 1500);
+  }
+
+  async function uploadLogo(p: Partner, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/partners/${p.id}/logo`, { method: "POST", body: fd });
+    e.target.value = "";
+    if (res.ok) load();
+    else alert((await res.json()).error ?? "Upload failed");
   }
 
   function startEdit(p: Partner) {
@@ -146,12 +158,39 @@ export default function PartnersPage() {
                 </form>
               ) : (
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="font-semibold">{p.name}</p>
-                    <p className="text-xs text-ink-muted mt-0.5">
-                      {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
-                      {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    {p.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.logoUrl}
+                        alt=""
+                        className="w-11 h-11 rounded-lg object-contain bg-white border border-slate-200 p-1"
+                      />
+                    ) : (
+                      <label
+                        className="w-11 h-11 rounded-lg border border-dashed border-slate-300 text-ink-muted flex items-center justify-center text-[9px] font-semibold cursor-pointer hover:border-brand hover:text-brand text-center leading-tight"
+                        title="Upload this partner's logo"
+                      >
+                        + logo
+                        <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
+                      </label>
+                    )}
+                    <div>
+                      <p className="font-semibold">{p.name}</p>
+                      <p className="text-xs text-ink-muted mt-0.5">
+                        {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
+                        {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
+                        {p.logoUrl && (
+                          <>
+                            {" · "}
+                            <label className="text-brand cursor-pointer hover:underline">
+                              replace logo
+                              <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
+                            </label>
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => startEdit(p)}>

@@ -55,7 +55,7 @@ export async function GET() {
     }
     byPartner.set(name, row);
   }
-  const partnerBreakdown = [...byPartner.values()].sort((a, b) => b.premium - a.premium);
+  const partnerBreakdown = Array.from(byPartner.values()).sort((a, b) => b.premium - a.premium);
 
   return NextResponse.json({
     total: refs.length,

@@ -108,6 +108,9 @@ create table if not exists agent_profile (
 );
 alter table agent_profile enable row level security;
 
+-- Partner logos (see migration_06)
+alter table partners add column if not exists logo_path text;
+
 -- Referral message threads + premium tracking (see migration_05)
 create table if not exists messages (
   id uuid primary key default gen_random_uuid(),

@@ -13,6 +13,7 @@ type Referral = {
   status: string;
   source: string;
   created_at: string;
+  premium: number | null;
   partners: { name: string } | null;
   documents: { id: string; kind: string }[];
 };
@@ -154,14 +155,32 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Summary strip */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex gap-5 text-sm text-ink-secondary">
-            <span><strong className="text-ink text-base">{inProgress}</strong> in progress</span>
-            <span><strong className="text-ink text-base">{groups.risk.length}</strong> closing soon</span>
-            <span><strong className="text-ink text-base">{groups.done.length}</strong> bound</span>
+        {/* Stat tiles */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1">
+            {[
+              { v: String(inProgress), l: "In progress" },
+              { v: String(groups.risk.length), l: "Closing soon", alert: groups.risk.length > 0 },
+              { v: String(groups.done.length), l: "Bound" },
+              {
+                v: (() => {
+                  const p = referrals
+                    .filter((r) => ["bound", "docs_delivered"].includes(r.status))
+                    .reduce((a, r) => a + (r.premium ?? 0), 0);
+                  return p > 0 ? `$${Math.round(p).toLocaleString()}` : "$0";
+                })(),
+                l: "Premium sourced",
+              },
+            ].map((t) => (
+              <div key={t.l} className={`card px-4 py-3 ${t.alert ? "border-red-200" : ""}`}>
+                <p className={`text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
+                  {t.v}
+                </p>
+                <p className="text-[11px] text-ink-muted mt-0.5">{t.l}</p>
+              </div>
+            ))}
           </div>
-          <button onClick={openAdd} className="btn-primary">+ Log lead</button>
+          <button onClick={openAdd} className="btn-primary shrink-0">+ Log lead</button>
         </div>
 
         {showAdd && (
@@ -227,7 +246,15 @@ export default function Dashboard() {
         )}
 
         {loading ? (
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <div className="space-y-2.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="card p-4 animate-pulse">
+                <div className="h-4 w-40 bg-slate-200 rounded" />
+                <div className="h-3 w-64 bg-slate-100 rounded mt-2.5" />
+                <div className="h-1.5 w-full bg-slate-100 rounded mt-3.5" />
+              </div>
+            ))}
+          </div>
         ) : referrals.length === 0 ? (
           <div className="card p-10 text-center space-y-2">
             <p className="font-semibold">No referrals yet</p>
