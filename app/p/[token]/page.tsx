@@ -279,7 +279,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
                 {docs.length === 0 ? null : (
                   <div className="mt-3.5 flex flex-wrap gap-2">
-                    {docs.map((d) => (
+                    {docs.map((d: any) => (
                       <a
                         key={d.id}
                         href={`/api/docs/${d.id}/download?t=${partner.token}`}
