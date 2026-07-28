@@ -39,6 +39,7 @@ export default function DealPage() {
   const [premium, setPremium] = useState("");
   const [lines, setLines] = useState("");
   const [dealSaving, setDealSaving] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docKind, setDocKind] = useState("eoi");
@@ -365,14 +366,24 @@ export default function DealPage() {
           </p>
         </section>
 
-        {/* Activity timeline */}
+        {/* Activity timeline — latest entry up front, full history on demand */}
         <section className="card p-6 space-y-3.5">
-          <h2 className="section-label">Activity</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="section-label">Latest activity</h2>
+            {activity.length > 1 && (
+              <button
+                onClick={() => setShowAllActivity(!showAllActivity)}
+                className="text-xs font-semibold text-brand hover:text-brand-dark"
+              >
+                {showAllActivity ? "Show less" : `Full history (${activity.length - 1} more)`}
+              </button>
+            )}
+          </div>
           {activity.length === 0 ? (
             <p className="text-sm text-ink-muted">No activity recorded yet.</p>
           ) : (
             <ol className="relative space-y-4 before:absolute before:left-[5px] before:top-1 before:bottom-1 before:w-px before:bg-slate-200">
-              {activity.map((a) => (
+              {(showAllActivity ? activity : activity.slice(0, 1)).map((a) => (
                 <li key={a.id} className="relative pl-5">
                   <span
                     className={`absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-white ${
