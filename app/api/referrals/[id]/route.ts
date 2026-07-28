@@ -6,9 +6,12 @@ import { appUrl } from "@/lib/helpers";
 import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
 
-// Partner is notified on these status changes (bound is handled by docs-ready
-// logic too, but a bound email goes out immediately even before docs upload).
-const NOTIFY_STATUSES = new Set(["quoted", "bound", "docs_delivered", "lost"]);
+// Partner email cadence is deliberately sparse to avoid notification fatigue:
+// one email at "quoted" (we're on it), then ONE combined email at
+// "docs_delivered" (bound + documents ready together). Marking "bound" sends
+// nothing — it's the agent's cue to upload EOI/RCE, and the portal shows the
+// bound status live for anyone who looks.
+const NOTIFY_STATUSES = new Set(["quoted", "docs_delivered"]);
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json().catch(() => null);

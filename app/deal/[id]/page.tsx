@@ -106,6 +106,12 @@ export default function DealPage() {
   }, [id]);
 
   async function setStatus(status: string, extra: Record<string, unknown> = {}) {
+    if (status === "docs_delivered" && r && r.documents.length === 0) {
+      const ok = confirm(
+        "No documents are uploaded yet, but this sends the partner their one “bound + documents ready” email. Upload the EOI/RCE first, or continue anyway?"
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     const res = await fetch(`/api/referrals/${id}`, {
       method: "PATCH",
@@ -224,9 +230,12 @@ export default function DealPage() {
               </button>
             </div>
           )}
-          {r.status === "bound" && !hasEoi && (
+          {r.status === "bound" && (
             <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-              Bound — upload the EOI (and RCE) below, then mark “EOI &amp; docs delivered” to notify {r.partners?.name}.
+              Bound ✓ — no email has gone to {r.partners?.name} yet.{" "}
+              {hasEoi
+                ? "Docs are uploaded — mark “EOI & docs delivered” to send their one combined bound + documents email."
+                : "Upload the EOI (and RCE) below, then mark “EOI & docs delivered” to send their one combined bound + documents email."}
             </p>
           )}
         </section>

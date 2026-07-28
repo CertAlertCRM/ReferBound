@@ -109,6 +109,12 @@ export default function Dashboard() {
   async function advance(r: Referral) {
     const ns = nextStatus(r.status);
     if (!ns) return;
+    if (ns === "docs_delivered" && (r.documents?.length ?? 0) === 0) {
+      const ok = confirm(
+        "No documents are uploaded yet, but this sends the partner their one “bound + documents ready” email. Open the deal to upload the EOI/RCE first, or continue anyway?"
+      );
+      if (!ok) return;
+    }
     setBusyId(r.id);
     await fetch(`/api/referrals/${r.id}`, {
       method: "PATCH",
