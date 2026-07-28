@@ -174,7 +174,7 @@ export function agentDigestEmail(
          .join("")}</ul>`
     : "";
   return wrap(`
-    <h2 style="margin:0 0 4px">Your ReferLive morning check</h2>
+    <h2 style="margin:0 0 4px">Your ReferBound morning check</h2>
     <p style="font-size:14px;color:#555;margin:0">Fresh statuses are what keep your partners trusting the portal.</p>
     ${closingHtml}
     ${staleHtml}

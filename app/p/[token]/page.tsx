@@ -339,7 +339,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
       <footer className="text-center text-xs text-ink-muted pt-4 pb-8">
         <a href="/" className="hover:underline">
-          Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Live</span></span>
+          Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Bound</span></span>
         </a>
         {" · "}Statuses update in real time
         <span className="block mt-1">

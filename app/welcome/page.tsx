@@ -5,7 +5,7 @@ import { WaitlistForm } from "./waitlist-form";
 // the middleware; the logged-in agent still sees their dashboard at "/".
 
 export const metadata = {
-  title: "ReferLive — Live referral tracking for insurance agents",
+  title: "ReferBound — Live referral tracking for insurance agents",
   description:
     "Give your realtor, lender, and CPA partners a live window into every client they send you. Status updates, instant EOI delivery, closing-date protection.",
 };
@@ -40,7 +40,7 @@ export default function WelcomePage() {
           <span className="text-brand">&ldquo;any update?&rdquo;</span>
         </h1>
         <p className="mt-4 text-lg text-ink-secondary max-w-xl mx-auto">
-          ReferLive gives insurance agents a live referral portal for their lender, realtor, and CPA
+          ReferBound gives insurance agents a live referral portal for their lender, realtor, and CPA
           partners — status on every client, documents the moment policies bind, and closings that
           never slip quietly.
         </p>
@@ -129,7 +129,7 @@ export default function WelcomePage() {
       </section>
 
       <footer className="text-center text-xs text-ink-muted pb-10">
-        © 2026 ReferLive · Built by agents, for agents
+        © 2026 ReferBound · Built by agents, for agents
         <span className="block mt-1">
           <a href="/login" className="hover:underline">
             Agent sign-in

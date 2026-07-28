@@ -1,4 +1,4 @@
-# ReferLive — Referral Partner Portal (Pilot)
+# ReferBound — Referral Partner Portal (Pilot)
 
 Real-time referral tracking between an insurance agent and their lending partners.
 Built for the Cowart Home Loans pilot.

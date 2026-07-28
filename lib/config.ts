@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   // The agent's display name, shown to partners
   agentName: process.env.NEXT_PUBLIC_AGENT_NAME || "Your Agent",
   // Product working title (footer "powered by")
-  productName: process.env.NEXT_PUBLIC_PRODUCT_NAME || "ReferLive",
+  productName: process.env.NEXT_PUBLIC_PRODUCT_NAME || "ReferBound",
 };
 
 // Pipeline statuses, in order. "lost" is reachable from any status.

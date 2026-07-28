@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         await sendEmail({
           kind: "agent_digest",
           to: [agentEmail],
-          subject: `ReferLive check: ${closingSoon.length} closing soon, ${stale.length} need a touch`,
+          subject: `ReferBound check: ${closingSoon.length} closing soon, ${stale.length} need a touch`,
           html: agentDigestEmail(stale, closingSoon, appUrl()),
         });
         digestSent = true;

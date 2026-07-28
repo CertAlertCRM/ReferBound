@@ -62,7 +62,7 @@ export function Wordmark({ size = "text-lg" }: { size?: string }) {
   return (
     <span className={`font-bold tracking-tight ${size} inline-flex items-center gap-2`}>
       <span>
-        Refer<span className="text-brand">Live</span>
+        Refer<span className="text-brand">Bound</span>
       </span>
       <span className="live-dot" aria-hidden />
     </span>

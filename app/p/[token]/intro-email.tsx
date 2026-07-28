@@ -129,7 +129,7 @@ export function IntroEmail({
           <p className="text-[10px] text-ink-muted">
             Opens in your own email app addressed to{" "}
             {clientEmail ? "your client (agent cc'd)" : "the agent — add your client's address before sending"}. Edit
-            anything first; it sends from you, not from ReferLive.
+            anything first; it sends from you, not from ReferBound.
           </p>
           {note && <p className="text-xs text-emerald-700">{note}</p>}
         </>
