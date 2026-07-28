@@ -117,6 +117,9 @@ alter table documents add column if not exists uploaded_by text not null default
 -- Partner types (see migration_08)
 alter table partners add column if not exists partner_type text not null default 'lender';
 
+-- Partner intro-email templates (see migration_09)
+alter table partners add column if not exists intro_template text;
+
 -- Partner logos (see migration_06)
 alter table partners add column if not exists logo_path text;
 

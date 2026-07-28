@@ -142,7 +142,13 @@ export function PartnerSubmitForm({
       </div>
 
       {done ? (
-        <p className="text-emerald-700 font-semibold text-center py-6">Sent ✓ — thank you!</p>
+        <div className="text-center py-6 space-y-1.5">
+          <p className="text-emerald-700 font-semibold">Sent ✓ — thank you!</p>
+          <p className="text-xs text-ink-secondary">
+            Tip: tap <span className="font-semibold">✉️ Intro email</span> on the new card below to connect
+            your client and the agent in one step.
+          </p>
+        </div>
       ) : (
         <>
           {/* Docs-first: the fast lane */}

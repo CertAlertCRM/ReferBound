@@ -8,6 +8,7 @@ import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
 import { PartnerSubmitForm } from "./submit-form";
 import { AutoRefresh } from "./auto-refresh";
 import { ReferralMessages } from "./referral-messages";
+import { IntroEmail } from "./intro-email";
 import { DOCS_BUCKET } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -300,6 +301,12 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                   <p className="mt-2.5 text-[10px] text-ink-muted">
                     📎 You sent: {partnerDocs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", ")}
                   </p>
+                )}
+
+                {r.status !== "lost" && (
+                  <div className="mt-3">
+                    <IntroEmail token={partner.token} referralId={r.id} clientName={r.client_name} />
+                  </div>
                 )}
 
                 <ReferralMessages
