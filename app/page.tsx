@@ -538,6 +538,15 @@ function GettingStarted({ profileDone, partnerDone }: { profileDone: boolean; pa
         </button>{" "}
         with the button above.
       </p>
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-sm font-semibold">📱 Put ReferBound on your phone</p>
+        <p className="text-xs text-ink-secondary mt-1">
+          It installs like an app — no app store needed. <span className="font-medium text-ink">iPhone:</span>{" "}
+          open referbound.com in Safari → Share → Add to Home Screen.{" "}
+          <span className="font-medium text-ink">Android:</span> Chrome shows an Install button in
+          the address bar.
+        </p>
+      </div>
     </div>
   );
 }

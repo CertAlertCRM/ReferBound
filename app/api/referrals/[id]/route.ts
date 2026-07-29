@@ -7,6 +7,7 @@ import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
 import { getAccount } from "@/lib/account";
 import { fireWebhook } from "@/lib/webhook";
+import { sendSms } from "@/lib/sms";
 
 // Partner email cadence is deliberately sparse to avoid notification fatigue:
 // one email at "quoted" (we're on it), then ONE combined email at
@@ -43,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", params.id)
     .eq("account_id", account.id)
-    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email), documents(kind, file_name)")
+    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in), documents(kind, file_name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -88,6 +89,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       // "lost" is intentionally not emailed to the partner in the pilot —
       // that conversation deserves a personal touch. It's logged either way.
+
+      // Opt-in text to the contact who sent this lead, at the two moments
+      // LOs actually care about: quote's out, and docs are ready.
+      const contact = (referral as any).partner_contacts;
+      if (contact?.sms_opt_in && contact?.phone) {
+        await sendSms({
+          referralId: referral.id,
+          kind: `status_${referral.status}`,
+          to: contact.phone,
+          body:
+            referral.status === "docs_delivered"
+              ? `ReferBound: ${referral.client_name} is bound — insurance docs are ready on your portal: ${portalUrl}`
+              : `ReferBound: ${referral.client_name} has been quoted. Live status: ${portalUrl}`,
+        });
+      }
     }
   }
 

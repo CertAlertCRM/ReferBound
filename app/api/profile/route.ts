@@ -42,6 +42,7 @@ export async function PUT(req: NextRequest) {
   for (const f of ["display_name", "agency_name", "office", "phone", "email", "google_review_url"]) {
     if (f in body) row[f] = String(body[f] ?? "").trim() || null;
   }
+  if ("sms_new_lead" in body) row.sms_new_lead = Boolean(body.sms_new_lead);
 
   const { data, error } = await db().from("agent_profile").upsert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

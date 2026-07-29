@@ -36,6 +36,8 @@ export function PartnerSubmitForm({
   const [senderId, setSenderId] = useState<string>("");
   const [senderName, setSenderName] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [senderSms, setSenderSms] = useState(false);
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(`rb_sender_${token}`);
@@ -104,7 +106,12 @@ export function PartnerSubmitForm({
       senderId && senderId !== "new"
         ? { sender_contact_id: senderId }
         : senderName.trim() && senderEmail.trim()
-          ? { sender_name: senderName, sender_email: senderEmail }
+          ? {
+              sender_name: senderName,
+              sender_email: senderEmail,
+              sender_phone: senderPhone || undefined,
+              sender_sms_opt_in: senderSms,
+            }
           : {};
     const res = await fetch(`/api/p/${token}/submit`, {
       method: "POST",
@@ -340,9 +347,30 @@ export function PartnerSubmitForm({
                     value={senderEmail}
                     onChange={(e) => setSenderEmail(e.target.value)}
                   />
+                  <input
+                    className="input !py-2 text-sm"
+                    type="tel"
+                    placeholder="Mobile (optional, for texts)"
+                    value={senderPhone}
+                    onChange={(e) => setSenderPhone(formatPhoneInput(e.target.value))}
+                  />
                 </div>
               )}
             </div>
+            {senderId === "new" && senderPhone && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-brand"
+                  checked={senderSms}
+                  onChange={(e) => setSenderSms(e.target.checked)}
+                />
+                <span className="text-[11px] text-ink-secondary">
+                  Text me when my referrals are quoted and when documents are ready. Msg &amp; data
+                  rates may apply; reply STOP anytime to opt out.
+                </span>
+              </label>
+            )}
           </div>
 
           <button className="btn-primary w-full" disabled={busy || prefilling || !form.client_name.trim()}>

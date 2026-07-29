@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data, error } = await db()
     .from("partner_contacts")
-    .select("id, name, email, role, created_at")
+    .select("id, name, email, role, phone, sms_opt_in, created_at")
     .eq("partner_id", params.id)
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -41,14 +41,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const name = String(body?.name ?? "").trim();
   const email = normalizeEmail(body?.email);
   const role = String(body?.role ?? "").trim() || null;
+  const phone = String(body?.phone ?? "").trim() || null;
+  const sms_opt_in = Boolean(body?.sms_opt_in) && Boolean(phone);
   if (!name || !email || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Name and a valid email are required" }, { status: 400 });
   }
 
   const { data, error } = await db()
     .from("partner_contacts")
-    .insert({ partner_id: params.id, name, email, role })
-    .select("id, name, email, role")
+    .insert({ partner_id: params.id, name, email, role, phone, sms_opt_in })
+    .select("id, name, email, role, phone, sms_opt_in")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ contact: data });

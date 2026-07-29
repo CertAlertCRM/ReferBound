@@ -60,10 +60,14 @@ export default function PartnerWorkspacePage() {
   const [editRecap, setEditRecap] = useState(true);
   const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
-  const [contacts, setContacts] = useState<{ id: string; name: string; email: string; role: string | null }[]>([]);
+  const [contacts, setContacts] = useState<
+    { id: string; name: string; email: string; role: string | null; phone?: string | null; sms_opt_in?: boolean }[]
+  >([]);
   const [cName, setCName] = useState("");
   const [cEmail, setCEmail] = useState("");
   const [cRole, setCRole] = useState("");
+  const [cPhone, setCPhone] = useState("");
+  const [cSms, setCSms] = useState(false);
   const [cBusy, setCBusy] = useState(false);
   const [missing, setMissing] = useState(false);
   const [refs, setRefs] = useState<Referral[]>([]);
@@ -205,13 +209,15 @@ export default function PartnerWorkspacePage() {
     const res = await fetch(`/api/partners/${id}/contacts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: cName, email: cEmail, role: cRole }),
+      body: JSON.stringify({ name: cName, email: cEmail, role: cRole, phone: cPhone, sms_opt_in: cSms }),
     });
     setCBusy(false);
     if (res.ok) {
       setCName("");
       setCEmail("");
       setCRole("");
+      setCPhone("");
+      setCSms(false);
       const { contact } = await res.json();
       setContacts((c) => [...c, contact]);
     } else alert((await res.json()).error ?? "Couldn't add contact");
@@ -429,12 +435,23 @@ export default function PartnerWorkspacePage() {
                         ))}
                       </ul>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px_auto] gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input className="input !py-2 text-sm" placeholder="Name" value={cName} onChange={(e) => setCName(e.target.value)} />
                       <input className="input !py-2 text-sm" type="email" placeholder="Email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} />
-                      <input className="input !py-2 text-sm" placeholder="Role (LO…)" value={cRole} onChange={(e) => setCRole(e.target.value)} />
+                      <input className="input !py-2 text-sm" placeholder="Role (LO, processor…)" value={cRole} onChange={(e) => setCRole(e.target.value)} />
+                      <input className="input !py-2 text-sm" type="tel" placeholder="Mobile (optional)" value={cPhone} onChange={(e) => setCPhone(formatPhoneInput(e.target.value))} />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      {cPhone ? (
+                        <label className="flex items-center gap-2 cursor-pointer text-[11px] text-ink-secondary">
+                          <input type="checkbox" className="accent-brand" checked={cSms} onChange={(e) => setCSms(e.target.checked)} />
+                          Text them at quote &amp; docs-ready (only with their OK)
+                        </label>
+                      ) : (
+                        <span />
+                      )}
                       <button type="button" className="btn-ghost !py-2 text-xs" onClick={addContact} disabled={cBusy}>
-                        {cBusy ? "…" : "Add"}
+                        {cBusy ? "…" : "Add contact"}
                       </button>
                     </div>
                   </div>

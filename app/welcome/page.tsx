@@ -60,6 +60,10 @@ export default function WelcomePage() {
             Free includes your first partner with every feature — no card required. Pro is $20/mo for
             unlimited partners; Agency is $99/mo. Built inside a working insurance agency.
           </p>
+          <p className="text-xs text-ink-muted">
+            📱 Works as an app — install from your phone&apos;s browser (Add to Home Screen), no app
+            store needed.
+          </p>
         </div>
 
         {/* Product preview — what a partner sees */}

@@ -22,9 +22,10 @@ type Profile = {
   phone: string | null;
   email: string | null;
   google_review_url: string | null;
+  sms_new_lead: boolean;
 };
 
-const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "" };
+const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false };
 
 export default function ProfilePage() {
   const [form, setForm] = useState<Profile>(EMPTY);
@@ -62,6 +63,7 @@ export default function ProfilePage() {
             phone: profile.phone ?? "",
             email: profile.email ?? "",
             google_review_url: profile.google_review_url ?? "",
+            sms_new_lead: Boolean(profile.sms_new_lead),
           };
           setForm(loaded);
           setBaseline(loaded);
@@ -280,6 +282,21 @@ export default function ProfilePage() {
                 <span className="text-xs text-ink-muted mt-1 block">
                   Google Business Profile → &ldquo;Ask for reviews&rdquo; → copy the short link.
                   Powers the one-tap review request on bound deals.
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-brand"
+                  checked={form.sms_new_lead}
+                  onChange={(e) => setForm({ ...form, sms_new_lead: e.target.checked })}
+                />
+                <span>
+                  <span className="text-sm font-medium block">Text me when a new referral arrives</span>
+                  <span className="text-xs text-ink-muted">
+                    Uses the phone number above. The one moment worth a buzz — a partner just sent
+                    you business.
+                  </span>
                 </span>
               </label>
               <button className="btn-primary" disabled={saving || !dirty}>

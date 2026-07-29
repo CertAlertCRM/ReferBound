@@ -6,6 +6,7 @@ import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail, EMAIL_RE } from "@/lib/format";
 import { fireWebhook } from "@/lib/webhook";
 import { rateLimit, RATE_LIMITED } from "@/lib/ratelimit";
+import { sendSms } from "@/lib/sms";
 
 // Partner submits a new referral from their magic-link portal. Three fields.
 
@@ -59,9 +60,11 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         contactId = existingC.id;
         contactName = existingC.name;
       } else {
+        const sPhone = String(body?.sender_phone ?? "").replace(/[^\d\-() +.]/g, "").slice(0, 20) || null;
+        const sOptIn = Boolean(body?.sender_sms_opt_in) && Boolean(sPhone);
         const { data: created } = await db()
           .from("partner_contacts")
-          .insert({ partner_id: partner.id, name: sName, email: sEmail })
+          .insert({ partner_id: partner.id, name: sName, email: sEmail, phone: sPhone, sms_opt_in: sOptIn })
           .select("id, name")
           .single();
         if (created) {
@@ -109,6 +112,21 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .maybeSingle();
   const agentEmail = ownerAccount?.email || process.env.AGENT_EMAIL;
   await fireWebhook((partner as any).account_id, "referral.created", referral, partner as any);
+
+  // Opt-in text to the agent — the "never miss a lead" moment.
+  const { data: agentProf } = await db()
+    .from("agent_profile")
+    .select("phone, sms_new_lead")
+    .eq("account_id", (partner as any).account_id)
+    .maybeSingle();
+  if (agentProf?.sms_new_lead && agentProf?.phone) {
+    await sendSms({
+      referralId: referral.id,
+      kind: "new_lead",
+      to: agentProf.phone,
+      body: `ReferBound: new referral from ${contactName ? `${contactName} (${partner.name})` : partner.name} — ${referral.client_name}. Open referbound.com to start the quote.`,
+    });
+  }
   await sendEmail({
     referralId: referral.id,
     kind: "new_partner_lead",
