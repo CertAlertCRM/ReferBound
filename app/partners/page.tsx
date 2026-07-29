@@ -15,6 +15,7 @@ type Partner = {
   logoUrl: string | null;
   partner_type: string;
   monthly_summary: boolean;
+  thankyou_cadence: string;
   short_code: string | null;
   referrals: { count: number }[];
 };
@@ -31,6 +32,7 @@ export default function PartnersPage() {
   const [editName, setEditName] = useState("");
   const [editEmails, setEditEmails] = useState("");
   const [editRecap, setEditRecap] = useState(true);
+  const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
   const [qr, setQr] = useState<{ name: string; dataUrl: string; link: string } | null>(null);
 
@@ -118,6 +120,7 @@ export default function PartnersPage() {
     setEditEmails(p.emails.join(", "));
     setEditType(p.partner_type ?? "lender");
     setEditRecap(p.monthly_summary !== false);
+    setEditCadence(p.thankyou_cadence ?? "off");
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -127,7 +130,7 @@ export default function PartnersPage() {
     const res = await fetch(`/api/partners/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap, thankyou_cadence: editCadence }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -250,21 +253,34 @@ export default function PartnersPage() {
                       </label>
                     </div>
                   </div>
-                  <label className="flex items-start gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 accent-brand"
-                      checked={editRecap}
-                      onChange={(e) => setEditRecap(e.target.checked)}
-                    />
-                    <span>
-                      <span className="text-sm font-medium block">Send the monthly recap email</span>
-                      <span className="text-xs text-ink-muted">
-                        Their monthly referral summary. Turn off for partners who&apos;d rather just
-                        have the live portal and great service — status and document emails still send.
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 accent-brand"
+                        checked={editRecap}
+                        onChange={(e) => setEditRecap(e.target.checked)}
+                      />
+                      <span>
+                        <span className="text-sm font-medium block">Send the monthly recap email</span>
+                        <span className="text-xs text-ink-muted">
+                          Their monthly referral summary. Turn off for partners who&apos;d rather just
+                          have the live portal and great service — status and document emails still send.
+                        </span>
                       </span>
-                    </span>
-                  </label>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-medium block">Thank-you notes</span>
+                      <span className="text-xs text-ink-muted block">
+                        Short, metric-free appreciation from you, sent on the 1st.
+                      </span>
+                      <select className="input mt-1.5 !py-2 text-sm" value={editCadence} onChange={(e) => setEditCadence(e.target.value)}>
+                        <option value="off">Off</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                      </select>
+                    </label>
+                  </div>
                   <div className="flex gap-2">
                     <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={editSaving}>
                       {editSaving ? "Saving…" : "Save changes"}

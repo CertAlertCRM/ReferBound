@@ -11,13 +11,10 @@ export async function GET() {
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data } = await db()
     .from("accounts")
-    .select("webhook_url, thankyou_cadence")
+    .select("webhook_url")
     .eq("id", account.id)
     .maybeSingle();
-  return NextResponse.json({
-    webhook_url: data?.webhook_url ?? "",
-    thankyou_cadence: data?.thankyou_cadence ?? "off",
-  });
+  return NextResponse.json({ webhook_url: data?.webhook_url ?? "" });
 }
 
 export async function PUT(req: NextRequest) {
@@ -35,14 +32,6 @@ export async function PUT(req: NextRequest) {
       );
     }
     patch.webhook_url = url || null;
-  }
-
-  if (body && "thankyou_cadence" in body) {
-    const cadence = String(body.thankyou_cadence ?? "off");
-    if (!["off", "monthly", "quarterly"].includes(cadence)) {
-      return NextResponse.json({ error: "invalid cadence" }, { status: 400 });
-    }
-    patch.thankyou_cadence = cadence;
   }
 
   if (Object.keys(patch).length === 0) {

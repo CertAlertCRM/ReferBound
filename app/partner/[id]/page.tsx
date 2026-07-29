@@ -31,6 +31,7 @@ type Partner = {
   logoUrl: string | null;
   partner_type: string;
   monthly_summary: boolean;
+  thankyou_cadence: string;
   referrals: { count: number }[];
 };
 
@@ -56,6 +57,7 @@ export default function PartnerWorkspacePage() {
   const [editEmails, setEditEmails] = useState("");
   const [editType, setEditType] = useState("lender");
   const [editRecap, setEditRecap] = useState(true);
+  const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string; role: string | null }[]>([]);
   const [cName, setCName] = useState("");
@@ -146,6 +148,7 @@ export default function PartnerWorkspacePage() {
     setEditEmails(partner.emails.join(", "));
     setEditType(partner.partner_type ?? "lender");
     setEditRecap(partner.monthly_summary !== false);
+    setEditCadence(partner.thankyou_cadence ?? "off");
     setEditing(true);
   }
 
@@ -155,7 +158,7 @@ export default function PartnerWorkspacePage() {
     const res = await fetch(`/api/partners/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap, thankyou_cadence: editCadence }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -324,16 +327,29 @@ export default function PartnerWorkspacePage() {
                       </label>
                     </div>
                   </div>
-                  <label className="flex items-start gap-2.5 cursor-pointer">
-                    <input type="checkbox" className="mt-0.5 accent-brand" checked={editRecap} onChange={(e) => setEditRecap(e.target.checked)} />
-                    <span>
-                      <span className="text-sm font-medium block">Send the monthly recap email</span>
-                      <span className="text-xs text-ink-muted">
-                        Turn off for partners who&apos;d rather just have the live portal — status and
-                        document emails still send.
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5 accent-brand" checked={editRecap} onChange={(e) => setEditRecap(e.target.checked)} />
+                      <span>
+                        <span className="text-sm font-medium block">Send the monthly recap email</span>
+                        <span className="text-xs text-ink-muted">
+                          Turn off for partners who&apos;d rather just have the live portal — status and
+                          document emails still send.
+                        </span>
                       </span>
-                    </span>
-                  </label>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-medium block">Thank-you notes</span>
+                      <span className="text-xs text-ink-muted block">
+                        Short, metric-free appreciation from you, sent on the 1st.
+                      </span>
+                      <select className="input mt-1.5 !py-2 text-sm" value={editCadence} onChange={(e) => setEditCadence(e.target.value)}>
+                        <option value="off">Off</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                      </select>
+                    </label>
+                  </div>
                   {/* Team contacts — who's who at this partner */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
                     <p className="text-sm font-semibold">Team contacts</p>

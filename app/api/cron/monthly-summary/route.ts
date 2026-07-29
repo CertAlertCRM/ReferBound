@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const { data: partners, error: pErr } = await db()
     .from("partners")
-    .select("id, name, token, emails, account_id, monthly_summary");
+    .select("id, name, token, emails, account_id, monthly_summary, thankyou_cadence");
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
 
   let sent = 0;
@@ -128,50 +128,46 @@ export async function GET(req: NextRequest) {
     sent++;
   }
 
-  // ── Partner thank-you notes (opt-in per account, agent-chosen cadence) ────
+  // ── Partner thank-you notes (per-PARTNER cadence, set on the partner) ─────
   // Monthly cadence fires every run; quarterly fires on Jan/Apr/Jul/Oct 1st.
   // Metric-free by design — a warm note, never a scoreboard.
   const isQuarterStart = [0, 3, 6, 9].includes(now.getUTCMonth());
-  const { data: accounts } = await db()
-    .from("accounts")
-    .select("id, thankyou_cadence")
-    .neq("thankyou_cadence", "off");
   let thanked = 0;
 
-  for (const acct of accounts ?? []) {
-    if (acct.thankyou_cadence === "quarterly" && !isQuarterStart) continue;
-    const periodLabel = acct.thankyou_cadence === "quarterly" ? "this past quarter" : "this past month";
-    const agentName = nameByAccount.get(acct.id) || "Your agent";
+  for (const partner of partners ?? []) {
+    const cadence = (partner as any).thankyou_cadence ?? "off";
+    if (cadence === "off") continue;
+    if (cadence === "quarterly" && !isQuarterStart) continue;
+    if (!partner.emails || partner.emails.length === 0) continue;
 
-    for (const partner of (partners ?? []).filter((p) => (p as any).account_id === acct.id)) {
-      if (!partner.emails || partner.emails.length === 0) continue;
+    // Only thank partners who've actually referred someone, ever.
+    const { count } = await db()
+      .from("referrals")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_id", partner.id);
+    if (!count) continue;
 
-      // Only thank partners who've actually referred someone, ever.
-      const { count } = await db()
-        .from("referrals")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partner.id);
-      if (!count) continue;
+    const periodLabel = cadence === "quarterly" ? "this past quarter" : "this past month";
+    const agentName = nameByAccount.get((partner as any).account_id) || "Your agent";
 
-      const subject = `A thank-you from ${agentName} — ${monthLabel}`;
-      const { data: existing } = await db()
-        .from("email_log")
-        .select("id")
-        .eq("kind", "thank_you")
-        .eq("subject", subject)
-        .contains("recipients", [partner.emails[0]])
-        .eq("sent", true)
-        .limit(1);
-      if (existing && existing.length > 0) continue;
+    const subject = `A thank-you from ${agentName} — ${monthLabel}`;
+    const { data: existing } = await db()
+      .from("email_log")
+      .select("id")
+      .eq("kind", "thank_you")
+      .eq("subject", subject)
+      .contains("recipients", [partner.emails[0]])
+      .eq("sent", true)
+      .limit(1);
+    if (existing && existing.length > 0) continue;
 
-      await sendEmail({
-        kind: "thank_you",
-        to: partner.emails,
-        subject,
-        html: thankYouEmail(partner.name, agentName, periodLabel),
-      });
-      thanked++;
-    }
+    await sendEmail({
+      kind: "thank_you",
+      to: partner.emails,
+      subject,
+      html: thankYouEmail(partner.name, agentName, periodLabel),
+    });
+    thanked++;
   }
 
   return NextResponse.json({ month: monthLabel, sent, thanked, skipped });

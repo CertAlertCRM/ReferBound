@@ -9,7 +9,7 @@ export async function GET() {
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data, error } = await db()
     .from("partners")
-    .select("id, name, token, short_code, emails, logo_path, partner_type, monthly_summary, created_at, referrals(count)")
+    .select("id, name, token, short_code, emails, logo_path, partner_type, monthly_summary, thankyou_cadence, created_at, referrals(count)")
     .eq("account_id", account.id)
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -174,6 +174,9 @@ alter table reset_codes enable row level security;
 -- Outbound webhook / Zapier bridge (see migration_11)
 alter table accounts add column if not exists webhook_url text;
 
+-- Per-partner thank-you cadence (see migration_18)
+alter table partners add column if not exists thankyou_cadence text not null default 'off';
+
 -- Partner contacts — who on the team sent each lead (see migration_17)
 create table if not exists partner_contacts (
   id uuid primary key default gen_random_uuid(),

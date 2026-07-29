@@ -29,6 +29,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("monthly_summary" in body) {
     patch.monthly_summary = Boolean(body.monthly_summary);
   }
+  if ("thankyou_cadence" in body) {
+    const cadence = String(body.thankyou_cadence ?? "off");
+    if (!["off", "monthly", "quarterly"].includes(cadence)) {
+      return NextResponse.json({ error: "invalid cadence" }, { status: 400 });
+    }
+    patch.thankyou_cadence = cadence;
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   }
