@@ -62,6 +62,7 @@ export default function Dashboard() {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [feed, setFeed] = useState<ActivityItem[]>([]);
+  const [feedOpen, setFeedOpen] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -337,7 +338,7 @@ export default function Dashboard() {
               </p>
             ) : (
               <ul className="space-y-2.5">
-                {feed.slice(0, 8).map((a) => (
+                {feed.slice(0, feedOpen ? 12 : 4).map((a) => (
                   <li key={a.id} className="flex gap-2.5">
                     <span
                       className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -360,6 +361,23 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+            )}
+            {feed.length > 4 && (
+              <button
+                type="button"
+                className="link !text-xs mt-3"
+                onClick={() => setFeedOpen(!feedOpen)}
+              >
+                {feedOpen ? (
+                  <>
+                    <IconChevronUp size={12} /> Show less
+                  </>
+                ) : (
+                  <>
+                    <IconChevronDown size={12} /> Show more ({Math.min(feed.length, 12) - 4})
+                  </>
+                )}
+              </button>
             )}
           </div>
 
