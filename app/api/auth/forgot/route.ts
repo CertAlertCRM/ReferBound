@@ -3,12 +3,19 @@ import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { normalizeEmail } from "@/lib/format";
 import { randomInt } from "crypto";
+import { rateLimit, clientIp, RATE_LIMITED } from "@/lib/ratelimit";
 
 // Sends a 6-digit reset code. Always responds ok (no account enumeration).
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const email = normalizeEmail(body?.email);
   if (!email) return NextResponse.json({ ok: true });
+
+  const [okEmail, okIp] = await Promise.all([
+    rateLimit(`forgot:${email}`, 3, 900),
+    rateLimit(`forgot-ip:${clientIp(req)}`, 10, 900),
+  ]);
+  if (!okEmail || !okIp) return NextResponse.json(RATE_LIMITED, { status: 429 });
 
   const { data: account } = await db().from("accounts").select("id").eq("email", email).maybeSingle();
   if (account) {

@@ -5,6 +5,7 @@ import { appUrl } from "@/lib/helpers";
 import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail, EMAIL_RE } from "@/lib/format";
 import { fireWebhook } from "@/lib/webhook";
+import { rateLimit, RATE_LIMITED } from "@/lib/ratelimit";
 
 // Partner submits a new referral from their magic-link portal. Three fields.
 
@@ -15,6 +16,10 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .eq("token", params.token)
     .single();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  if (!(await rateLimit(`submit:${partner.id}`, 30, 3600))) {
+    return NextResponse.json(RATE_LIMITED, { status: 429 });
+  }
 
   const body = await req.json().catch(() => null);
   const name = String(body?.client_name ?? "").trim();

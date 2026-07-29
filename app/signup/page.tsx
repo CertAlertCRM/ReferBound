@@ -97,6 +97,11 @@ export default function SignupPage() {
           <button className="btn-primary w-full" disabled={busy}>
             {busy ? "Creating account…" : invite ? "Join the team" : "Create account"}
           </button>
+          <p className="text-[11px] text-ink-muted text-center">
+            By creating an account you agree to the{" "}
+            <Link href="/terms" className="link !text-[11px]">Terms of Service</Link> and{" "}
+            <Link href="/privacy" className="link !text-[11px]">Privacy Policy</Link>.
+          </p>
           <p className="text-xs text-ink-muted text-center">
             Already have one?{" "}
             <Link href="/login" className="link !text-xs">Sign in</Link>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAccount } from "@/lib/account";
 import { sendEmail, feedbackEmail } from "@/lib/email";
+import { rateLimit, clientIp, RATE_LIMITED } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,9 @@ export const dynamic = "force-dynamic";
 // email log; the message just gets delivered.
 
 export async function POST(req: NextRequest) {
+  if (!(await rateLimit(`feedback-ip:${clientIp(req)}`, 6, 3600))) {
+    return NextResponse.json(RATE_LIMITED, { status: 429 });
+  }
   const body = await req.json().catch(() => null);
   const message = String(body?.message ?? "").trim().slice(0, 3000);
   if (message.length < 3) {

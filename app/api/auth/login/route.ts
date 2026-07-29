@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { verifyPassword, createSessionToken, sessionCookie } from "@/lib/session";
 import { normalizeEmail } from "@/lib/format";
+import { rateLimit, clientIp, RATE_LIMITED } from "@/lib/ratelimit";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -10,6 +11,13 @@ export async function POST(req: NextRequest) {
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
+
+  // Brute-force protection: per-target-account and per-source-IP windows.
+  const [okEmail, okIp] = await Promise.all([
+    rateLimit(`login:${email}`, 8, 600),
+    rateLimit(`login-ip:${clientIp(req)}`, 30, 600),
+  ]);
+  if (!okEmail || !okIp) return NextResponse.json(RATE_LIMITED, { status: 429 });
 
   const { data: account } = await db()
     .from("accounts")

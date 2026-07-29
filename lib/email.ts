@@ -85,6 +85,12 @@ export async function sendEmail({ referralId, kind, to, subject, html }: SendArg
   return { sent: log.sent, error: log.error };
 }
 
+// Escape user-supplied values before they enter email HTML — a client or
+// partner name must never be able to inject markup into an email we send.
+function esc(v: unknown): string {
+  return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function wrap(body: string): string {
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">
   ${body}
@@ -101,7 +107,7 @@ export function feedbackEmail(source: string, fromLabel: string, message: string
   const safe = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return wrap(`
     <h2 style="margin:0 0 12px">Product feedback — ${source}</h2>
-    <p style="font-size:13px;color:#555">${fromLabel}</p>
+    <p style="font-size:13px;color:#555">${esc(fromLabel)}</p>
     <div style="margin-top:14px;padding:16px 18px;border-left:3px solid #2547eb;background:#f6f8ff;border-radius:0 10px 10px 0;font-size:15px;line-height:1.7;white-space:pre-wrap">${safe}</div>
   `);
 }
@@ -115,12 +121,12 @@ export function partnerClosingsEmail(
   const open = items.filter((i) => !i.done);
   return wrap(`
     <h2 style="margin:0 0 12px">Your closings — next 14 days</h2>
-    <p style="font-size:15px">Hi ${partnerName} team — insurance status on everything closing soon:</p>
+    <p style="font-size:15px">Hi ${esc(partnerName)} team — insurance status on everything closing soon:</p>
     ${
       open.length
         ? `<p style="font-size:14px;font-weight:600;margin:16px 0 6px">⚠ Still in motion</p>
            <ul style="font-size:14px;line-height:1.7;margin:0;padding-left:20px">
-             ${open.map((i) => `<li><strong>${i.name}</strong> — closes ${i.closing} · ${i.statusLabel}</li>`).join("")}
+             ${open.map((i) => `<li><strong>${esc(i.name)}</strong> — closes ${i.closing} · ${esc(i.statusLabel)}</li>`).join("")}
            </ul>`
         : ""
     }
@@ -128,7 +134,7 @@ export function partnerClosingsEmail(
       ready.length
         ? `<p style="font-size:14px;font-weight:600;margin:16px 0 6px">✓ Insurance ready</p>
            <ul style="font-size:14px;line-height:1.7;margin:0;padding-left:20px">
-             ${ready.map((i) => `<li><strong>${i.name}</strong> — closes ${i.closing}</li>`).join("")}
+             ${ready.map((i) => `<li><strong>${esc(i.name)}</strong> — closes ${i.closing}</li>`).join("")}
            </ul>`
         : ""
     }
@@ -153,26 +159,26 @@ export function reviewRequestEmail(
 ) {
   const firstName = clientName.split(" ")[0];
   return wrap(`
-    <h2 style="margin:0 0 12px">Thanks for trusting ${agencyName || "us"} with your insurance</h2>
-    <p style="font-size:15px">Hi ${firstName},</p>
-    <p style="font-size:15px">It was a pleasure getting your coverage in place. If you had a good experience working with ${agentName}, a quick Google review would mean a lot — it's the best way to help other families find us.</p>
-    <p style="margin:20px 0"><a href="${reviewUrl}" style="background:#1d4ed8;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Leave a review — takes 60 seconds</a></p>
-    <p style="font-size:13px;color:#555">And if anything wasn't right, just reply to this email — ${agentName} reads every one.</p>
+    <h2 style="margin:0 0 12px">Thanks for trusting ${esc(agencyName || "us")} with your insurance</h2>
+    <p style="font-size:15px">Hi ${esc(firstName)},</p>
+    <p style="font-size:15px">It was a pleasure getting your coverage in place. If you had a good experience working with ${esc(agentName)}, a quick Google review would mean a lot — it's the best way to help other families find us.</p>
+    <p style="margin:20px 0"><a href="${esc(reviewUrl)}" style="background:#1d4ed8;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Leave a review — takes 60 seconds</a></p>
+    <p style="font-size:13px;color:#555">And if anything wasn't right, just reply to this email — ${esc(agentName)} reads every one.</p>
   `);
 }
 
 export function thankYouEmail(partnerName: string, agentName: string, periodLabel: string) {
   return wrap(`
     <h2 style="margin:0 0 12px">Thank you</h2>
-    <p style="font-size:15px">Hi ${partnerName} team,</p>
+    <p style="font-size:15px">Hi ${esc(partnerName)} team,</p>
     <p style="font-size:15px">No numbers, no updates — just a genuine thank-you. The clients you've trusted us with ${periodLabel} mean a lot, and we work hard to make sure every one of them reflects well on you.</p>
-    <p style="font-size:15px">If there's ever anything we can do better — faster turnarounds, different updates, anything — just reply. This inbox reaches ${agentName} directly.</p>
-    <p style="font-size:15px">— ${agentName}</p>
+    <p style="font-size:15px">If there's ever anything we can do better — faster turnarounds, different updates, anything — just reply. This inbox reaches ${esc(agentName)} directly.</p>
+    <p style="font-size:15px">— ${esc(agentName)}</p>
   `);
 }
 
 export function welcomeEmail(name: string | null, appUrl: string, isTeamMember: boolean) {
-  const hi = name ? `Hi ${name.split(" ")[0]},` : "Hi,";
+  const hi = name ? `Hi ${esc(name.split(" ")[0])},` : "Hi,";
   if (isTeamMember) {
     return wrap(`
     <h2 style="margin:0 0 12px">You're on the team</h2>
@@ -198,7 +204,7 @@ export function welcomeEmail(name: string | null, appUrl: string, isTeamMember: 
 export function statusUpdateEmail(clientName: string, status: string, portalUrl: string) {
   const label = STATUS_LABELS[status] ?? status;
   return wrap(`
-    <h2 style="margin:0 0 12px">Update on ${clientName}</h2>
+    <h2 style="margin:0 0 12px">Update on ${esc(clientName)}</h2>
     <p style="font-size:16px">Insurance status: <strong>${label}</strong></p>
     <p><a href="${portalUrl}" style="color:#1d4ed8">Open your referral portal</a> for details.</p>
   `);
@@ -206,17 +212,17 @@ export function statusUpdateEmail(clientName: string, status: string, portalUrl:
 
 export function docsReadyEmail(clientName: string, docList: string[], portalUrl: string) {
   return wrap(`
-    <h2 style="margin:0 0 12px">${clientName} is bound — documents ready</h2>
+    <h2 style="margin:0 0 12px">${esc(clientName)} is bound — documents ready</h2>
     <p style="font-size:16px">The following documents are ready to download:</p>
-    <ul>${docList.map((d) => `<li>${d}</li>`).join("")}</ul>
+    <ul>${docList.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
     <p><a href="${portalUrl}" style="color:#1d4ed8">Download from your referral portal</a></p>
   `);
 }
 
 export function newPartnerLeadEmail(clientName: string, partnerName: string, appUrl: string) {
   return wrap(`
-    <h2 style="margin:0 0 12px">New referral from ${partnerName}</h2>
-    <p style="font-size:16px"><strong>${clientName}</strong> was just submitted through the partner portal.</p>
+    <h2 style="margin:0 0 12px">New referral from ${esc(partnerName)}</h2>
+    <p style="font-size:16px"><strong>${esc(clientName)}</strong> was just submitted through the partner portal.</p>
     <p><a href="${appUrl}" style="color:#1d4ed8">Open your dashboard</a> to start the quote.</p>
   `);
 }
@@ -229,7 +235,7 @@ export function monthlySummaryEmail(
   portalUrl: string
 ) {
   return wrap(`
-    <h2 style="margin:0 0 12px">${monthLabel} — your referrals with ${agentName}</h2>
+    <h2 style="margin:0 0 12px">${monthLabel} — your referrals with ${esc(agentName)}</h2>
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
       <tr>
         <td style="padding:12px;text-align:center;background:#eef4ff;border-radius:8px">
@@ -248,7 +254,7 @@ export function monthlySummaryEmail(
         </td>
       </tr>
     </table>
-    <p style="font-size:15px">${stats.allTimeBound} of your referred clients are covered all-time. Thank you for trusting ${agentName} with them — it never goes unnoticed.</p>
+    <p style="font-size:15px">${stats.allTimeBound} of your referred clients are covered all-time. Thank you for trusting ${esc(agentName)} with them — it never goes unnoticed.</p>
     <p><a href="${portalUrl}" style="color:#1d4ed8">See every referral live in your portal</a></p>
   `);
 }
@@ -262,7 +268,7 @@ export function messageEmail(
 ) {
   const safeBody = body.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return wrap(`
-    <h2 style="margin:0 0 12px">${fromName} — about ${clientName}</h2>
+    <h2 style="margin:0 0 12px">${esc(fromName)} — about ${esc(clientName)}</h2>
     <blockquote style="margin:0;padding:12px 16px;background:#f8fafc;border-left:3px solid #2547eb;border-radius:6px;font-size:15px">${safeBody}</blockquote>
     <p style="margin-top:16px"><a href="${linkUrl}" style="color:#1d4ed8">${linkLabel}</a></p>
   `);
@@ -276,13 +282,13 @@ export function agentDigestEmail(
   const staleHtml = stale.length
     ? `<h3 style="margin:16px 0 6px;font-size:14px">Needs a touch (no update in 3+ days)</h3>
        <ul style="margin:0;padding-left:18px;font-size:14px">${stale
-         .map((s) => `<li><strong>${s.name}</strong> — ${s.status}, ${s.days}d since last update</li>`)
+         .map((s) => `<li><strong>${esc(s.name)}</strong> — ${esc(s.status)}, ${s.days}d since last update</li>`)
          .join("")}</ul>`
     : "";
   const closingHtml = closingSoon.length
     ? `<h3 style="margin:16px 0 6px;font-size:14px;color:#b91c1c">Closing soon, not bound</h3>
        <ul style="margin:0;padding-left:18px;font-size:14px">${closingSoon
-         .map((c) => `<li><strong>${c.name}</strong> — closes ${c.closing} (${c.status})</li>`)
+         .map((c) => `<li><strong>${esc(c.name)}</strong> — closes ${c.closing} (${esc(c.status)})</li>`)
          .join("")}</ul>`
     : "";
   return wrap(`
@@ -297,7 +303,7 @@ export function agentDigestEmail(
 export function atRiskEmail(clientName: string, closingDate: string, status: string, portalUrl: string) {
   const label = STATUS_LABELS[status] ?? status;
   return wrap(`
-    <h2 style="margin:0 0 12px;color:#b91c1c">⚠ Closing soon: ${clientName}</h2>
+    <h2 style="margin:0 0 12px;color:#b91c1c">⚠ Closing soon: ${esc(clientName)}</h2>
     <p style="font-size:16px">Closing date <strong>${closingDate}</strong> is approaching and insurance is not yet bound (current status: <strong>${label}</strong>).</p>
     <p><a href="${portalUrl}" style="color:#1d4ed8">View in the referral portal</a></p>
   `);

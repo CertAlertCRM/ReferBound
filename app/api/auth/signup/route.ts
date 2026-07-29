@@ -5,8 +5,12 @@ import { normalizeEmail, EMAIL_RE } from "@/lib/format";
 import { sendEmail, welcomeEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { TEAM_SEAT_LIMIT } from "@/lib/account";
+import { rateLimit, clientIp, RATE_LIMITED } from "@/lib/ratelimit";
 
 export async function POST(req: NextRequest) {
+  if (!(await rateLimit(`signup-ip:${clientIp(req)}`, 6, 3600))) {
+    return NextResponse.json(RATE_LIMITED, { status: 429 });
+  }
   const body = await req.json().catch(() => null);
   const email = normalizeEmail(body?.email);
   const password = String(body?.password ?? "");

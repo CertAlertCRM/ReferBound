@@ -149,6 +149,14 @@ export default function WelcomePage() {
           <a href="/login" className="link !text-xs">
             Sign in
           </a>
+          {" · "}
+          <a href="/terms" className="link-muted !text-xs">
+            Terms
+          </a>
+          {" · "}
+          <a href="/privacy" className="link-muted !text-xs">
+            Privacy
+          </a>
         </span>
       </footer>
     </main>

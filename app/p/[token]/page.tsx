@@ -512,6 +512,11 @@ export default async function PartnerPortal({ params }: { params: { token: strin
             Get this for your partners <IconArrowRight size={12} />
           </a>
         </span>
+        <span className="block mt-1">
+          <a href="/terms" className="link-muted !text-[11px]">Terms</a>
+          {" · "}
+          <a href="/privacy" className="link-muted !text-[11px]">Privacy</a>
+        </span>
       </footer>
       </div>
     </main>
