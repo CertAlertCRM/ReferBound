@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { TopNav, StatusBadge } from "../../components";
 import { PARTNER_TYPES } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
@@ -28,6 +28,7 @@ type Partner = {
   emails: string[];
   logoUrl: string | null;
   partner_type: string;
+  monthly_summary: boolean;
   referrals: { count: number }[];
 };
 
@@ -46,7 +47,14 @@ type Referral = {
 
 export default function PartnerWorkspacePage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [partner, setPartner] = useState<Partner | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmails, setEditEmails] = useState("");
+  const [editType, setEditType] = useState("lender");
+  const [editRecap, setEditRecap] = useState(true);
+  const [editSaving, setEditSaving] = useState(false);
   const [missing, setMissing] = useState(false);
   const [refs, setRefs] = useState<Referral[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -120,6 +128,55 @@ export default function PartnerWorkspacePage() {
     load();
   }
 
+  function startEdit() {
+    if (!partner) return;
+    setEditName(partner.name);
+    setEditEmails(partner.emails.join(", "));
+    setEditType(partner.partner_type ?? "lender");
+    setEditRecap(partner.monthly_summary !== false);
+    setEditing(true);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setEditSaving(true);
+    const res = await fetch(`/api/partners/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap }),
+    });
+    setEditSaving(false);
+    if (res.ok) {
+      setEditing(false);
+      load();
+    } else alert((await res.json()).error ?? "Failed to save");
+  }
+
+  async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/partners/${id}/logo`, { method: "POST", body: fd });
+    e.target.value = "";
+    if (res.ok) load();
+    else alert((await res.json()).error ?? "Upload failed");
+  }
+
+  async function deletePartner() {
+    if (!partner) return;
+    const n = refs.length;
+    const ok = confirm(
+      `Delete ${partner.name}? Their magic link stops working immediately and ${
+        n === 0 ? "" : `their ${n} lead${n === 1 ? "" : "s"}, documents, and messages are `
+      }permanently removed. This can't be undone.`
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/partners/${id}`, { method: "DELETE" });
+    if (res.ok) router.push("/partners");
+    else alert((await res.json()).error ?? "Failed to delete");
+  }
+
   async function addLead(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -179,18 +236,110 @@ export default function PartnerWorkspacePage() {
           <div className="card p-10 text-center text-ink-muted">Loading…</div>
         ) : (
           <>
-            {/* Partner header */}
+            {/* Partner header — edits happen right here, in place */}
             <header className="card p-5 sm:p-6">
+              {editing ? (
+                <form onSubmit={saveEdit} className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <label
+                      className="relative w-20 h-20 rounded-xl cursor-pointer group/logo shrink-0"
+                      title={partner.logoUrl ? "Replace logo" : "Upload logo"}
+                    >
+                      {partner.logoUrl ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={partner.logoUrl}
+                            alt=""
+                            className="w-20 h-20 rounded-xl object-contain bg-white border border-slate-200 p-2"
+                          />
+                          <span className="absolute inset-0 rounded-xl bg-slate-900/60 text-white text-[11px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
+                            Replace
+                          </span>
+                        </>
+                      ) : (
+                        <span className="w-20 h-20 rounded-xl border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-1 text-[11px] font-semibold hover:border-brand hover:text-brand">
+                          <IconPlus size={16} />
+                          Add logo
+                        </span>
+                      )}
+                      <input type="file" className="hidden" accept="image/*" onChange={uploadLogo} />
+                    </label>
+                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className="block sm:col-span-2">
+                        <span className="section-label">Partner name</span>
+                        <input className="input mt-1.5" value={editName} onChange={(e) => setEditName(e.target.value)} required autoFocus />
+                      </label>
+                      <label className="block">
+                        <span className="section-label">Notification emails (comma-separated)</span>
+                        <input
+                          className="input mt-1.5"
+                          value={editEmails}
+                          onChange={(e) => setEditEmails(e.target.value)}
+                          placeholder="lo@lender.com, processor@lender.com"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="section-label">Partner type</span>
+                        <select className="input mt-1.5" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                          {Object.entries(PARTNER_TYPES).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" className="mt-0.5 accent-brand" checked={editRecap} onChange={(e) => setEditRecap(e.target.checked)} />
+                    <span>
+                      <span className="text-sm font-medium block">Send the monthly recap email</span>
+                      <span className="text-xs text-ink-muted">
+                        Turn off for partners who&apos;d rather just have the live portal — status and
+                        document emails still send.
+                      </span>
+                    </span>
+                  </label>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex gap-2">
+                      <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={editSaving}>
+                        {editSaving ? "Saving…" : "Save changes"}
+                      </button>
+                      <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => setEditing(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                    <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs !text-red-600" onClick={deletePartner}>
+                      <IconTrash size={12} /> Delete partner…
+                    </button>
+                  </div>
+                </form>
+              ) : (
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-4 min-w-0">
-                  {partner.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={partner.logoUrl}
-                      alt=""
-                      className="w-16 h-16 rounded-xl object-contain bg-white border border-slate-200 p-1.5 shrink-0"
-                    />
-                  ) : null}
+                  <label
+                    className="relative w-16 h-16 rounded-xl cursor-pointer group/logo shrink-0"
+                    title={partner.logoUrl ? "Replace logo" : "Upload logo"}
+                  >
+                    {partner.logoUrl ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={partner.logoUrl}
+                          alt=""
+                          className="w-16 h-16 rounded-xl object-contain bg-white border border-slate-200 p-1.5"
+                        />
+                        <span className="absolute inset-0 rounded-xl bg-slate-900/60 text-white text-[11px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
+                          Replace
+                        </span>
+                      </>
+                    ) : (
+                      <span className="w-16 h-16 rounded-xl border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold hover:border-brand hover:text-brand">
+                        <IconPlus size={14} />
+                        logo
+                      </span>
+                    )}
+                    <input type="file" className="hidden" accept="image/*" onChange={uploadLogo} />
+                  </label>
                   <div className="min-w-0">
                     <h1 className="text-xl font-bold tracking-tight truncate">
                       {partner.name}{" "}
@@ -204,9 +353,9 @@ export default function PartnerWorkspacePage() {
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Link href="/partners" className="btn-ghost !px-3 !py-1.5 text-xs">
-                    <IconPencil size={12} /> Edit details
-                  </Link>
+                  <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={startEdit}>
+                    <IconPencil size={12} /> Edit
+                  </button>
                   <Link href={portalPath} className="btn-ghost !px-3 !py-1.5 text-xs">
                     <IconExternal size={12} /> View portal
                   </Link>
@@ -218,6 +367,7 @@ export default function PartnerWorkspacePage() {
                   </button>
                 </div>
               </div>
+              )}
               <div className="grid grid-cols-4 gap-2.5 mt-4">
                 {[
                   { v: String(stats.total), l: "Referred" },
