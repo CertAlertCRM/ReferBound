@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { STATUS_LABELS, STATUSES } from "@/lib/config";
 import { IconAlert } from "./icons";
 import { FeedbackWidget } from "./feedback-widget";
@@ -72,8 +73,13 @@ export function Wordmark({ size = "text-lg" }: { size?: string }) {
 export function TopNav({
   active,
 }: {
-  active?: "referrals" | "partners" | "stats" | "profile" | "billing";
+  active?: "referrals" | "partners" | "stats" | "profile" | "billing" | "admin";
 }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    // Cheap authorization ping — only the founder account gets the Admin tab.
+    fetch("/api/admin/summary?ping=1").then((r) => setIsAdmin(r.ok)).catch(() => {});
+  }, []);
   const tab = (href: string, key: string, label: string) => (
     <Link
       href={href}
@@ -97,6 +103,7 @@ export function TopNav({
           {tab("/stats", "stats", "Stats")}
           {tab("/profile", "profile", "Profile")}
           {tab("/billing", "billing", "Billing")}
+          {isAdmin && tab("/admin", "admin", "Admin")}
           <button
             onClick={async () => {
               await fetch("/api/auth/logout", { method: "POST" });

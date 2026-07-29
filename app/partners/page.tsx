@@ -30,6 +30,7 @@ export default function PartnersPage() {
   const [editEmails, setEditEmails] = useState("");
   const [editRecap, setEditRecap] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
+  const [qr, setQr] = useState<{ name: string; dataUrl: string; link: string } | null>(null);
 
   async function load() {
     const res = await fetch("/api/partners");
@@ -69,6 +70,18 @@ export default function PartnersPage() {
     await navigator.clipboard.writeText(`${window.location.origin}/p/${p.short_code || p.token}`);
     setCopied(p.id);
     setTimeout(() => setCopied(null), 1500);
+  }
+
+  async function showQr(p: Partner) {
+    const link = `${window.location.origin}/p/${p.short_code || p.token}`;
+    const QR = (await import("qrcode")).default;
+    const url = await QR.toDataURL(link, {
+      width: 640,
+      margin: 2,
+      color: { dark: "#0f172a", light: "#ffffff" },
+      errorCorrectionLevel: "M",
+    });
+    setQr({ name: p.name, dataUrl: url, link });
   }
 
   async function deletePartner(p: Partner) {
@@ -173,33 +186,68 @@ export default function PartnersPage() {
           {partners.map((p) => (
             <div key={p.id} className="card p-5">
               {editingId === p.id ? (
-                <form onSubmit={saveEdit} className="space-y-3">
-                  <label className="block">
-                    <span className="section-label">Partner name</span>
-                    <input
-                      className="input mt-1.5"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      required
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="section-label">Notification emails (comma-separated)</span>
-                    <input
-                      className="input mt-1.5"
-                      value={editEmails}
-                      onChange={(e) => setEditEmails(e.target.value)}
-                      placeholder="lo@lender.com, processor@lender.com"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="section-label">Partner type</span>
-                    <select className="input mt-1.5" value={editType} onChange={(e) => setEditType(e.target.value)}>
-                      {Object.entries(PARTNER_TYPES).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
-                      ))}
-                    </select>
-                  </label>
+                <form onSubmit={saveEdit} className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-semibold">Edit {p.name}</h3>
+                    <span className="badge bg-slate-100 text-slate-600">
+                      {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    {/* Logo with replace-on-hover, right where you'd expect it */}
+                    <label
+                      className="relative w-20 h-20 rounded-xl cursor-pointer group/logo shrink-0"
+                      title={p.logoUrl ? "Replace logo" : "Upload logo"}
+                    >
+                      {p.logoUrl ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.logoUrl}
+                            alt=""
+                            className="w-20 h-20 rounded-xl object-contain bg-white border border-slate-200 p-2"
+                          />
+                          <span className="absolute inset-0 rounded-xl bg-slate-900/60 text-white text-[11px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
+                            Replace
+                          </span>
+                        </>
+                      ) : (
+                        <span className="w-20 h-20 rounded-xl border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-1 text-[11px] font-semibold hover:border-brand hover:text-brand">
+                          <IconPlus size={16} />
+                          Add logo
+                        </span>
+                      )}
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
+                    </label>
+                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className="block sm:col-span-2">
+                        <span className="section-label">Partner name</span>
+                        <input
+                          className="input mt-1.5"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          required
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="section-label">Notification emails (comma-separated)</span>
+                        <input
+                          className="input mt-1.5"
+                          value={editEmails}
+                          onChange={(e) => setEditEmails(e.target.value)}
+                          placeholder="lo@lender.com, processor@lender.com"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="section-label">Partner type</span>
+                        <select className="input mt-1.5" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                          {Object.entries(PARTNER_TYPES).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
                   <label className="flex items-start gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
@@ -242,24 +290,32 @@ export default function PartnersPage() {
                 </form>
               ) : (
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    {p.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.logoUrl}
-                        alt=""
-                        className="w-16 h-16 rounded-lg object-contain bg-white border border-slate-200 p-1.5"
-                      />
-                    ) : (
-                      <label
-                        className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold cursor-pointer hover:border-brand hover:text-brand text-center leading-tight"
-                        title="Upload this partner's logo"
-                      >
-                        <IconPlus size={14} />
-                        logo
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
-                      </label>
-                    )}
+                  <div className="flex items-center gap-3.5">
+                    {/* Logo box IS the upload/replace control — hover it */}
+                    <label
+                      className="relative w-16 h-16 rounded-lg cursor-pointer group/logo shrink-0"
+                      title={p.logoUrl ? "Replace this partner's logo" : "Upload this partner's logo"}
+                    >
+                      {p.logoUrl ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.logoUrl}
+                            alt=""
+                            className="w-16 h-16 rounded-lg object-contain bg-white border border-slate-200 p-1.5"
+                          />
+                          <span className="absolute inset-0 rounded-lg bg-slate-900/60 text-white text-[10px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
+                            Replace
+                          </span>
+                        </>
+                      ) : (
+                        <span className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold hover:border-brand hover:text-brand text-center leading-tight">
+                          <IconPlus size={14} />
+                          logo
+                        </span>
+                      )}
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
+                    </label>
                     <div>
                       <p className="font-semibold">
                         {p.name}{" "}
@@ -270,25 +326,19 @@ export default function PartnersPage() {
                       <p className="text-xs text-ink-muted mt-0.5">
                         {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
                         {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
-                        {p.logoUrl && (
-                          <>
-                            {" · "}
-                            <label className="text-brand cursor-pointer hover:text-brand-dark font-medium">
-                              replace logo
-                              <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
-                            </label>
-                          </>
-                        )}
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => startEdit(p)}>
                       <IconPencil size={12} /> Edit
                     </button>
-                    <a className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.token}`} target="_blank">
+                    <a className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.short_code || p.token}`} target="_blank">
                       <IconExternal size={12} /> View portal
                     </a>
+                    <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => showQr(p)}>
+                      ▦ QR
+                    </button>
                     <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
                       {copied === p.id ? (
                         <>
@@ -305,6 +355,30 @@ export default function PartnersPage() {
               )}
             </div>
           ))}
+
+          {/* QR modal — scan-to-open magic link for coffee-meeting handoffs */}
+          {qr && (
+            <div
+              className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-6"
+              onClick={() => setQr(null)}
+            >
+              <div className="card p-6 max-w-xs w-full text-center" onClick={(e) => e.stopPropagation()}>
+                <p className="font-semibold">{qr.name}</p>
+                <p className="text-xs text-ink-muted mt-0.5">Scan to open their live portal</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qr.dataUrl} alt={`QR code for ${qr.name}'s portal`} className="w-full rounded-xl border border-slate-200 mt-3" />
+                <p className="text-[10px] text-ink-muted mt-2 break-all">{qr.link}</p>
+                <div className="flex gap-2 mt-4">
+                  <a href={qr.dataUrl} download={`referbound-qr-${qr.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`} className="btn-primary flex-1 !py-2 text-xs">
+                    Download PNG
+                  </a>
+                  <button className="btn-ghost flex-1 !py-2 text-xs" onClick={() => setQr(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {partners.length === 0 && (
             <div className="card p-10 text-center text-ink-muted text-sm">
               No partners yet — add your first one above, then send them their magic link.
