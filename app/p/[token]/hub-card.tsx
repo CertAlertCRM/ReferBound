@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { IconMail } from "../../icons";
 
-// Portal-side entry to the lender workspace: they enter their email, the
-// board link goes to that inbox (never shown on screen — delivery IS the
-// ownership check).
+// Optional lender workspace entry — a quiet one-liner, not a billboard.
+// Partners who already have tooling they love can ignore it forever; the
+// portal works exactly the same either way. Expands to the email form only
+// if they're curious. The board link goes to their inbox (never shown on
+// screen — delivery IS the ownership check).
 
 export function HubCard() {
+  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState("");
@@ -29,12 +32,24 @@ export function HubCard() {
     }
   }
 
+  if (!open && state !== "sent") {
+    return (
+      <p className="text-center text-xs text-ink-muted">
+        Work with more than one insurance agent?{" "}
+        <button type="button" className="link !text-xs" onClick={() => setOpen(true)}>
+          Get an optional combined view
+        </button>
+      </p>
+    );
+  }
+
   return (
     <div className="card p-5">
-      <p className="font-semibold text-sm">Work with more than one insurance agent?</p>
+      <p className="font-semibold text-sm">Your referral board — optional, and free</p>
       <p className="text-xs text-ink-secondary mt-1">
-        Get your <span className="font-medium text-ink">referral board</span> — every agent, every
-        client you&apos;ve sent, one live page. We&apos;ll email your private link.
+        One live page combining every ReferBound agent you work with. Purely a complement to
+        whatever you already use — this portal keeps working exactly the same either way. We&apos;ll
+        email your private link.
       </p>
       {state === "sent" ? (
         <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 mt-3 inline-flex items-center gap-1.5">
@@ -51,9 +66,17 @@ export function HubCard() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoFocus
           />
           <button className="btn-primary !py-2 text-xs shrink-0" disabled={state === "sending"}>
             {state === "sending" ? "Sending…" : "Email me my board"}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost !py-2 text-xs shrink-0"
+            onClick={() => setOpen(false)}
+          >
+            No thanks
           </button>
           {error && <p className="text-xs text-red-600 w-full">{error}</p>}
         </form>

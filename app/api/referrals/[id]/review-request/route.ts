@@ -47,13 +47,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const agentName = prof?.display_name || APP_CONFIG.agentName;
-  await sendEmail({
+  const result = await sendEmail({
     referralId: referral.id,
     kind: "review_request",
     to: [referral.client_email],
     subject: `Quick favor? A review for ${prof?.agency_name || agentName}`,
     html: reviewRequestEmail(referral.client_name, agentName, prof?.agency_name ?? null, reviewUrl),
   });
+  if (!result.sent) {
+    // Never log a "sent" that didn't happen — and tell the agent the truth.
+    return NextResponse.json(
+      { error: `The email didn't go through (${result.error ?? "unknown error"}). Check the client's email address.` },
+      { status: 502 }
+    );
+  }
   await logActivity(referral.id, "email_sent", `Google review request sent to ${referral.client_name}`, "agent");
 
   return NextResponse.json({ ok: true });

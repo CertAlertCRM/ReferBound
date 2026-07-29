@@ -24,7 +24,7 @@ type SendArgs = {
   html: string;
 };
 
-export async function sendEmail({ referralId, kind, to, subject, html }: SendArgs) {
+export async function sendEmail({ referralId, kind, to, subject, html }: SendArgs): Promise<{ sent: boolean; error: string | null }> {
   const recipients = to.filter(Boolean);
   const log = {
     referral_id: referralId ?? null,
@@ -38,7 +38,7 @@ export async function sendEmail({ referralId, kind, to, subject, html }: SendArg
   if (recipients.length === 0) {
     log.error = "no recipients";
     await db().from("email_log").insert(log);
-    return;
+    return { sent: false, error: log.error };
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -46,7 +46,7 @@ export async function sendEmail({ referralId, kind, to, subject, html }: SendArg
   if (!apiKey || !from) {
     log.error = "email not configured (RESEND_API_KEY / EMAIL_FROM missing)";
     await db().from("email_log").insert(log);
-    return;
+    return { sent: false, error: log.error };
   }
 
   try {
@@ -79,6 +79,8 @@ export async function sendEmail({ referralId, kind, to, subject, html }: SendArg
         if (error) console.error("activity log write failed:", error.message);
       });
   }
+
+  return { sent: log.sent, error: log.error };
 }
 
 function wrap(body: string): string {
