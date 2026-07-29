@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getAccount, ownedReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): the immutable activity timeline for a referral.
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await ownedReferral(account.id, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { data, error } = await db()
     .from("activity_log")
     .select("id, event_type, detail, actor, created_at")

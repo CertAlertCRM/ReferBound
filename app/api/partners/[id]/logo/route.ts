@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
+import { getAccount } from "@/lib/account";
 
 // Agent-only (protected by middleware): upload/replace a partner's logo.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const { data: owned } = await db()
+    .from("partners")
+    .select("id")
+    .eq("id", params.id)
+    .eq("account_id", account.id)
+    .maybeSingle();
+  if (!owned) return NextResponse.json({ error: "not found" }, { status: 404 });
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "expected multipart form" }, { status: 400 });
   const file = form.get("file") as File | null;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { askClaude } from "@/lib/ai";
 import { APP_CONFIG, STATUS_LABELS } from "@/lib/config";
+import { getAccount, ownedReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): draft a short partner update grounded
 // ONLY in this referral's real data. The agent reviews/edits before sending.
@@ -18,6 +19,11 @@ Hard rules:
 - Respond with ONLY the message text. No quotes around it, no commentary.`;
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await ownedReferral(account.id, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const [{ data: referral }, { data: msgs }, { data: activity }, { data: prof }] = await Promise.all([
     db()
       .from("referrals")
@@ -36,7 +42,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       .eq("referral_id", params.id)
       .order("created_at", { ascending: false })
       .limit(6),
-    db().from("agent_profile").select("display_name").eq("id", "default").maybeSingle(),
+    db().from("agent_profile").select("display_name").eq("account_id", account.id).maybeSingle(),
   ]);
 
   if (!referral) return NextResponse.json({ error: "referral not found" }, { status: 404 });

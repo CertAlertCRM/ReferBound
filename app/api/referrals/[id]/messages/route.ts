@@ -4,10 +4,16 @@ import { sendEmail, messageEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 import { appUrl } from "@/lib/helpers";
 import { APP_CONFIG } from "@/lib/config";
+import { getAccount, ownedReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): read the thread / reply to the partner.
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await ownedReferral(account.id, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { data, error } = await db()
     .from("messages")
     .select("id, sender, body, created_at")
@@ -19,6 +25,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await ownedReferral(account.id, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const body = await req.json().catch(() => null);
   const text = String(body?.body ?? "").trim().slice(0, 2000);
   if (!text) return NextResponse.json({ error: "body is required" }, { status: 400 });
@@ -38,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data: prof } = await db()
     .from("agent_profile")
     .select("display_name")
-    .eq("id", "default")
+    .eq("account_id", account.id)
     .maybeSingle();
   const agentName = prof?.display_name || APP_CONFIG.agentName;
 

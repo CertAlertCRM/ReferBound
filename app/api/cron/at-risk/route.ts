@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { AT_RISK_DAYS, SAFE_STATUSES } from "@/lib/config";
+import { AT_RISK_DAYS, SAFE_STATUSES, STATUS_LABELS } from "@/lib/config";
 import { sendEmail, atRiskEmail, agentDigestEmail } from "@/lib/email";
 import { appUrl, fmtDate } from "@/lib/helpers";
 import { logActivity } from "@/lib/activity";
-import { STATUS_LABELS } from "@/lib/config";
 
-// Daily check: any referral closing within AT_RISK_DAYS that isn't bound yet
-// triggers one alert email to the agent + partner (deduped to one per day).
-// Wire this to Vercel Cron (vercel.json) or hit it manually. Guarded by CRON_SECRET.
+// Daily check across ALL accounts:
+//  1) referrals closing within AT_RISK_DAYS and not bound → alert partner + owning agent
+//  2) per-account digest: stale referrals + closing-soon → the account's email
+// Folded into one cron (Vercel Hobby allows max 2 cron jobs). Guarded by CRON_SECRET.
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -22,21 +22,23 @@ export async function GET(req: NextRequest) {
   today.setHours(0, 0, 0, 0);
   const horizon = new Date(today.getTime() + AT_RISK_DAYS * 86400000);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const since = new Date(today).toISOString();
+
+  // Account emails, once.
+  const { data: accounts } = await db().from("accounts").select("id, email");
+  const emailByAccount = new Map((accounts ?? []).map((a) => [a.id, a.email]));
 
   const { data: atRisk, error } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, partners(name, token, emails)")
+    .select("id, client_name, closing_date, status, account_id, partners(name, token, emails)")
     .not("closing_date", "is", null)
     .gte("closing_date", iso(today))
     .lte("closing_date", iso(horizon))
     .not("status", "in", `(${[...SAFE_STATUSES, "lost"].join(",")})`);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const since = new Date(today).toISOString();
   let sent = 0;
-
   for (const r of atRisk ?? []) {
-    // dedupe: skip if an at_risk email for this referral already went out today
     const { data: existing } = await db()
       .from("email_log")
       .select("id")
@@ -47,11 +49,9 @@ export async function GET(req: NextRequest) {
     if (existing && existing.length > 0) continue;
 
     const partner = (r as any).partners;
+    const ownerEmail = emailByAccount.get((r as any).account_id);
     const portalUrl = `${appUrl()}/p/${partner?.token}`;
-    const recipients = [
-      ...(partner?.emails ?? []),
-      ...(process.env.AGENT_EMAIL ? [process.env.AGENT_EMAIL] : []),
-    ];
+    const recipients = [...(partner?.emails ?? []), ...(ownerEmail ? [ownerEmail] : [])];
     await sendEmail({
       referralId: r.id,
       kind: "at_risk",
@@ -68,48 +68,58 @@ export async function GET(req: NextRequest) {
     sent++;
   }
 
-  // ── Agent daily digest: stale referrals + closing-soon, one email per day ──
-  // Folded into this cron because Vercel's Hobby plan allows max 2 cron jobs.
-  let digestSent = false;
-  const agentEmail = process.env.AGENT_EMAIL;
-  if (agentEmail) {
-    const { data: dupe } = await db()
-      .from("email_log")
-      .select("id")
-      .eq("kind", "agent_digest")
-      .gte("created_at", since)
-      .limit(1);
+  // ── Per-account daily digest ───────────────────────────────────────────────
+  let digestsSent = 0;
+  const { data: dupe } = await db()
+    .from("email_log")
+    .select("id")
+    .eq("kind", "agent_digest")
+    .gte("created_at", since)
+    .limit(1);
 
-    if (!dupe || dupe.length === 0) {
-      const staleCutoff = new Date(Date.now() - 3 * 86400000).toISOString();
-      const { data: staleRefs } = await db()
-        .from("referrals")
-        .select("client_name, status, updated_at")
-        .not("status", "in", `(${[...SAFE_STATUSES, "lost"].join(",")})`)
-        .lt("updated_at", staleCutoff);
+  if (!dupe || dupe.length === 0) {
+    const staleCutoff = new Date(Date.now() - 3 * 86400000).toISOString();
+    const { data: staleRefs } = await db()
+      .from("referrals")
+      .select("client_name, status, updated_at, account_id")
+      .not("status", "in", `(${[...SAFE_STATUSES, "lost"].join(",")})`)
+      .lt("updated_at", staleCutoff);
 
-      const stale = (staleRefs ?? []).map((r) => ({
+    const byAccount = new Map<string, { stale: any[]; closing: any[] }>();
+    const bucket = (id: string) => {
+      if (!byAccount.has(id)) byAccount.set(id, { stale: [], closing: [] });
+      return byAccount.get(id)!;
+    };
+    for (const r of staleRefs ?? []) {
+      if (!r.account_id) continue;
+      bucket(r.account_id).stale.push({
         name: r.client_name,
         status: STATUS_LABELS[r.status] ?? r.status,
         days: Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000),
-      }));
-      const closingSoon = (atRisk ?? []).map((r) => ({
+      });
+    }
+    for (const r of atRisk ?? []) {
+      const aid = (r as any).account_id;
+      if (!aid) continue;
+      bucket(aid).closing.push({
         name: r.client_name,
         closing: fmtDate(r.closing_date),
         status: STATUS_LABELS[r.status] ?? r.status,
-      }));
+      });
+    }
 
-      if (stale.length > 0 || closingSoon.length > 0) {
-        await sendEmail({
-          kind: "agent_digest",
-          to: [agentEmail],
-          subject: `ReferBound check: ${closingSoon.length} closing soon, ${stale.length} need a touch`,
-          html: agentDigestEmail(stale, closingSoon, appUrl()),
-        });
-        digestSent = true;
-      }
+    for (const [accountId, items] of byAccount) {
+      const email = emailByAccount.get(accountId);
+      if (!email || (items.stale.length === 0 && items.closing.length === 0)) continue;
+      await sendEmail({
+        kind: "agent_digest",
+        to: [email],
+        subject: `ReferBound check: ${items.closing.length} closing soon, ${items.stale.length} need a touch`,
+        html: agentDigestEmail(items.stale, items.closing, appUrl()),
+      });
+      digestsSent++;
     }
   }
 
-  return NextResponse.json({ checked: atRisk?.length ?? 0, alerted: sent, digestSent });
+  return NextResponse.json({ checked: atRisk?.length ?? 0, alerted: sent, digestsSent });
 }

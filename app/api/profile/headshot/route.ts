@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
+import { getAccount } from "@/lib/account";
 
 // Agent-only (protected by middleware): upload/replace the profile headshot.
 
 export async function POST(req: NextRequest) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "expected multipart form" }, { status: 400 });
   const file = form.get("file") as File | null;
@@ -24,9 +27,19 @@ export async function POST(req: NextRequest) {
     .upload(path, buf, { contentType: file.type });
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
+  const { data: existing } = await db()
+    .from("agent_profile")
+    .select("id")
+    .eq("account_id", account.id)
+    .maybeSingle();
   const { error } = await db()
     .from("agent_profile")
-    .upsert({ id: "default", headshot_path: path, updated_at: new Date().toISOString() });
+    .upsert({
+      id: existing?.id ?? account.id,
+      account_id: account.id,
+      headshot_path: path,
+      updated_at: new Date().toISOString(),
+    });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const { data: signed } = await db()

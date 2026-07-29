@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { DOC_KINDS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
+import { getAccount, ownedReferral } from "@/lib/account";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await ownedReferral(account.id, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "expected multipart form" }, { status: 400 });
   const file = form.get("file") as File | null;

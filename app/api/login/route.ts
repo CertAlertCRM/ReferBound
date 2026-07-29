@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { checkPasscode, agentCookie } from "@/lib/auth";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  const { passcode } = await req.json().catch(() => ({ passcode: "" }));
-  if (!checkPasscode(String(passcode ?? ""))) {
-    return NextResponse.json({ error: "Incorrect passcode" }, { status: 401 });
-  }
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(agentCookie());
-  return res;
+// Legacy passcode endpoint — replaced by account auth at /api/auth/login.
+export async function POST() {
+  return NextResponse.json(
+    { error: "This endpoint moved. Sign in with your account at /login." },
+    { status: 410 }
+  );
 }

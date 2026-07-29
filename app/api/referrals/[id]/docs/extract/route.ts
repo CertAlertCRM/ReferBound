@@ -3,6 +3,7 @@ import { db, DOCS_BUCKET } from "@/lib/db";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { logActivity } from "@/lib/activity";
 import { DOC_KINDS } from "@/lib/config";
+import { getAccount, ownedReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): extract structured details from an
 // uploaded document (1003, dec page, EOI, HOI request…) and fill EMPTY fields
@@ -53,6 +54,11 @@ const norm = (v: unknown) =>
     .replace(/[^a-z0-9]/g, "");
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await ownedReferral(account.id, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const body = await req.json().catch(() => null);
   const documentId = String(body?.document_id ?? "");
   if (!documentId) return NextResponse.json({ error: "document_id is required" }, { status: 400 });

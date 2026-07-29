@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getAccount } from "@/lib/account";
 
 export async function GET() {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const s = db();
   const [{ data: referrals }, { data: events }, { data: emails }] = await Promise.all([
-    s.from("referrals").select("id, status, source, log_seconds, created_at, premium, partner_id, partners(name)"),
+    s.from("referrals").select("id, status, source, log_seconds, created_at, premium, partner_id, partners(name)").eq("account_id", account.id),
     s.from("status_events").select("referral_id, status, created_at"),
     s.from("email_log").select("kind, sent, created_at"),
   ]);

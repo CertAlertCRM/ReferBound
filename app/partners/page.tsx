@@ -49,7 +49,16 @@ export default function PartnersPage() {
       setName("");
       setEmails("");
       load();
-    } else alert((await res.json()).error ?? "Failed");
+    } else {
+      const err = await res.json();
+      if (err.upgrade) {
+        if (confirm(`${err.error}\n\nOpen the billing page to upgrade?`)) {
+          window.location.href = "/billing";
+        }
+      } else {
+        alert(err.error ?? "Failed");
+      }
+    }
   }
 
   async function copy(p: Partner) {

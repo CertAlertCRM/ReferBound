@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
+import { getAccount } from "@/lib/account";
 
 // Agent-only (protected by middleware): read/update the agent's profile.
 
 export async function GET() {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data: profile, error } = await db()
     .from("agent_profile")
     .select("*")
-    .eq("id", "default")
+    .eq("account_id", account.id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -22,10 +25,20 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
-  const row: Record<string, unknown> = { id: "default", updated_at: new Date().toISOString() };
+  // Profile rows are keyed by account: id mirrors the account uuid for new
+  // accounts; the claimed legacy row keeps id 'default' but carries account_id.
+  const { data: existing } = await db()
+    .from("agent_profile")
+    .select("id")
+    .eq("account_id", account.id)
+    .maybeSingle();
+  const rowId = existing?.id ?? account.id;
+  const row: Record<string, unknown> = { id: rowId, account_id: account.id, updated_at: new Date().toISOString() };
   for (const f of ["display_name", "agency_name", "office", "phone", "email"]) {
     if (f in body) row[f] = String(body[f] ?? "").trim() || null;
   }

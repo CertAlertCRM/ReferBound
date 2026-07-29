@@ -68,7 +68,11 @@ export function Wordmark({ size = "text-lg" }: { size?: string }) {
   );
 }
 
-export function TopNav({ active }: { active?: "referrals" | "partners" | "stats" | "profile" }) {
+export function TopNav({
+  active,
+}: {
+  active?: "referrals" | "partners" | "stats" | "profile" | "billing";
+}) {
   const tab = (href: string, key: string, label: string) => (
     <Link
       href={href}
@@ -90,6 +94,17 @@ export function TopNav({ active }: { active?: "referrals" | "partners" | "stats"
           {tab("/partners", "partners", "Partners")}
           {tab("/stats", "stats", "Stats")}
           {tab("/profile", "profile", "Profile")}
+          {tab("/billing", "billing", "Billing")}
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors"
+            title="Sign out"
+          >
+            Sign out
+          </button>
         </nav>
       </div>
     </header>

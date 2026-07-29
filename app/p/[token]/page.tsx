@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/lib/db";
-import { isAgentAuthed } from "@/lib/auth";
+import { currentAccountId } from "@/lib/auth";
 import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
 import { PartnerSubmitForm } from "./submit-form";
@@ -68,7 +68,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   noStore(); // opt this render out of every Next.js cache layer — always live data
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, token, logo_path, partner_type")
+    .select("id, name, token, logo_path, partner_type, account_id")
     .eq("token", params.token)
     .single();
   if (!partner) notFound();
@@ -115,7 +115,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const { data: prof } = await db()
     .from("agent_profile")
     .select("display_name, agency_name, phone, email, headshot_path")
-    .eq("id", "default")
+    .eq("account_id", (partner as any).account_id)
     .maybeSingle();
   const agencyName = prof?.agency_name || APP_CONFIG.agencyName;
   const agentName = prof?.display_name || APP_CONFIG.agentName;
@@ -128,8 +128,8 @@ export default async function PartnerPortal({ params }: { params: { token: strin
     headshotUrl = signed?.signedUrl ?? null;
   }
 
-  // Only the logged-in agent sees this — partners never do.
-  const agentView = isAgentAuthed();
+  // Only the OWNING agent sees this — partners and other accounts never do.
+  const agentView = currentAccountId() === (partner as any).account_id;
 
   // Active work floats to the top (at-risk first); finished business collapses.
   const isClosedRef = (r: any) => SAFE_STATUSES.includes(r.status) || r.status === "lost";

@@ -27,16 +27,17 @@ export async function GET(req: NextRequest) {
     timeZone: "UTC",
   });
 
-  const { data: prof } = await db()
+  // Per-account agent names (from each account's profile).
+  const { data: profiles } = await db()
     .from("agent_profile")
-    .select("display_name")
-    .eq("id", "default")
-    .maybeSingle();
-  const agentName = prof?.display_name || APP_CONFIG.agentName;
+    .select("account_id, display_name");
+  const nameByAccount = new Map(
+    (profiles ?? []).filter((p) => p.account_id).map((p) => [p.account_id, p.display_name])
+  );
 
   const { data: partners, error: pErr } = await db()
     .from("partners")
-    .select("id, name, token, emails");
+    .select("id, name, token, emails, account_id");
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
 
   let sent = 0;
@@ -103,6 +104,9 @@ export async function GET(req: NextRequest) {
       skipped.push(`${partner.name}: quiet month`);
       continue;
     }
+
+    const agentName =
+      nameByAccount.get((partner as any).account_id) || APP_CONFIG.agentName;
 
     await sendEmail({
       kind: "monthly_summary",

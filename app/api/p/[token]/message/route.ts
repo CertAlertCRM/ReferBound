@@ -8,7 +8,7 @@ import { appUrl } from "@/lib/helpers";
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name")
+    .select("id, name, account_id")
     .eq("token", params.token)
     .single();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -36,7 +36,12 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   await logActivity(referral.id, "email_sent", `Message from ${partner.name}: “${text.slice(0, 120)}”`, "partner");
 
-  const agentEmail = process.env.AGENT_EMAIL;
+  const { data: ownerAccount } = await db()
+    .from("accounts")
+    .select("email")
+    .eq("id", (partner as any).account_id)
+    .maybeSingle();
+  const agentEmail = ownerAccount?.email || process.env.AGENT_EMAIL;
   await sendEmail({
     referralId: referral.id,
     kind: "message",

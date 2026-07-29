@@ -30,7 +30,7 @@ Respond with ONLY a JSON object (no fences):
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, intro_template")
+    .select("id, name, intro_template, account_id")
     .eq("token", params.token)
     .single();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -47,15 +47,18 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .single();
   if (!referral) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const { data: prof } = await db()
-    .from("agent_profile")
-    .select("display_name, agency_name, phone, email")
-    .eq("id", "default")
-    .maybeSingle();
+  const [{ data: prof }, { data: ownerAccount }] = await Promise.all([
+    db()
+      .from("agent_profile")
+      .select("display_name, agency_name, phone, email")
+      .eq("account_id", (partner as any).account_id)
+      .maybeSingle(),
+    db().from("accounts").select("email").eq("id", (partner as any).account_id).maybeSingle(),
+  ]);
 
   const agentName = prof?.display_name || APP_CONFIG.agentName;
   const agencyName = prof?.agency_name || APP_CONFIG.agencyName;
-  const agentEmail = prof?.email || process.env.AGENT_EMAIL || "";
+  const agentEmail = prof?.email || ownerAccount?.email || "";
   const clientFirst = referral.client_name.split(" ")[0];
 
   const facts = {

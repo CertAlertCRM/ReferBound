@@ -1,29 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Protects agent pages. Partner portal (/p/*), login, cron, and doc downloads
-// (which carry their own token checks) are public.
-// Edge-safe: uses Web Crypto to recompute the expected session cookie value,
-// SHA-256("agent-session-v1:" + AGENT_PASSCODE) — must match lib/auth.ts.
+// Protects agent pages/APIs with the rb_session cookie (HMAC-signed,
+// format: <accountId>.<expiresMs>.<hexSig> — must match lib/session.ts).
+// Public: landing, auth pages/APIs, partner portals, crons, doc downloads
+// (token-checked in-route), waitlist, and the Stripe webhook.
 
 const PUBLIC_PREFIXES = [
   "/login",
+  "/signup",
+  "/forgot",
   "/welcome",
   "/p/",
-  "/api/login",
+  "/api/auth/",
   "/api/p/",
   "/api/cron/",
   "/api/docs/",
   "/api/waitlist",
+  "/api/stripe/",
   "/_next",
   "/favicon.ico",
+  "/icon.svg",
 ];
 
-async function expectedToken(passcode: string): Promise<string> {
-  const data = new TextEncoder().encode(`agent-session-v1:${passcode}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
+async function hmacHex(payload: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function isValidSession(token: string | undefined, secret: string): Promise<boolean> {
+  if (!token || !secret) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const [accountId, exp, sig] = parts;
+  if (Number(exp) < Date.now()) return false;
+  return (await hmacHex(`${accountId}.${exp}`, secret)) === sig;
 }
 
 export async function middleware(req: NextRequest) {
@@ -31,12 +50,11 @@ export async function middleware(req: NextRequest) {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
-  const passcode = process.env.AGENT_PASSCODE || "";
-  const cookie = req.cookies.get("rl_agent")?.value;
-  const authed = !!passcode && !!cookie && cookie === (await expectedToken(passcode));
 
-  // Root is dual-purpose: the agent's dashboard when signed in, the public
-  // marketing/landing page for everyone else (URL stays "/" either way).
+  const secret = process.env.SESSION_SECRET || process.env.AGENT_PASSCODE || "";
+  const authed = await isValidSession(req.cookies.get("rb_session")?.value, secret);
+
+  // Root is dual-purpose: dashboard when signed in, public landing otherwise.
   if (pathname === "/" && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = "/welcome";

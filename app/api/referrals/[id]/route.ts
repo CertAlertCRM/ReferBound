@@ -5,6 +5,7 @@ import { sendEmail, statusUpdateEmail, docsReadyEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
+import { getAccount } from "@/lib/account";
 
 // Partner email cadence is deliberately sparse to avoid notification fatigue:
 // one email at "quoted" (we're on it), then ONE combined email at
@@ -14,6 +15,8 @@ import { logActivity } from "@/lib/activity";
 const NOTIFY_STATUSES = new Set(["quoted", "docs_delivered"]);
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
@@ -38,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .from("referrals")
     .update(patch)
     .eq("id", params.id)
+    .eq("account_id", account.id)
     .select("*, partners(name, token, emails), documents(kind, file_name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -84,7 +88,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { error } = await db().from("referrals").delete().eq("id", params.id);
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const { error } = await db().from("referrals").delete().eq("id", params.id).eq("account_id", account.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

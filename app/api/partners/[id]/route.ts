@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES } from "@/lib/config";
+import { getAccount } from "@/lib/account";
 
 // Agent-only (protected by middleware): edit a partner's name / notification emails.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
@@ -31,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .from("partners")
     .update(patch)
     .eq("id", params.id)
+    .eq("account_id", account.id)
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

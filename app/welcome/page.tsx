@@ -1,5 +1,4 @@
 import { Wordmark } from "../components";
-import { WaitlistForm } from "./waitlist-form";
 
 // Public landing page. Unauthenticated visitors to "/" are rewritten here by
 // the middleware; the logged-in agent still sees their dashboard at "/".
@@ -53,11 +52,13 @@ export default function WelcomePage() {
           partners — live status on every referred client, document downloads once policies are
           bound, and automatic alerts when a closing is approaching without coverage in place.
         </p>
-        <div className="mt-8 max-w-md mx-auto">
-          <WaitlistForm />
-          <p className="mt-3 text-xs text-ink-muted">
-            Built inside a working insurance agency. Early access is limited while we pilot with
-            founding agents.
+        <div className="mt-8 max-w-md mx-auto space-y-3">
+          <a href="/signup" className="btn-primary w-full !py-3 text-base">
+            Create your free account
+          </a>
+          <p className="text-xs text-ink-muted">
+            Free includes your first partner with every feature — no card required. Pro is $20/mo for
+            unlimited partners; Agency is $99/mo. Built inside a working insurance agency.
           </p>
         </div>
 

@@ -10,7 +10,7 @@ import { normalizePhone, normalizeEmail, EMAIL_RE } from "@/lib/format";
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name")
+    .select("id, name, account_id")
     .eq("token", params.token)
     .single();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .from("referrals")
     .insert({
       partner_id: partner.id,
+      account_id: (partner as any).account_id,
       client_name: name,
       coborrower_name: String(body?.coborrower_name ?? "").trim() || null,
       client_phone: normalizePhone(body?.client_phone),
@@ -52,7 +53,12 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     "partner"
   );
 
-  const agentEmail = process.env.AGENT_EMAIL;
+  const { data: ownerAccount } = await db()
+    .from("accounts")
+    .select("email")
+    .eq("id", (partner as any).account_id)
+    .maybeSingle();
+  const agentEmail = ownerAccount?.email || process.env.AGENT_EMAIL;
   await sendEmail({
     referralId: referral.id,
     kind: "new_partner_lead",
