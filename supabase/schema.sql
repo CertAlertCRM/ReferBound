@@ -171,6 +171,21 @@ alter table agent_profile add column if not exists account_id uuid;
 alter table accounts enable row level security;
 alter table reset_codes enable row level security;
 
+-- Outbound webhook / Zapier bridge (see migration_11)
+alter table accounts add column if not exists webhook_url text;
+
+-- Agency team seats (see migration_12)
+alter table accounts add column if not exists team_owner_id uuid references accounts(id) on delete cascade;
+create index if not exists idx_accounts_team_owner on accounts(team_owner_id);
+create table if not exists team_invites (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  code text unique not null default replace(gen_random_uuid()::text, '-', ''),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_team_invites_account on team_invites(account_id);
+alter table team_invites enable row level security;
+
 -- Private storage bucket for EOI / RCE / dec page uploads
 insert into storage.buckets (id, name, public)
 values ('docs', 'docs', false)

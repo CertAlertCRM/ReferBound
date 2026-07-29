@@ -4,13 +4,14 @@ import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail, EMAIL_RE } from "@/lib/format";
+import { fireWebhook } from "@/lib/webhook";
 
 // Partner submits a new referral from their magic-link portal. Three fields.
 
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, account_id")
+    .select("id, name, partner_type, account_id")
     .eq("token", params.token)
     .single();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     .eq("id", (partner as any).account_id)
     .maybeSingle();
   const agentEmail = ownerAccount?.email || process.env.AGENT_EMAIL;
+  await fireWebhook((partner as any).account_id, "referral.created", referral, partner as any);
   await sendEmail({
     referralId: referral.id,
     kind: "new_partner_lead",

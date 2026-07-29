@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { formatPhoneInput } from "@/lib/format";
+import { IconDownload, IconZap } from "../icons";
 
 type Profile = {
   display_name: string | null;
@@ -21,8 +22,18 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [webhook, setWebhook] = useState("");
+  const [webhookBaseline, setWebhookBaseline] = useState("");
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [testState, setTestState] = useState<"idle" | "sending" | "ok" | "failed">("idle");
+  const [testError, setTestError] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  const webhookDirty = webhook.trim() !== webhookBaseline.trim();
 
   useEffect(() => {
     fetch("/api/profile").then(async (res) => {
@@ -43,7 +54,64 @@ export default function ProfilePage() {
       }
       setLoading(false);
     });
+    fetch("/api/integrations").then(async (res) => {
+      if (res.ok) {
+        const { webhook_url } = await res.json();
+        setWebhook(webhook_url ?? "");
+        setWebhookBaseline(webhook_url ?? "");
+      }
+    });
   }, []);
+
+  async function saveWebhook(e: React.FormEvent) {
+    e.preventDefault();
+    setWebhookSaving(true);
+    const res = await fetch("/api/integrations", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ webhook_url: webhook.trim() }),
+    });
+    setWebhookSaving(false);
+    if (res.ok) {
+      setWebhookBaseline(webhook.trim());
+      setTestState("idle");
+    } else {
+      alert((await res.json()).error ?? "Failed to save");
+    }
+  }
+
+  async function deleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleteBusy(true);
+    setDeleteError("");
+    const res = await fetch("/api/account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: deleteConfirm }),
+    });
+    if (res.ok) {
+      window.location.href = "/welcome";
+    } else {
+      setDeleteBusy(false);
+      setDeleteError((await res.json()).error ?? "Deletion failed");
+    }
+  }
+
+  async function sendTest() {
+    setTestState("sending");
+    setTestError("");
+    const res = await fetch("/api/integrations/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ webhook_url: webhook.trim() }),
+    });
+    if (res.ok) {
+      setTestState("ok");
+    } else {
+      setTestState("failed");
+      setTestError((await res.json()).error ?? "Test failed");
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -153,6 +221,130 @@ export default function ProfilePage() {
                 {saving ? "Saving…" : dirty ? "Save profile" : "Saved ✓"}
               </button>
             </form>
+
+            <section className="card p-6 space-y-4">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <IconZap size={16} className="text-brand" /> CRM & AMS integrations
+                </h2>
+                <p className="text-sm text-ink-secondary mt-1">
+                  Push every new lead into AgencyZoom, Agency MVP, or any other system — no
+                  rekeying.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 p-4">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <IconDownload size={15} /> Spreadsheet export
+                </p>
+                <p className="text-xs text-ink-secondary mt-1">
+                  Download all your referrals as a CSV — opens in Excel or Google Sheets, and
+                  imports into any AMS that accepts a file.
+                </p>
+                <a href="/api/export" className="btn-ghost mt-3 inline-flex">
+                  <IconDownload size={15} /> Export referrals (CSV)
+                </a>
+              </div>
+
+              <form onSubmit={saveWebhook} className="rounded-xl border border-slate-100 p-4 space-y-3">
+                <p className="text-sm font-semibold">Webhook (works with Zapier & Make)</p>
+                <p className="text-xs text-ink-secondary">
+                  When a lead comes in or a status changes, ReferBound sends the details to this
+                  URL as JSON. In Zapier: create a Zap with the{" "}
+                  <span className="font-medium text-ink">Webhooks by Zapier → Catch Hook</span>{" "}
+                  trigger, paste its URL here, hit Send test, then map the fields into your CRM
+                  once. Every lead after that flows in automatically.
+                </p>
+                <input
+                  className="input"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://hooks.zapier.com/hooks/catch/…"
+                  value={webhook}
+                  onChange={(e) => {
+                    setWebhook(e.target.value);
+                    setTestState("idle");
+                  }}
+                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button className="btn-primary" disabled={webhookSaving || !webhookDirty}>
+                    {webhookSaving ? "Saving…" : webhookDirty ? "Save webhook" : "Saved ✓"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={testState === "sending" || !webhook.trim()}
+                    onClick={sendTest}
+                  >
+                    {testState === "sending" ? "Sending…" : "Send test"}
+                  </button>
+                  {testState === "ok" && (
+                    <span className="text-xs text-emerald-600 font-medium">
+                      Test delivered ✓ — check your Zap for the sample lead
+                    </span>
+                  )}
+                  {testState === "failed" && (
+                    <span className="text-xs text-red-600 font-medium">{testError}</span>
+                  )}
+                </div>
+              </form>
+            </section>
+
+            <section className="card p-6 space-y-3 border-red-100">
+              <div>
+                <h2 className="font-semibold text-red-700">Delete account</h2>
+                <p className="text-sm text-ink-secondary mt-1">
+                  Permanently removes your account, partners, referrals, messages, and documents.
+                  Partner magic links stop working immediately. This can&apos;t be undone —{" "}
+                  <a href="/api/export" className="link !text-sm">
+                    export your referrals first
+                  </a>
+                  .
+                </p>
+              </div>
+              {!showDelete ? (
+                <button type="button" className="btn-ghost !text-red-600" onClick={() => setShowDelete(true)}>
+                  Delete my account…
+                </button>
+              ) : (
+                <form onSubmit={deleteAccount} className="space-y-2">
+                  <label className="block">
+                    <span className="text-xs text-ink-secondary">
+                      Type your account email to confirm:
+                    </span>
+                    <input
+                      className="input mt-1.5"
+                      type="email"
+                      inputMode="email"
+                      placeholder={form.email || "you@youragency.com"}
+                      value={deleteConfirm}
+                      onChange={(e) => setDeleteConfirm(e.target.value)}
+                      required
+                    />
+                  </label>
+                  {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn-primary !bg-red-600 hover:!bg-red-700"
+                      disabled={deleteBusy || !deleteConfirm.trim()}
+                    >
+                      {deleteBusy ? "Deleting…" : "Permanently delete"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => {
+                        setShowDelete(false);
+                        setDeleteConfirm("");
+                        setDeleteError("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </section>
           </>
         )}
       </main>

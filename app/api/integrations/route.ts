@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { getAccount } from "@/lib/account";
+
+export const dynamic = "force-dynamic";
+
+// Read / save the account's outbound webhook URL (the Zapier bridge).
+
+export async function GET() {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const { data } = await db()
+    .from("accounts")
+    .select("webhook_url")
+    .eq("id", account.id)
+    .maybeSingle();
+  return NextResponse.json({ webhook_url: data?.webhook_url ?? "" });
+}
+
+export async function PUT(req: NextRequest) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const body = await req.json().catch(() => null);
+  const url = String(body?.webhook_url ?? "").trim();
+
+  if (url && !/^https:\/\/.+\..+/i.test(url)) {
+    return NextResponse.json(
+      { error: "That doesn't look like a URL — it should start with https://" },
+      { status: 400 }
+    );
+  }
+
+  const { error } = await db()
+    .from("accounts")
+    .update({ webhook_url: url || null })
+    .eq("id", account.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, webhook_url: url });
+}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { STATUSES, STATUS_LABELS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
-import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp } from "./icons";
+import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck } from "./icons";
 
 type Referral = {
   id: string;
@@ -190,9 +190,16 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <button onClick={openAdd} className="btn-primary shrink-0">
-            <IconPlus size={15} /> Log lead
-          </button>
+          <div className="flex flex-col items-stretch gap-2 shrink-0">
+            <button onClick={openAdd} className="btn-primary">
+              <IconPlus size={15} /> Log lead
+            </button>
+            {referrals.length > 0 && (
+              <a href="/api/export" className="btn-ghost !py-1.5 text-xs justify-center" title="Download all referrals as a CSV">
+                <IconDownload size={13} /> Export CSV
+              </a>
+            )}
+          </div>
         </div>
 
         {showAdd && (
@@ -270,15 +277,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : referrals.length === 0 ? (
-          <div className="card p-10 text-center space-y-2">
-            <p className="font-semibold">No referrals yet</p>
-            <p className="text-sm text-ink-secondary">
-              Add your partners first, then log your first lead — it takes seconds.
-            </p>
-            <Link href="/partners" className="btn-ghost inline-flex mt-2">
-              Set up partners <IconArrowRight size={14} />
-            </Link>
-          </div>
+          <GettingStarted profileDone={Boolean(profileName)} partnerDone={partners.length > 0} />
         ) : (
           <>
             <Section title="Closing soon — not bound" items={groups.risk} advance={advance} busyId={busyId} highlight />
@@ -289,6 +288,74 @@ export default function Dashboard() {
         )}
       </main>
     </>
+  );
+}
+
+function GettingStarted({ profileDone, partnerDone }: { profileDone: boolean; partnerDone: boolean }) {
+  const steps = [
+    {
+      done: profileDone,
+      title: "Fill in your profile",
+      body: "Your name, agency, and headshot appear on every partner portal — it's how partners see you.",
+      href: "/profile",
+      cta: "Open profile",
+    },
+    {
+      done: partnerDone,
+      title: "Add your best referral partner",
+      body: "Start with the lender or realtor who sends you the most business. Takes thirty seconds.",
+      href: "/partners",
+      cta: "Add a partner",
+    },
+    {
+      done: false,
+      title: "Send them their magic link",
+      body: "Copy the link from the Partners page and text or email it over. No login on their end — they'll see every referral live, and they can submit new ones straight to you.",
+      href: "/partners",
+      cta: "Copy magic link",
+    },
+  ];
+  const next = steps.findIndex((s) => !s.done);
+  return (
+    <div className="card p-6 sm:p-8">
+      <h2 className="font-bold tracking-tight">Let&apos;s get your first partner live</h2>
+      <p className="text-sm text-ink-secondary mt-1">
+        Three steps, about five minutes — then every lead they send lands here on its own.
+      </p>
+      <ol className="mt-5 space-y-4">
+        {steps.map((s, i) => (
+          <li key={s.title} className="flex items-start gap-3.5">
+            <span
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                s.done
+                  ? "bg-emerald-50 text-emerald-600"
+                  : i === next
+                    ? "bg-brand text-white"
+                    : "bg-slate-100 text-ink-muted"
+              }`}
+            >
+              {s.done ? <IconCheck size={14} /> : i + 1}
+            </span>
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${s.done ? "text-ink-muted line-through" : ""}`}>{s.title}</p>
+              {!s.done && <p className="text-xs text-ink-secondary mt-0.5 leading-relaxed">{s.body}</p>}
+              {!s.done && i === next && (
+                <Link href={s.href} className="btn-primary !py-1.5 text-xs inline-flex mt-2">
+                  {s.cta} <IconArrowRight size={12} />
+                </Link>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-ink-muted mt-5">
+        Prefer to start solo? You can also{" "}
+        <button type="button" className="link !text-xs" onClick={() => window.scrollTo({ top: 0 })}>
+          log a lead yourself
+        </button>{" "}
+        with the button above.
+      </p>
+    </div>
   );
 }
 

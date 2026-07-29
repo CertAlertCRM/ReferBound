@@ -14,11 +14,26 @@ export async function GET() {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  // Team members don't manage billing — their plan rides on the owner's.
+  if (account.isTeamMember) {
+    return NextResponse.json({
+      plan: account.plan,
+      planLabel: PLAN_LABELS[account.plan] ?? account.plan,
+      email: account.email,
+      subscriptionStatus: account.subscription_status,
+      managed: true,
+      ownerEmail: account.ownerEmail,
+      links: { pro: null, agency: null, portal: null },
+    });
+  }
+
   return NextResponse.json({
     plan: account.plan,
     planLabel: PLAN_LABELS[account.plan] ?? account.plan,
     email: account.email,
     subscriptionStatus: account.subscription_status,
+    managed: false,
+    ownerEmail: null,
     links: {
       pro: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_PRO, account.id, account.email),
       agency: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_AGENCY, account.id, account.email),

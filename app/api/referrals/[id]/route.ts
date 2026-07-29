@@ -6,6 +6,7 @@ import { appUrl } from "@/lib/helpers";
 import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
 import { getAccount } from "@/lib/account";
+import { fireWebhook } from "@/lib/webhook";
 
 // Partner email cadence is deliberately sparse to avoid notification fatigue:
 // one email at "quoted" (we're on it), then ONE combined email at
@@ -42,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", params.id)
     .eq("account_id", account.id)
-    .select("*, partners(name, token, emails), documents(kind, file_name)")
+    .select("*, partners(name, partner_type, token, emails), documents(kind, file_name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -56,6 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }`,
       "agent"
     );
+    await fireWebhook(account.id, "referral.status_changed", referral, referral.partners);
 
     if (NOTIFY_STATUSES.has(referral.status) && referral.partners) {
       const portalUrl = `${appUrl()}/p/${referral.partners.token}`;

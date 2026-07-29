@@ -13,7 +13,8 @@ type SendArgs = {
     | "at_risk"
     | "monthly_summary"
     | "message"
-    | "agent_digest";
+    | "agent_digest"
+    | "welcome";
   to: string[];
   subject: string;
   html: string;
@@ -81,6 +82,30 @@ function wrap(body: string): string {
   ${body}
   <p style="margin-top:32px;font-size:12px;color:#888">Sent by ${APP_CONFIG.agencyName} via ${APP_CONFIG.productName}</p>
 </div>`;
+}
+
+export function welcomeEmail(name: string | null, appUrl: string, isTeamMember: boolean) {
+  const hi = name ? `Hi ${name.split(" ")[0]},` : "Hi,";
+  if (isTeamMember) {
+    return wrap(`
+    <h2 style="margin:0 0 12px">You're on the team</h2>
+    <p style="font-size:15px">${hi}</p>
+    <p style="font-size:15px">Your agency's partners and referrals are already in your dashboard — nothing to set up. Jump in, work your leads, and every update you make shows on your partners' live portals.</p>
+    <p><a href="${appUrl}" style="color:#1d4ed8;font-weight:600">Open your dashboard</a></p>
+  `);
+  }
+  return wrap(`
+    <h2 style="margin:0 0 12px">Welcome — here's how to get your first partner live</h2>
+    <p style="font-size:15px">${hi}</p>
+    <p style="font-size:15px">Three steps, about five minutes total:</p>
+    <ol style="font-size:15px;line-height:1.7;padding-left:20px">
+      <li><strong>Fill in your profile</strong> — your name and headshot appear on every partner portal.</li>
+      <li><strong>Add your best referral partner</strong> — the lender or realtor who sends you the most business.</li>
+      <li><strong>Text or email them their magic link</strong> — one tap Copy on the Partners page. No login on their end, ever.</li>
+    </ol>
+    <p style="font-size:15px">From then on, every lead they send shows up on your dashboard, and every status you set shows up live on their portal.</p>
+    <p><a href="${appUrl}/profile" style="color:#1d4ed8;font-weight:600">Start with your profile</a></p>
+  `);
 }
 
 export function statusUpdateEmail(clientName: string, status: string, portalUrl: string) {

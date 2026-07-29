@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
 import { getAccount } from "@/lib/account";
+import { fireWebhook } from "@/lib/webhook";
 
 export async function GET() {
   const account = await getAccount();
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   // The chosen partner must belong to this account.
   const { data: partnerOwned } = await db()
     .from("partners")
-    .select("id")
+    .select("id, name, partner_type")
     .eq("id", body.partner_id)
     .eq("account_id", account.id)
     .maybeSingle();
@@ -47,5 +48,6 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await db().from("status_events").insert({ referral_id: data.id, status: "new" });
   await logActivity(data.id, "lead_logged", `Lead logged for ${data.client_name}`, "agent");
+  await fireWebhook(account.id, "referral.created", data, partnerOwned);
   return NextResponse.json({ referral: data });
 }

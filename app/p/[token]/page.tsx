@@ -128,8 +128,18 @@ export default async function PartnerPortal({ params }: { params: { token: strin
     headshotUrl = signed?.signedUrl ?? null;
   }
 
-  // Only the OWNING agent sees this — partners and other accounts never do.
-  const agentView = currentAccountId() === (partner as any).account_id;
+  // Only the OWNING agent (or their teammates) sees this — partners and
+  // unrelated accounts never do.
+  const viewerId = currentAccountId();
+  let agentView = viewerId === (partner as any).account_id;
+  if (!agentView && viewerId) {
+    const { data: viewer } = await db()
+      .from("accounts")
+      .select("team_owner_id")
+      .eq("id", viewerId)
+      .maybeSingle();
+    agentView = viewer?.team_owner_id === (partner as any).account_id;
+  }
 
   // Active work floats to the top (at-risk first); finished business collapses.
   const isClosedRef = (r: any) => SAFE_STATUSES.includes(r.status) || r.status === "lost";

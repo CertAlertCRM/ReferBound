@@ -1,17 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Wordmark } from "../components";
+import { IconUsers } from "../icons";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setInvite(new URLSearchParams(window.location.search).get("invite") ?? "");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,11 +26,13 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_name: name, email, password }),
+      body: JSON.stringify({ display_name: name, email, password, invite_code: invite || undefined }),
     });
     setBusy(false);
     if (res.ok) {
-      router.push("/profile");
+      const { teamMember } = await res.json();
+      // Teammates land on the shared dashboard; new owners start at their profile.
+      router.push(teamMember ? "/" : "/profile");
       router.refresh();
     } else {
       setError((await res.json()).error ?? "Signup failed");
@@ -37,9 +45,18 @@ export default function SignupPage() {
         <div className="text-center mb-6">
           <Wordmark size="text-2xl" />
           <p className="text-sm text-ink-secondary mt-2">
-            Create your account — free for your first partner
+            {invite ? "Join your agency's team" : "Create your account — free for your first partner"}
           </p>
         </div>
+        {invite && (
+          <div className="card px-4 py-3 mb-4 flex items-center gap-2.5 bg-brand-light/60 border-brand-200">
+            <IconUsers size={16} className="text-brand-700 shrink-0" />
+            <p className="text-xs text-brand-800">
+              You&apos;ve been invited to an agency team — create your login and you&apos;ll see the
+              shared partners and referrals right away.
+            </p>
+          </div>
+        )}
         <form onSubmit={submit} className="card p-6 space-y-4">
           <label className="block">
             <span className="section-label">Your name</span>
@@ -78,7 +95,7 @@ export default function SignupPage() {
           </label>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button className="btn-primary w-full" disabled={busy}>
-            {busy ? "Creating account…" : "Create account"}
+            {busy ? "Creating account…" : invite ? "Join the team" : "Create account"}
           </button>
           <p className="text-xs text-ink-muted text-center">
             Already have one?{" "}
