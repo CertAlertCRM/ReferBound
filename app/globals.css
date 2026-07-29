@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 body {
-  /* slate-100 background so white cards visibly lift off the page — slate-50
-     was too close to white to read as a separate layer. */
-  @apply bg-slate-100 text-ink antialiased font-sans;
+  /* slate-200 background — decisively darker than the white cards, so every
+     card reads as a raised surface even on washed-out office monitors. */
+  @apply bg-slate-200 text-ink antialiased font-sans;
   /* Composed whitespace: a brand wash from the top, two soft corner glows,
      and a barely-there dot grid that only shows in the open space between
      cards. Fixed attachment so the ambience doesn't scroll away. */

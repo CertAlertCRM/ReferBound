@@ -32,8 +32,8 @@ const config: Config = {
         sans: ["var(--font-inter)", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(15 23 42 / 0.06), 0 2px 8px -1px rgb(15 23 42 / 0.08)",
-        lift: "0 6px 16px -2px rgb(15 23 42 / 0.12), 0 3px 8px -2px rgb(15 23 42 / 0.07)",
+        card: "0 1px 3px 0 rgb(15 23 42 / 0.10), 0 4px 14px -2px rgb(15 23 42 / 0.12)",
+        lift: "0 8px 22px -3px rgb(15 23 42 / 0.18), 0 4px 10px -2px rgb(15 23 42 / 0.10)",
       },
     },
   },
