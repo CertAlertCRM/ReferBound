@@ -59,7 +59,7 @@ export function ReferralMessages({
                   : "bg-slate-100 text-ink"
               }`}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5">
                 {m.sender === "partner" ? partnerName : agentName} ·{" "}
                 {new Date(m.created_at).toLocaleString("en-US", {
                   month: "short",
@@ -83,7 +83,7 @@ export function ReferralMessages({
               {busy ? "…" : "Send"}
             </button>
           </form>
-          <p className="text-[10px] text-ink-muted">
+          <p className="text-[11px] text-ink-muted">
             {agentName} is notified instantly and replies land here and in your inbox.
           </p>
         </div>

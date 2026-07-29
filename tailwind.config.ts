@@ -21,9 +21,11 @@ const config: Config = {
           light: "#eef4ff",
         },
         ink: {
+          // Contrast-safe greys: secondary reads as body text (slate-700),
+          // muted stays quiet but passes WCAG AA on white (slate-500).
           DEFAULT: "#0f172a",
-          secondary: "#475569",
-          muted: "#94a3b8",
+          secondary: "#334155",
+          muted: "#64748b",
         },
       },
       fontFamily: {

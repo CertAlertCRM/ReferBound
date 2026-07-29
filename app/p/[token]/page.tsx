@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: { token: string } }
 }
 
 const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
-  new: { pill: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
+  new: { pill: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
   quoting: { pill: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
   quoted: { pill: "bg-blue-50 text-blue-700", dot: "bg-blue-500" },
   application: { pill: "bg-violet-50 text-violet-700", dot: "bg-violet-500" },
@@ -384,7 +384,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 <div className="mt-3.5">
                   <Progress status={r.status} />
                   {r.status !== "lost" && (
-                    <p className="mt-1.5 text-[10px] text-ink-muted">
+                    <p className="mt-1.5 text-[11px] text-ink-muted">
                       {SAFE_STATUSES.includes(r.status) ? (
                         <span className="text-emerald-600 font-semibold">
                           {STATUS_LABELS[r.status]} — all set
@@ -439,7 +439,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 )}
 
                 {partnerDocs.length > 0 && (
-                  <p className="mt-2.5 text-[10px] text-ink-muted inline-flex items-center gap-1">
+                  <p className="mt-2.5 text-[11px] text-ink-muted inline-flex items-center gap-1">
                     <IconPaperclip size={11} /> You sent:{" "}
                     {partnerDocs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", ")}
                   </p>

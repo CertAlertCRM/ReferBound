@@ -189,7 +189,7 @@ export default function PartnersPage() {
                 <form onSubmit={saveEdit} className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="font-semibold">Edit {p.name}</h3>
-                    <span className="badge bg-slate-100 text-slate-600">
+                    <span className="badge bg-slate-100 text-slate-700">
                       {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
                     </span>
                   </div>
@@ -304,12 +304,12 @@ export default function PartnersPage() {
                             alt=""
                             className="w-16 h-16 rounded-lg object-contain bg-white border border-slate-200 p-1.5"
                           />
-                          <span className="absolute inset-0 rounded-lg bg-slate-900/60 text-white text-[10px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
+                          <span className="absolute inset-0 rounded-lg bg-slate-900/60 text-white text-[11px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
                             Replace
                           </span>
                         </>
                       ) : (
-                        <span className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold hover:border-brand hover:text-brand text-center leading-tight">
+                        <span className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold hover:border-brand hover:text-brand text-center leading-tight">
                           <IconPlus size={14} />
                           logo
                         </span>
@@ -319,7 +319,7 @@ export default function PartnersPage() {
                     <div>
                       <p className="font-semibold">
                         {p.name}{" "}
-                        <span className="badge bg-slate-100 text-slate-600 align-middle ml-1">
+                        <span className="badge bg-slate-100 text-slate-700 align-middle ml-1">
                           {PARTNER_TYPES[p.partner_type] ?? "Lender"}
                         </span>
                       </p>
@@ -367,7 +367,7 @@ export default function PartnersPage() {
                 <p className="text-xs text-ink-muted mt-0.5">Scan to open their live portal</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={qr.dataUrl} alt={`QR code for ${qr.name}'s portal`} className="w-full rounded-xl border border-slate-200 mt-3" />
-                <p className="text-[10px] text-ink-muted mt-2 break-all">{qr.link}</p>
+                <p className="text-[11px] text-ink-muted mt-2 break-all">{qr.link}</p>
                 <div className="flex gap-2 mt-4">
                   <a href={qr.dataUrl} download={`referbound-qr-${qr.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`} className="btn-primary flex-1 !py-2 text-xs">
                     Download PNG

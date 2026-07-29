@@ -530,7 +530,7 @@ export default function DealPage() {
                     m.sender === "agent" ? "bg-brand-light ml-auto" : "bg-slate-100"
                   }`}
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5">
                     {m.sender === "agent" ? "You" : r.partners?.name ?? "Partner"} ·{" "}
                     {new Date(m.created_at).toLocaleString("en-US", {
                       month: "short",

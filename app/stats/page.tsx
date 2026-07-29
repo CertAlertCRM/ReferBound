@@ -98,7 +98,7 @@ export default function StatsPage() {
             <div key={t.label} className="card p-4">
               <p className="text-[26px] leading-8 font-semibold tracking-tight">{t.value}</p>
               <p className="text-xs text-ink-secondary mt-1">{t.label}</p>
-              {t.hint && <p className="text-[10px] text-ink-muted mt-1">{t.hint}</p>}
+              {t.hint && <p className="text-[11px] text-ink-muted mt-1">{t.hint}</p>}
             </div>
           ))}
         </div>
@@ -115,7 +115,7 @@ export default function StatsPage() {
                 <div className="grid grid-cols-6 gap-2 items-end">
                   {stats.monthly.map((m) => (
                     <div key={m.label} className="flex flex-col items-center gap-1.5">
-                      <p className="text-[10px] font-semibold text-ink h-4">
+                      <p className="text-[11px] font-semibold text-ink h-4">
                         {m.premium > 0 ? `$${Math.round(m.premium / 100) / 10}k` : ""}
                       </p>
                       <div className="flex items-end gap-1 h-24 w-full justify-center">
@@ -130,8 +130,8 @@ export default function StatsPage() {
                           title={`${m.bound} bound`}
                         />
                       </div>
-                      <p className="text-[10px] text-ink-muted">{m.label}</p>
-                      <p className="text-[10px] text-ink-secondary -mt-1">
+                      <p className="text-[11px] text-ink-muted">{m.label}</p>
+                      <p className="text-[11px] text-ink-secondary -mt-1">
                         {m.referred}·{m.bound}
                       </p>
                     </div>
@@ -139,7 +139,7 @@ export default function StatsPage() {
                 </div>
               );
             })()}
-            <div className="flex items-center gap-4 mt-3 text-[10px] text-ink-muted">
+            <div className="flex items-center gap-4 mt-3 text-[11px] text-ink-muted">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm bg-brand-200 inline-block" /> Referred
               </span>

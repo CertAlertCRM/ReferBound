@@ -129,7 +129,7 @@ export function IntroEmail({
               <IconCheck size={13} /> {hasTemplate ? "Update my template" : "Save as my template"}
             </button>
           </div>
-          <p className="text-[10px] text-ink-muted">
+          <p className="text-[11px] text-ink-muted">
             Opens in your own email app addressed to{" "}
             {clientEmail ? "your client (agent cc'd)" : "the agent — add your client's address before sending"}. Edit
             anything first; it sends from you, not from ReferBound.

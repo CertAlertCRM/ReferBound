@@ -355,7 +355,7 @@ export default function Dashboard() {
                       >
                         {a.detail ?? a.event_type}
                       </Link>
-                      <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(a.created_at)}</p>
+                      <p className="text-[11px] text-ink-muted mt-0.5">{timeAgo(a.created_at)}</p>
                     </div>
                   </li>
                 ))}

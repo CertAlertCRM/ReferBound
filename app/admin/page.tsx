@@ -118,7 +118,7 @@ export default function AdminPage() {
             <div key={x.l} className="card px-4 py-3.5">
               <p className={`text-xl font-semibold tracking-tight ${x.good ? "text-emerald-600" : ""}`}>{x.v}</p>
               <p className="text-[11px] text-ink-muted mt-0.5">{x.l}</p>
-              {x.hint && <p className="text-[10px] text-ink-muted mt-0.5">{x.hint}</p>}
+              {x.hint && <p className="text-[11px] text-ink-muted mt-0.5">{x.hint}</p>}
             </div>
           ))}
         </div>
@@ -138,7 +138,7 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-between text-[9px] text-ink-muted mt-1.5">
+            <div className="flex justify-between text-[11px] text-ink-muted mt-1.5">
               <span>{data.signups14d[0]?.label}</span>
               <span>{data.signups14d[data.signups14d.length - 1]?.label}</span>
             </div>
@@ -157,7 +157,7 @@ export default function AdminPage() {
                 onChange={(e) => saveCost(e.target.value)}
               />
             </label>
-            <p className="text-[10px] text-ink-muted mt-2">
+            <p className="text-[11px] text-ink-muted mt-2">
               Domains, Anthropic credits, Vercel/Supabase/Resend if upgraded. Saved on this
               device; used for the Net figure above.
             </p>
@@ -179,7 +179,7 @@ export default function AdminPage() {
             <div key={x.l} className="card px-4 py-3.5">
               <p className="text-sm font-semibold tracking-tight">{x.v}</p>
               <p className="text-[11px] text-ink-muted mt-0.5">{x.l}</p>
-              {x.hint && <p className="text-[10px] text-brand mt-0.5">{x.hint}</p>}
+              {x.hint && <p className="text-[11px] text-brand mt-0.5">{x.hint}</p>}
             </div>
           ))}
         </div>
@@ -203,7 +203,7 @@ export default function AdminPage() {
                 <tr key={a.email}>
                   <td className="py-2 pr-3 truncate max-w-[220px]">{a.email}</td>
                   <td className="py-2 pr-3">
-                    <span className={`badge ${a.plan === "free" ? "bg-slate-100 text-slate-600" : "bg-brand-light text-brand-700"}`}>
+                    <span className={`badge ${a.plan === "free" ? "bg-slate-100 text-slate-700" : "bg-brand-light text-brand-700"}`}>
                       {a.isMember ? "team seat" : (PLAN_LABELS[a.plan] ?? a.plan)}
                     </span>
                   </td>

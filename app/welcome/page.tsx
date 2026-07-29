@@ -66,7 +66,7 @@ export default function WelcomePage() {
         <div className="mt-12 max-w-lg mx-auto text-left">
           <div className="card overflow-hidden shadow-lift">
             <div className="bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-5 py-4 text-white">
-              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-brand-100">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-100">
                 <span className="live-dot" aria-hidden />
                 Live referral tracking
               </div>
@@ -84,7 +84,7 @@ export default function WelcomePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold">{d.name}</p>
-                      <p className="text-[10px] text-ink-muted">{d.meta}</p>
+                      <p className="text-[11px] text-ink-muted">{d.meta}</p>
                     </div>
                     <span className={`badge ${d.pillCls}`}>{d.pill}</span>
                   </div>

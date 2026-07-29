@@ -8,7 +8,7 @@ import { FeedbackWidget } from "./feedback-widget";
 
 // ── Status colors: dot + tinted pill, label always present ──────────────────
 const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
-  new: { pill: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
+  new: { pill: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
   quoting: { pill: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
   quoted: { pill: "bg-blue-50 text-blue-700", dot: "bg-blue-500" },
   application: { pill: "bg-violet-50 text-violet-700", dot: "bg-violet-500" },
