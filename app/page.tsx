@@ -188,18 +188,18 @@ export default function Dashboard() {
               <img
                 src={headshotUrl}
                 alt=""
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-white shadow-lift ring-1 ring-slate-200"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-[3px] border-white shadow-lift ring-1 ring-slate-200"
               />
             ) : (
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-brand text-white flex items-center justify-center text-3xl font-bold border-[3px] border-white shadow-lift ring-1 ring-slate-200">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-brand text-white flex items-center justify-center text-4xl font-bold border-[3px] border-white shadow-lift ring-1 ring-slate-200">
                 {(profileName || "?").charAt(0).toUpperCase()}
               </div>
             )}
             <div>
-              <p className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+              <p className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
                 Welcome back{profileName ? `, ${profileName.split(" ")[0]}` : ""}
               </p>
-              <p className="text-sm text-ink-secondary mt-1">Here&apos;s where your referrals stand.</p>
+              <p className="text-sm sm:text-base text-ink-secondary mt-1">Here&apos;s where your referrals stand.</p>
             </div>
           </div>
         )}

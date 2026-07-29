@@ -63,7 +63,17 @@ export function PartnerInviteButton({
     }
   }
 
+  const [copied, setCopied] = useState(false);
   const mailto = `mailto:${recipients.join(",")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Gmail web compose — works for browser-Gmail users where mailto: silently
+  // does nothing (no default desktop mail app configured).
+  const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients.join(","))}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  async function copyEmail() {
+    await navigator.clipboard.writeText(`To: ${recipients.join(", ")}\nSubject: ${subject}\n\n${body}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   return (
     <>
@@ -107,13 +117,23 @@ export function PartnerInviteButton({
                   >
                     {state === "sending" ? "Sending…" : "Send from ReferBound"}
                   </button>
-                  <a href={mailto} className="btn-ghost !py-2 text-xs">
-                    Open in my email
+                  <a href={gmail} target="_blank" rel="noopener" className="btn-ghost !py-2 text-xs">
+                    Open in Gmail
                   </a>
+                  <button className="btn-ghost !py-2 text-xs" onClick={copyEmail}>
+                    {copied ? "Copied ✓" : "Copy email"}
+                  </button>
                   <button className="btn-ghost !py-2 text-xs" onClick={() => setOpen(false)}>
                     Cancel
                   </button>
                 </div>
+                <p className="text-[11px] text-ink-muted">
+                  Use a desktop mail app instead?{" "}
+                  <a href={mailto} className="link !text-[11px]">
+                    Open in mail app
+                  </a>{" "}
+                  (needs a default mail app set in Windows/Mac).
+                </p>
               </div>
             )}
           </div>
