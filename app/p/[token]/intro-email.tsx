@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconMail, IconSparkles, IconCopy, IconCheck } from "../../icons";
 
 // The partner's intro-email composer: AI drafts (following their saved
 // template if one exists), they edit, then it opens in THEIR email app via
@@ -75,10 +76,10 @@ export function IntroEmail({
     return (
       <button
         onClick={loadDraft}
-        className="text-xs font-semibold text-brand hover:text-brand-dark"
+        className="link"
         title="AI drafts the introduction email connecting your client with the agent — it opens in your own email app to send"
       >
-        ✉️ Intro email
+        <IconMail size={13} /> Intro email
       </button>
     );
   }
@@ -96,7 +97,9 @@ export function IntroEmail({
       </div>
 
       {loading ? (
-        <p className="text-sm text-ink-muted py-3">✨ Drafting…</p>
+        <p className="text-sm text-ink-muted py-3 inline-flex items-center gap-1.5">
+          <IconSparkles size={14} /> Drafting…
+        </p>
       ) : (
         <>
           <input
@@ -112,18 +115,18 @@ export function IntroEmail({
           />
           <div className="flex flex-wrap gap-2 items-center">
             <a href={mailtoHref()} className="btn-primary !px-3 !py-1.5 text-xs">
-              ✉️ Open in my email
+              <IconMail size={13} /> Open in my email
             </a>
             <button type="button" onClick={copyAll} className="btn-ghost !px-3 !py-1.5 text-xs">
-              Copy
+              <IconCopy size={13} /> Copy
             </button>
             <button
               type="button"
               onClick={saveTemplate}
-              className="text-xs font-semibold text-brand hover:text-brand-dark ml-auto"
+              className="link ml-auto"
               title="Save this wording as your pattern — future drafts keep your style and just swap the client details"
             >
-              {hasTemplate ? "Update my template" : "Save as my template"}
+              <IconCheck size={13} /> {hasTemplate ? "Update my template" : "Save as my template"}
             </button>
           </div>
           <p className="text-[10px] text-ink-muted">

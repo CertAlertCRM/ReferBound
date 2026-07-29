@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
+import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus } from "../icons";
 
 type Partner = {
   id: string;
@@ -198,10 +199,11 @@ export default function PartnersPage() {
                       />
                     ) : (
                       <label
-                        className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex items-center justify-center text-[10px] font-semibold cursor-pointer hover:border-brand hover:text-brand text-center leading-tight"
+                        className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold cursor-pointer hover:border-brand hover:text-brand text-center leading-tight"
                         title="Upload this partner's logo"
                       >
-                        + logo
+                        <IconPlus size={14} />
+                        logo
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
                       </label>
                     )}
@@ -218,7 +220,7 @@ export default function PartnersPage() {
                         {p.logoUrl && (
                           <>
                             {" · "}
-                            <label className="text-brand cursor-pointer hover:underline">
+                            <label className="text-brand cursor-pointer hover:text-brand-dark font-medium">
                               replace logo
                               <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
                             </label>
@@ -229,13 +231,21 @@ export default function PartnersPage() {
                   </div>
                   <div className="flex gap-2">
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => startEdit(p)}>
-                      Edit
+                      <IconPencil size={12} /> Edit
                     </button>
                     <a className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.token}`} target="_blank">
-                      View portal
+                      <IconExternal size={12} /> View portal
                     </a>
                     <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
-                      {copied === p.id ? "Copied ✓" : "Copy magic link"}
+                      {copied === p.id ? (
+                        <>
+                          <IconCheck size={12} /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <IconCopy size={12} /> Copy magic link
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

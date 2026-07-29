@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DOC_KINDS, PARTNER_DOC_KINDS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
+import { IconZap, IconUpload, IconX, IconMail } from "../../icons";
 
 type PendingFile = { file: File; kind: string };
 
@@ -144,20 +145,26 @@ export function PartnerSubmitForm({
       {done ? (
         <div className="text-center py-6 space-y-1.5">
           <p className="text-emerald-700 font-semibold">Sent ✓ — thank you!</p>
-          <p className="text-xs text-ink-secondary">
-            Tip: tap <span className="font-semibold">✉️ Intro email</span> on the new card below to connect
-            your client and the agent in one step.
+          <p className="text-xs text-ink-secondary inline-flex items-center gap-1 flex-wrap justify-center">
+            Tip: tap{" "}
+            <span className="font-semibold inline-flex items-center gap-1">
+              <IconMail size={12} /> Intro email
+            </span>{" "}
+            on the new card below to connect your client and the agent in one step.
           </p>
         </div>
       ) : (
         <>
           {/* Docs-first: the fast lane */}
           <div className="rounded-xl border border-dashed border-brand-200 bg-brand-light/40 p-4 space-y-2">
-            <p className="text-sm font-semibold text-brand-800">
-              ⚡ Fastest way:{" "}
-              {isLender
-                ? "upload the 1003 (or any client doc) and we'll fill this form for you"
-                : "have a document with the client's details? Upload it and we'll fill this form for you"}
+            <p className="text-sm font-semibold text-brand-800 flex items-center gap-1.5">
+              <IconZap size={15} className="shrink-0" />
+              <span>
+                Fastest way:{" "}
+                {isLender
+                  ? "upload the 1003 (or any client doc) and we'll fill this form for you"
+                  : "have a document with the client's details? Upload it and we'll fill this form for you"}
+              </span>
             </p>
             {files.map((f, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
@@ -177,21 +184,23 @@ export function PartnerSubmitForm({
                 )}
                 <button
                   type="button"
-                  className="text-xs text-ink-muted hover:text-red-600"
+                  className="text-ink-muted hover:text-red-600 transition-colors"
                   onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                  aria-label="Remove file"
                 >
-                  ✕
+                  <IconX size={14} />
                 </button>
               </div>
             ))}
             <label className="btn-ghost cursor-pointer !py-2 text-xs">
+              <IconUpload size={13} />
               {prefilling
                 ? "Reading document…"
                 : files.length > 0
-                ? "+ Add another file"
+                ? "Add another file"
                 : isLender
-                ? "+ Upload 1003 / HOI request / other docs"
-                : "+ Upload a document (optional)"}
+                ? "Upload 1003 / HOI request / other docs"
+                : "Upload a document (optional)"}
               <input
                 type="file"
                 className="hidden"

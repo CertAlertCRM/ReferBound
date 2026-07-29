@@ -10,6 +10,15 @@ import { AutoRefresh } from "./auto-refresh";
 import { ReferralMessages } from "./referral-messages";
 import { IntroEmail } from "./intro-email";
 import { DOCS_BUCKET } from "@/lib/db";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconAlert,
+  IconPaperclip,
+  IconDownload,
+  IconPhone,
+  IconMail,
+} from "../../icons";
 
 export const dynamic = "force-dynamic";
 
@@ -139,8 +148,8 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           <p className="text-xs font-medium text-brand-800">
             You&apos;re viewing this portal as the agent — this bar is invisible to your partner.
           </p>
-          <Link href="/" className="text-xs font-semibold text-brand hover:text-brand-dark shrink-0">
-            ← Back to dashboard
+          <Link href="/" className="link shrink-0">
+            <IconArrowLeft size={13} /> Back to dashboard
           </Link>
         </div>
       )}
@@ -169,11 +178,18 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 Every client you&apos;ve referred to {agentName}, updated in real time. Documents land here the moment policies are bound.
               </p>
               {(prof?.phone || prof?.email) && (
-                <p className="text-xs text-brand-100 mt-2.5">
-                  Reach {agentName?.split(" ")[0]} directly:
-                  {prof?.phone && <span className="font-semibold"> {prof.phone}</span>}
-                  {prof?.phone && prof?.email && " · "}
-                  {prof?.email && <span className="font-semibold">{prof.email}</span>}
+                <p className="text-xs text-brand-100 mt-2.5 flex items-center flex-wrap gap-x-3 gap-y-1">
+                  <span>Reach {agentName?.split(" ")[0]} directly:</span>
+                  {prof?.phone && (
+                    <span className="font-semibold inline-flex items-center gap-1">
+                      <IconPhone size={12} /> {prof.phone}
+                    </span>
+                  )}
+                  {prof?.email && (
+                    <span className="font-semibold inline-flex items-center gap-1">
+                      <IconMail size={12} /> {prof.email}
+                    </span>
+                  )}
                 </p>
               )}
             </div>
@@ -273,8 +289,9 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 </div>
 
                 {risk && (
-                  <p className="mt-3 text-xs font-medium text-red-700 bg-red-50 rounded-lg px-3 py-2">
-                    ⚠ Closing soon and insurance is not yet bound — {agentName} is on it.
+                  <p className="mt-3 text-xs font-medium text-red-700 bg-red-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <IconAlert size={13} className="shrink-0" /> Closing soon and insurance is not yet
+                    bound — {agentName} is on it.
                   </p>
                 )}
 
@@ -286,11 +303,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                         href={`/api/docs/${d.id}/download?t=${partner.token}`}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-brand-light text-brand-700 hover:bg-brand-100 px-3 py-1.5 text-xs font-semibold transition-colors"
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="7 10 12 15 17 10" />
-                          <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
+                        <IconDownload size={12} strokeWidth={2.5} />
                         {DOC_KINDS[d.kind] ?? d.file_name}
                       </a>
                     ))}
@@ -298,8 +311,9 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 )}
 
                 {partnerDocs.length > 0 && (
-                  <p className="mt-2.5 text-[10px] text-ink-muted">
-                    📎 You sent: {partnerDocs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", ")}
+                  <p className="mt-2.5 text-[10px] text-ink-muted inline-flex items-center gap-1">
+                    <IconPaperclip size={11} /> You sent:{" "}
+                    {partnerDocs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", ")}
                   </p>
                 )}
 
@@ -326,7 +340,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                   <details className="pt-1">
                     <summary className="cursor-pointer list-none card px-4 py-3 flex items-center justify-between hover:shadow-lift transition-shadow">
                       <span className="section-label">Completed &amp; past · {closedRefs.length}</span>
-                      <span className="text-xs font-semibold text-brand">Show ▾</span>
+                      <span className="link">Show all</span>
                     </summary>
                     <div className="space-y-3 mt-3">{closedRefs.map(renderCard)}</div>
                   </details>
@@ -342,10 +356,10 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Bound</span></span>
         </a>
         {" · "}Statuses update in real time
-        <span className="block mt-1">
+        <span className="mt-1 inline-flex items-center gap-1">
           Are you an insurance agent?{" "}
-          <a href="/" className="text-brand font-medium hover:underline">
-            Get this for your partners →
+          <a href="/" className="link !text-xs">
+            Get this for your partners <IconArrowRight size={12} />
           </a>
         </span>
       </footer>

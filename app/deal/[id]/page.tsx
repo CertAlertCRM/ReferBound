@@ -5,6 +5,21 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { STATUSES, STATUS_LABELS, DOC_KINDS } from "@/lib/config";
 import { StatusBadge, StatusProgress, TopNav } from "../../components";
+import {
+  IconMail,
+  IconSparkles,
+  IconPhone,
+  IconCalendar,
+  IconMapPin,
+  IconUsers,
+  IconHome,
+  IconDownload,
+  IconUpload,
+  IconArrowLeft,
+  IconTrash,
+  IconFile,
+  IconAlert,
+} from "../../icons";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
@@ -207,8 +222,8 @@ export default function DealPage() {
     <>
       <TopNav active="referrals" />
       <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
-        <Link href="/" className="text-sm font-medium text-brand hover:text-brand-dark">
-          ← All referrals
+        <Link href="/" className="link-back">
+          <IconArrowLeft size={15} /> All referrals
         </Link>
 
         <header className="card p-6 space-y-4">
@@ -223,13 +238,25 @@ export default function DealPage() {
             <StatusBadge status={r.status} />
           </div>
           <StatusProgress status={r.status} />
-          <div className="text-sm text-ink-secondary flex flex-wrap gap-x-5 gap-y-1">
-            {r.coborrower_name && <span>👥 Co-borrower: {r.coborrower_name}</span>}
-            {r.client_phone && <span>📞 {r.client_phone}</span>}
-            {r.client_email && <span>✉️ {r.client_email}</span>}
-            {r.client_dob && <span>🎂 DOB {r.client_dob}</span>}
-            {r.property_address && <span>📍 {r.property_address}</span>}
-            {r.closing_date && <span>🏠 Closes {r.closing_date}</span>}
+          <div className="text-sm text-ink-secondary flex flex-wrap gap-x-5 gap-y-1.5">
+            {r.coborrower_name && (
+              <span className="meta-item"><IconUsers size={14} className="text-ink-muted" /> {r.coborrower_name}</span>
+            )}
+            {r.client_phone && (
+              <span className="meta-item"><IconPhone size={14} className="text-ink-muted" /> {r.client_phone}</span>
+            )}
+            {r.client_email && (
+              <span className="meta-item"><IconMail size={14} className="text-ink-muted" /> {r.client_email}</span>
+            )}
+            {r.client_dob && (
+              <span className="meta-item"><IconCalendar size={14} className="text-ink-muted" /> DOB {r.client_dob}</span>
+            )}
+            {r.property_address && (
+              <span className="meta-item"><IconMapPin size={14} className="text-ink-muted" /> {r.property_address}</span>
+            )}
+            {r.closing_date && (
+              <span className="meta-item"><IconHome size={14} className="text-ink-muted" /> Closes {r.closing_date}</span>
+            )}
             {r.log_seconds !== null && (
               <span className="text-ink-muted text-xs self-center">logged in {r.log_seconds}s</span>
             )}
@@ -245,11 +272,8 @@ export default function DealPage() {
                   <span className="badge bg-amber-50 text-amber-700">
                     Missing: {missing.join(", ")}
                   </span>
-                  <button
-                    onClick={() => askForMissing(missing)}
-                    className="text-xs font-semibold text-brand hover:text-brand-dark"
-                  >
-                    ✨ Draft an ask to {r.partners?.name ?? "partner"} ↓
+                  <button onClick={() => askForMissing(missing)} className="link">
+                    <IconSparkles size={13} /> Draft an ask to {r.partners?.name ?? "partner"}
                   </button>
                 </>
               )}
@@ -318,19 +342,15 @@ export default function DealPage() {
                   </span>
                   <span className="flex items-center gap-3 shrink-0">
                     <button
-                      className="text-brand font-medium text-xs hover:text-brand-dark disabled:opacity-50"
+                      className="link disabled:opacity-50"
                       onClick={() => extractDoc(d.id)}
                       disabled={extracting !== null}
                       title="AI reads this document and fills in any missing client or policy details"
                     >
-                      {extracting === d.id ? "Reading…" : "✨ Extract"}
+                      <IconSparkles size={13} /> {extracting === d.id ? "Reading…" : "Extract"}
                     </button>
-                    <a
-                      className="text-brand font-medium text-xs hover:text-brand-dark"
-                      href={`/api/docs/${d.id}/download`}
-                      target="_blank"
-                    >
-                      Download
+                    <a className="link" href={`/api/docs/${d.id}/download`} target="_blank">
+                      <IconDownload size={13} /> Download
                     </a>
                   </span>
                 </li>
@@ -339,14 +359,20 @@ export default function DealPage() {
           )}
           {extractResult && (
             <div className="text-xs rounded-lg bg-brand-light/60 border border-brand-100 px-3 py-2.5 space-y-1">
-              {extractResult.summary && <p className="text-ink-secondary">📄 {extractResult.summary}</p>}
+              {extractResult.summary && (
+                <p className="text-ink-secondary inline-flex items-center gap-1.5">
+                  <IconFile size={12} className="shrink-0" /> {extractResult.summary}
+                </p>
+              )}
               {extractResult.filled.length > 0 ? (
                 <p className="text-emerald-700 font-medium">✓ Filled: {extractResult.filled.join(", ")}</p>
               ) : (
                 <p className="text-ink-muted">Nothing new to fill — existing info left untouched.</p>
               )}
               {extractResult.mismatches.map((m, i) => (
-                <p key={i} className="text-amber-700">⚠ {m}</p>
+                <p key={i} className="text-amber-700 inline-flex items-center gap-1.5">
+                  <IconAlert size={12} className="shrink-0" /> {m}
+                </p>
               ))}
             </div>
           )}
@@ -372,7 +398,7 @@ export default function DealPage() {
             </label>
           </div>
           <label className="btn-ghost cursor-pointer">
-            {uploading ? "Uploading…" : "Upload file"}
+            <IconUpload size={14} /> {uploading ? "Uploading…" : "Upload file"}
             <input
               type="file"
               className="hidden"
@@ -399,7 +425,7 @@ export default function DealPage() {
               {msgs.length > 3 && !showAllMsgs && (
                 <button
                   onClick={() => setShowAllMsgs(true)}
-                  className="text-xs font-semibold text-brand hover:text-brand-dark"
+                  className="link"
                 >
                   Show earlier messages ({msgs.length - 3})
                 </button>
@@ -440,7 +466,7 @@ export default function DealPage() {
               className="btn-ghost shrink-0"
               title="Draft an update from this deal's real status and activity — you edit before sending"
             >
-              {drafting ? "…" : "✨ Draft"}
+              <IconSparkles size={14} /> {drafting ? "…" : "Draft"}
             </button>
             <button className="btn-primary shrink-0" disabled={replySending || !reply.trim()}>
               {replySending ? "…" : "Send"}
@@ -490,7 +516,7 @@ export default function DealPage() {
             {activity.length > 1 && (
               <button
                 onClick={() => setShowAllActivity(!showAllActivity)}
-                className="text-xs font-semibold text-brand hover:text-brand-dark"
+                className="link"
               >
                 {showAllActivity ? "Show less" : `Full history (${activity.length - 1} more)`}
               </button>
@@ -533,8 +559,8 @@ export default function DealPage() {
         </section>
 
         <div className="text-center">
-          <button onClick={del} className="text-xs text-ink-muted hover:text-red-600 transition-colors">
-            Delete referral
+          <button onClick={del} className="link-muted hover:!text-red-600">
+            <IconTrash size={13} /> Delete referral
           </button>
         </div>
       </main>

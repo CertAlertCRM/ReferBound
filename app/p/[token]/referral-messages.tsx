@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { IconMessage } from "../../icons";
 
 type Msg = { id: string; sender: string; body: string; created_at: string };
 
@@ -42,10 +43,8 @@ export function ReferralMessages({
 
   return (
     <div className="mt-3.5 border-t border-slate-100 pt-3">
-      <button
-        onClick={() => setOpen(!open)}
-        className="text-xs font-semibold text-brand hover:text-brand-dark"
-      >
+      <button onClick={() => setOpen(!open)} className="link">
+        <IconMessage size={13} />
         {open ? "Hide messages" : messages.length > 0 ? `Messages (${messages.length})` : "Ask about this referral"}
       </button>
 

@@ -30,6 +30,19 @@ body {
   .section-label {
     @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted;
   }
+  /* Unified text links: brand-colored action links with icon alignment */
+  .link {
+    @apply inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-dark transition-colors;
+  }
+  .link-back {
+    @apply inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:text-brand-dark transition-colors;
+  }
+  .link-muted {
+    @apply inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors;
+  }
+  .meta-item {
+    @apply inline-flex items-center gap-1.5;
+  }
 }
 
 /* Live pulse dot for the wordmark and partner portal */

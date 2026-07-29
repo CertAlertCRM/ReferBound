@@ -5,6 +5,7 @@ import Link from "next/link";
 import { STATUSES, STATUS_LABELS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
+import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp } from "./icons";
 
 type Referral = {
   id: string;
@@ -189,7 +190,9 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <button onClick={openAdd} className="btn-primary shrink-0">+ Log lead</button>
+          <button onClick={openAdd} className="btn-primary shrink-0">
+            <IconPlus size={15} /> Log lead
+          </button>
         </div>
 
         {showAdd && (
@@ -272,7 +275,9 @@ export default function Dashboard() {
             <p className="text-sm text-ink-secondary">
               Add your partners first, then log your first lead — it takes seconds.
             </p>
-            <Link href="/partners" className="btn-ghost inline-flex mt-2">Set up partners →</Link>
+            <Link href="/partners" className="btn-ghost inline-flex mt-2">
+              Set up partners <IconArrowRight size={14} />
+            </Link>
           </div>
         ) : (
           <>
@@ -314,7 +319,9 @@ function Section({
           <span className="section-label">
             {title} · {items.length}
           </span>
-          <span className="text-xs font-semibold text-brand">Show ▾</span>
+          <span className="link">
+            Show <IconChevronDown size={13} />
+          </span>
         </button>
       </section>
     );
@@ -326,8 +333,8 @@ function Section({
           {title} · {items.length}
         </span>
         {collapsible && (
-          <button onClick={() => setOpen(false)} className="text-brand normal-case tracking-normal font-semibold">
-            Hide ▴
+          <button onClick={() => setOpen(false)} className="link normal-case tracking-normal">
+            Hide <IconChevronUp size={13} />
           </button>
         )}
       </h2>
@@ -373,7 +380,11 @@ function Section({
                     className="btn-ghost shrink-0 !px-3 !py-1.5 text-xs"
                     title={`Advance to ${STATUS_LABELS[ns]}`}
                   >
-                    {busyId === r.id ? "…" : `→ ${STATUS_LABELS[ns]}`}
+                    {busyId === r.id ? "…" : (
+                      <>
+                        {STATUS_LABELS[ns]} <IconArrowRight size={12} />
+                      </>
+                    )}
                   </button>
                 )}
               </div>
