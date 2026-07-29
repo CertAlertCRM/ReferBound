@@ -13,36 +13,45 @@ export const metadata = {
 const FEATURES = [
   {
     title: "A live portal for every partner",
-    body: "Your lenders and realtors get a private link — no logins, no passwords — showing every client they've sent you and exactly where each one stands. No more “any update?” texts.",
+    body: "Each partner gets a private link — no logins, no passwords — showing the clients they've sent you and where each one stands. Fewer “any update?” calls and texts.",
   },
   {
-    title: "EOI delivered the moment you bind",
-    body: "Evidence of insurance and replacement cost estimators land in the partner's portal the second the policy is bound. Their processor stops chasing you, and closings stop waiting on paperwork.",
+    title: "Documents in one place",
+    body: "When you bind and upload the EOI and RCE, your partner downloads them straight from their portal — no digging through email threads before a closing.",
   },
   {
-    title: "Closing-date protection",
-    body: "Any referral within a week of closing that isn't bound yet gets flagged to both sides automatically. The deal your partner cares about most never slips through quietly.",
+    title: "Closing-date alerts",
+    body: "If a referral is within a week of its closing date and not yet bound, both sides get flagged automatically so it gets attention in time.",
   },
   {
-    title: "You look responsive without lifting a finger",
-    body: "Every status change notifies your partner automatically, and a monthly summary shows them what their referrals turned into. The agents who close the loop get the next referral.",
+    title: "Updates without extra work",
+    body: "Key status changes send your partner a short email automatically, and a monthly summary recaps what their referrals turned into — with your name on it.",
   },
 ];
 
 export default function WelcomePage() {
   return (
     <main className="min-h-screen">
+      {/* Top bar with sign-in for existing accounts */}
+      <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-200/80">
+        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Wordmark />
+          <a href="/login" className="btn-primary !px-5">
+            Sign in
+          </a>
+        </div>
+      </header>
+
       {/* Hero */}
-      <section className="max-w-3xl mx-auto px-6 pt-16 pb-12 text-center">
-        <Wordmark size="text-3xl" />
-        <h1 className="mt-8 text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
+      <section className="max-w-3xl mx-auto px-6 pt-14 pb-12 text-center">
+        <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
           Your referral partners deserve better than{" "}
           <span className="text-brand">&ldquo;any update?&rdquo;</span>
         </h1>
         <p className="mt-4 text-lg text-ink-secondary max-w-xl mx-auto">
-          ReferBound gives insurance agents a live referral portal for their lender, realtor, and CPA
-          partners — status on every client, documents the moment policies bind, and closings that
-          never slip quietly.
+          ReferBound gives insurance agents a shared portal with their lender, realtor, and CPA
+          partners — live status on every referred client, document downloads once policies are
+          bound, and automatic alerts when a closing is approaching without coverage in place.
         </p>
         <div className="mt-8 max-w-md mx-auto">
           <WaitlistForm />
@@ -88,7 +97,7 @@ export default function WelcomePage() {
             </div>
           </div>
           <p className="text-center text-xs text-ink-muted mt-3">
-            ↑ What your lending partner sees — live, from one link, no login.
+            What your lending partner sees — live, from one link, no login.
           </p>
         </div>
       </section>
@@ -131,8 +140,9 @@ export default function WelcomePage() {
       <footer className="text-center text-xs text-ink-muted pb-10">
         © 2026 ReferBound · Built by agents, for agents
         <span className="block mt-1">
-          <a href="/login" className="hover:underline">
-            Agent sign-in
+          Already have an account?{" "}
+          <a href="/login" className="link !text-xs">
+            Sign in
           </a>
         </span>
       </footer>
