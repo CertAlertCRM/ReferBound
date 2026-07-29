@@ -268,7 +268,9 @@ export default function DealPage() {
             <div>
               <h1 className="text-xl font-bold tracking-tight">{r.client_name}</h1>
               <p className="text-sm text-ink-secondary mt-0.5">
-                Referred by {r.partners?.name ?? "—"}
+                Referred by {(r as any).partner_contacts?.name
+                  ? `${(r as any).partner_contacts.name} at ${r.partners?.name ?? "—"}`
+                  : (r.partners?.name ?? "—")}
                 {r.source === "partner" && " · via portal"}
               </p>
             </div>

@@ -10,7 +10,7 @@ export async function GET() {
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data, error } = await db()
     .from("referrals")
-    .select("*, partners(name), documents(id, kind, file_name, uploaded_by)")
+    .select("*, partners(name), partner_contacts(name), documents(id, kind, file_name, uploaded_by)")
     .eq("account_id", account.id)
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

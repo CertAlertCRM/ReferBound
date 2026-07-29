@@ -90,7 +90,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
   const { data: referrals, error: refError } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, created_at, updated_at, documents(id, kind, file_name, uploaded_by)")
+    .select("id, client_name, closing_date, status, created_at, updated_at, partner_contacts(name), documents(id, kind, file_name, uploaded_by)")
     .eq("partner_id", partner.id)
     .order("created_at", { ascending: false });
 
@@ -101,6 +101,13 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const refs = referrals ?? [];
   const active = refs.filter((r) => !SAFE_STATUSES.includes(r.status) && r.status !== "lost");
   const bound = refs.filter((r) => SAFE_STATUSES.includes(r.status));
+
+  // Known team contacts, for the submit form's "who's sending this?" picker.
+  const { data: teamContacts } = await db()
+    .from("partner_contacts")
+    .select("id, name, role")
+    .eq("partner_id", partner.id)
+    .order("created_at", { ascending: true });
 
   // Message threads for this partner's referrals, grouped per referral.
   const refIds = refs.map((r) => r.id);
@@ -334,7 +341,11 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           </div>
         )}
 
-      <PartnerSubmitForm token={partner.token} partnerType={partner.partner_type ?? "lender"} />
+      <PartnerSubmitForm
+        token={partner.token}
+        partnerType={partner.partner_type ?? "lender"}
+        contacts={(teamContacts ?? []) as any}
+      />
 
       {refError ? (
         <div className="card p-6 border-red-200 text-sm">
@@ -369,6 +380,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                     <p className="font-semibold">{r.client_name}</p>
                     <p className="text-xs text-ink-muted mt-0.5">
                       Referred {fmtDate(r.created_at)}
+                      {(r as any).partner_contacts?.name && <> by {(r as any).partner_contacts.name}</>}
                       {r.closing_date && (
                         <> · Closing {fmtDate(r.closing_date)}{days !== null && days >= 0 ? ` (${days}d)` : ""}</>
                       )}

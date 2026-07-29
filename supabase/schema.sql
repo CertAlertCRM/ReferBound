@@ -174,6 +174,19 @@ alter table reset_codes enable row level security;
 -- Outbound webhook / Zapier bridge (see migration_11)
 alter table accounts add column if not exists webhook_url text;
 
+-- Partner contacts — who on the team sent each lead (see migration_17)
+create table if not exists partner_contacts (
+  id uuid primary key default gen_random_uuid(),
+  partner_id uuid not null references partners(id) on delete cascade,
+  name text not null,
+  email text not null,
+  role text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_partner_contacts_partner on partner_contacts(partner_id);
+alter table partner_contacts enable row level security;
+alter table referrals add column if not exists contact_id uuid references partner_contacts(id) on delete set null;
+
 -- Short magic links (see migration_16)
 alter table partners add column if not exists short_code text unique
   default substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);

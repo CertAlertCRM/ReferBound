@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: referral } = await db()
     .from("referrals")
-    .select("id, client_name, partners(name, token, emails)")
+    .select("id, client_name, partners(name, token, emails), partner_contacts(name, email)")
     .eq("id", params.id)
     .single();
   if (!referral) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -55,10 +55,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   await logActivity(referral.id, "email_sent", `Reply from ${agentName}: “${text.slice(0, 120)}”`, "agent");
 
   const partner = (referral as any).partners;
+  const contact = (referral as any).partner_contacts;
   await sendEmail({
     referralId: referral.id,
     kind: "message",
-    to: partner?.emails ?? [],
+    to: contact?.email ? [contact.email] : (partner?.emails ?? []),
     subject: `${agentName} — update on ${referral.client_name}`,
     html: messageEmail(
       agentName,

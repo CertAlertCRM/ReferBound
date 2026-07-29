@@ -25,6 +25,48 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: "That client email doesn't look right — check the @ and domain." }, { status: 400 });
   }
 
+  // Who on the partner's team is sending this? Existing contact by id, or a
+  // new name+email pair (deduped by email per partner).
+  let contactId: string | null = null;
+  let contactName: string | null = null;
+  if (body?.sender_contact_id) {
+    const { data: c } = await db()
+      .from("partner_contacts")
+      .select("id, name")
+      .eq("id", String(body.sender_contact_id))
+      .eq("partner_id", partner.id)
+      .maybeSingle();
+    if (c) {
+      contactId = c.id;
+      contactName = c.name;
+    }
+  } else if (body?.sender_name && body?.sender_email) {
+    const sName = String(body.sender_name).trim().slice(0, 120);
+    const sEmail = normalizeEmail(body.sender_email);
+    if (sName && sEmail && EMAIL_RE.test(sEmail)) {
+      const { data: existingC } = await db()
+        .from("partner_contacts")
+        .select("id, name")
+        .eq("partner_id", partner.id)
+        .eq("email", sEmail)
+        .maybeSingle();
+      if (existingC) {
+        contactId = existingC.id;
+        contactName = existingC.name;
+      } else {
+        const { data: created } = await db()
+          .from("partner_contacts")
+          .insert({ partner_id: partner.id, name: sName, email: sEmail })
+          .select("id, name")
+          .single();
+        if (created) {
+          contactId = created.id;
+          contactName = created.name;
+        }
+      }
+    }
+  }
+
   const { data: referral, error } = await db()
     .from("referrals")
     .insert({
@@ -39,6 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       closing_date: body?.closing_date || null,
       notes: body?.notes || null,
       source: "partner",
+      contact_id: contactId,
     })
     .select()
     .single();
@@ -48,7 +91,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   await logActivity(
     referral.id,
     "referral_submitted",
-    `Referral submitted by ${partner.name} via portal${
+    `Referral submitted by ${contactName ? `${contactName} at ` : ""}${partner.name} via portal${
       referral.property_address ? ` — ${referral.property_address}` : ""
     }`,
     "partner"
@@ -65,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     referralId: referral.id,
     kind: "new_partner_lead",
     to: agentEmail ? [agentEmail] : [],
-    subject: `New referral from ${partner.name}: ${referral.client_name}`,
+    subject: `New referral from ${contactName ? `${contactName} (${partner.name})` : partner.name}: ${referral.client_name}`,
     html: newPartnerLeadEmail(referral.client_name, partner.name, appUrl()),
   });
 

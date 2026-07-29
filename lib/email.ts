@@ -19,7 +19,8 @@ type SendArgs = {
     | "thank_you"
     | "partner_closings"
     | "hub_link"
-    | "feedback";
+    | "feedback"
+    | "portal_invite";
   to: string[];
   subject: string;
   html: string;
@@ -89,6 +90,11 @@ function wrap(body: string): string {
   ${body}
   <p style="margin-top:32px;font-size:12px;color:#888">Sent via ${APP_CONFIG.productName}</p>
 </div>`;
+}
+
+export function plainBodyEmail(body: string) {
+  const safe = body.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+  return wrap(`<div style="font-size:15px;line-height:1.7">${safe}</div>`);
 }
 
 export function feedbackEmail(source: string, fromLabel: string, message: string) {

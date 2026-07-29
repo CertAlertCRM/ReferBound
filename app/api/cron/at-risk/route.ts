@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const { data: atRisk, error } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, account_id, partners(name, token, emails)")
+    .select("id, client_name, closing_date, status, account_id, partners(name, token, emails), partner_contacts(email)")
     .not("closing_date", "is", null)
     .gte("closing_date", iso(today))
     .lte("closing_date", iso(horizon))
@@ -51,7 +51,11 @@ export async function GET(req: NextRequest) {
     const partner = (r as any).partners;
     const ownerEmail = emailByAccount.get((r as any).account_id);
     const portalUrl = `${appUrl()}/p/${partner?.token}`;
-    const recipients = [...(partner?.emails ?? []), ...(ownerEmail ? [ownerEmail] : [])];
+    // The sender of this lead (if known) + the agent — not the whole team.
+    const partnerSide: string[] = (r as any).partner_contacts?.email
+      ? [(r as any).partner_contacts.email]
+      : (partner?.emails ?? []);
+    const recipients = [...partnerSide, ...(ownerEmail ? [ownerEmail] : [])];
     await sendEmail({
       referralId: r.id,
       kind: "at_risk",

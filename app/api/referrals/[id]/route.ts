@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", params.id)
     .eq("account_id", account.id)
-    .select("*, partners(name, partner_type, token, emails), documents(kind, file_name)")
+    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email), documents(kind, file_name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -61,6 +61,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (NOTIFY_STATUSES.has(referral.status) && referral.partners) {
       const portalUrl = `${appUrl()}/p/${referral.partners.token}`;
+      // Route deal-specific emails to whoever sent THIS lead; fall back to the
+      // partner's team list when no sender is on file.
+      const recipients: string[] = (referral as any).partner_contacts?.email
+        ? [(referral as any).partner_contacts.email]
+        : (referral.partners.emails ?? []);
       if (referral.status === "docs_delivered") {
         const docList = (referral.documents ?? []).map(
           (d: any) => DOC_KINDS[d.kind] ?? d.file_name
@@ -68,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         await sendEmail({
           referralId: referral.id,
           kind: "docs_ready",
-          to: referral.partners.emails ?? [],
+          to: recipients,
           subject: `${referral.client_name}: insurance documents ready`,
           html: docsReadyEmail(referral.client_name, docList, portalUrl),
         });
@@ -76,7 +81,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         await sendEmail({
           referralId: referral.id,
           kind: "status_update",
-          to: referral.partners.emails ?? [],
+          to: recipients,
           subject: `${referral.client_name}: insurance update`,
           html: statusUpdateEmail(referral.client_name, referral.status, portalUrl),
         });

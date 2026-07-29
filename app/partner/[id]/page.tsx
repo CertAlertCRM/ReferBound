@@ -14,7 +14,9 @@ import {
   IconPlus,
   IconTrash,
   IconPencil,
+  IconX,
 } from "../../icons";
+import { PartnerInviteButton } from "../../partner-invite";
 
 // The partner workspace: one partner, all their leads, bulk actions, and a
 // log-lead form already pointed at them. Reached by clicking a partner on the
@@ -55,6 +57,11 @@ export default function PartnerWorkspacePage() {
   const [editType, setEditType] = useState("lender");
   const [editRecap, setEditRecap] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
+  const [contacts, setContacts] = useState<{ id: string; name: string; email: string; role: string | null }[]>([]);
+  const [cName, setCName] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const [cRole, setCRole] = useState("");
+  const [cBusy, setCBusy] = useState(false);
   const [missing, setMissing] = useState(false);
   const [refs, setRefs] = useState<Referral[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -66,7 +73,12 @@ export default function PartnerWorkspacePage() {
   const [form, setForm] = useState({ client_name: "", client_phone: "", closing_date: "", notes: "" });
 
   async function load() {
-    const [pRes, rRes] = await Promise.all([fetch("/api/partners"), fetch("/api/referrals")]);
+    const [pRes, rRes, cRes] = await Promise.all([
+      fetch("/api/partners"),
+      fetch("/api/referrals"),
+      fetch(`/api/partners/${id}/contacts`),
+    ]);
+    if (cRes.ok) setContacts((await cRes.json()).contacts ?? []);
     if (pRes.ok) {
       const all: Partner[] = (await pRes.json()).partners ?? [];
       const found = all.find((x) => x.id === id) ?? null;
@@ -161,6 +173,29 @@ export default function PartnerWorkspacePage() {
     e.target.value = "";
     if (res.ok) load();
     else alert((await res.json()).error ?? "Upload failed");
+  }
+
+  async function addContact() {
+    if (!cName.trim() || !cEmail.trim()) return;
+    setCBusy(true);
+    const res = await fetch(`/api/partners/${id}/contacts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: cName, email: cEmail, role: cRole }),
+    });
+    setCBusy(false);
+    if (res.ok) {
+      setCName("");
+      setCEmail("");
+      setCRole("");
+      const { contact } = await res.json();
+      setContacts((c) => [...c, contact]);
+    } else alert((await res.json()).error ?? "Couldn't add contact");
+  }
+
+  async function removeContact(cid: string) {
+    const res = await fetch(`/api/partners/${id}/contacts?cid=${encodeURIComponent(cid)}`, { method: "DELETE" });
+    if (res.ok) setContacts((c) => c.filter((x) => x.id !== cid));
   }
 
   async function deletePartner() {
@@ -299,6 +334,40 @@ export default function PartnerWorkspacePage() {
                       </span>
                     </span>
                   </label>
+                  {/* Team contacts — who's who at this partner */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
+                    <p className="text-sm font-semibold">Team contacts</p>
+                    <p className="text-xs text-ink-muted -mt-1">
+                      Updates about a lead go to whoever sent it (they pick themselves when
+                      submitting, or you can assign here later). No contact on a lead = the
+                      notification emails above.
+                    </p>
+                    {contacts.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {contacts.map((c) => (
+                          <li key={c.id} className="flex items-center justify-between gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                            <span className="min-w-0 truncate">
+                              <span className="font-medium">{c.name}</span>
+                              {c.role && <span className="text-ink-muted"> · {c.role}</span>}
+                              <span className="text-xs text-ink-muted"> · {c.email}</span>
+                            </span>
+                            <button type="button" className="text-ink-muted hover:text-red-600 shrink-0" onClick={() => removeContact(c.id)} title="Remove contact">
+                              <IconX size={13} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px_auto] gap-2">
+                      <input className="input !py-2 text-sm" placeholder="Name" value={cName} onChange={(e) => setCName(e.target.value)} />
+                      <input className="input !py-2 text-sm" type="email" placeholder="Email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} />
+                      <input className="input !py-2 text-sm" placeholder="Role (LO…)" value={cRole} onChange={(e) => setCRole(e.target.value)} />
+                      <button type="button" className="btn-ghost !py-2 text-xs" onClick={addContact} disabled={cBusy}>
+                        {cBusy ? "…" : "Add"}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex gap-2">
                       <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={editSaving}>
@@ -362,6 +431,7 @@ export default function PartnerWorkspacePage() {
                   <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={showQr}>
                     ▦ QR
                   </button>
+                  <PartnerInviteButton partnerId={partner.id} partnerName={partner.name} />
                   <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={copyLink}>
                     {copied ? <IconCheck size={12} /> : <IconCopy size={12} />} {copied ? "Copied" : "Copy magic link"}
                   </button>

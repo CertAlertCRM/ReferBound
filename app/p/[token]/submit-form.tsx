@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DOC_KINDS, PARTNER_DOC_KINDS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
@@ -24,12 +24,25 @@ const EXTRACTABLE = /\.(pdf|png|jpe?g)$/i;
 export function PartnerSubmitForm({
   token,
   partnerType = "lender",
+  contacts = [],
 }: {
   token: string;
   partnerType?: string;
+  contacts?: { id: string; name: string; role: string | null }[];
 }) {
   const isLender = partnerType === "lender";
   const [open, setOpen] = useState(false);
+  // Who on the team is sending this? Remembered per device.
+  const [senderId, setSenderId] = useState<string>("");
+  const [senderName, setSenderName] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(`rb_sender_${token}`);
+      if (saved && contacts.some((c) => c.id === saved)) setSenderId(saved);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
   const [form, setForm] = useState({ ...EMPTY });
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
@@ -87,11 +100,20 @@ export function PartnerSubmitForm({
     setBusy(true);
     setProgress("Sending referral…");
 
+    const senderPayload =
+      senderId && senderId !== "new"
+        ? { sender_contact_id: senderId }
+        : senderName.trim() && senderEmail.trim()
+          ? { sender_name: senderName, sender_email: senderEmail }
+          : {};
     const res = await fetch(`/api/p/${token}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, ...senderPayload }),
     });
+    try {
+      if (senderId && senderId !== "new") window.localStorage.setItem(`rb_sender_${token}`, senderId);
+    } catch {}
     if (!res.ok) {
       setBusy(false);
       setProgress("");
@@ -281,6 +303,47 @@ export function PartnerSubmitForm({
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
+
+          {/* Who's sending — routes updates on this client to the right person */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2.5">
+            <p className="text-xs font-semibold text-ink-secondary">
+              Who&apos;s sending this referral?{" "}
+              <span className="font-normal text-ink-muted">Updates on this client go to you directly.</span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <select
+                className="input !py-2 text-sm"
+                value={senderId}
+                onChange={(e) => setSenderId(e.target.value)}
+              >
+                <option value="">Whole team</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.role ? ` — ${c.role}` : ""}
+                  </option>
+                ))}
+                <option value="new">I&apos;m not listed — add me</option>
+              </select>
+              {senderId === "new" && (
+                <div className="grid grid-cols-1 gap-2.5 sm:col-span-1">
+                  <input
+                    className="input !py-2 text-sm"
+                    placeholder="Your name"
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                  />
+                  <input
+                    className="input !py-2 text-sm"
+                    type="email"
+                    placeholder="Your email"
+                    value={senderEmail}
+                    onChange={(e) => setSenderEmail(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
 
           <button className="btn-primary w-full" disabled={busy || prefilling || !form.client_name.trim()}>
             {busy ? progress || "Sending…" : "Send referral"}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
 import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
+import { PartnerInviteButton } from "../partner-invite";
 
 type Partner = {
   id: string;
@@ -341,6 +342,7 @@ export default function PartnersPage() {
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => showQr(p)}>
                       ▦ QR
                     </button>
+                    <PartnerInviteButton partnerId={p.id} partnerName={p.name} />
                     <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
                       {copied === p.id ? (
                         <>
