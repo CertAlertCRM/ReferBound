@@ -139,6 +139,16 @@ export default function PartnerWorkspacePage() {
     });
   }
 
+  async function deleteOne(r: Referral) {
+    const ok = confirm(
+      `Delete ${r.client_name}? Documents, messages, and history for this lead are permanently removed. This can't be undone.`
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/referrals/${r.id}`, { method: "DELETE" });
+    if (res.ok) load();
+    else alert((await res.json()).error ?? "Failed to delete");
+  }
+
   async function bulkDelete() {
     if (selected.size === 0) return;
     const ok = confirm(
@@ -661,6 +671,14 @@ export default function PartnerWorkspacePage() {
                         </div>
                         <StatusBadge status={r.status} />
                       </Link>
+                      <button
+                        type="button"
+                        className="text-ink-muted hover:text-red-600 transition-colors shrink-0 p-1"
+                        title={`Delete ${r.client_name}`}
+                        onClick={() => deleteOne(r)}
+                      >
+                        <IconTrash size={14} />
+                      </button>
                     </li>
                   ))}
                 </ul>
