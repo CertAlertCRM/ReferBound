@@ -7,6 +7,7 @@ import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
 import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck } from "./icons";
 import { LeadPrefillBox } from "./lead-prefill";
+import { InstallPrompt } from "./install-prompt";
 
 type Referral = {
   id: string;
@@ -178,6 +179,7 @@ export default function Dashboard() {
       <main className="max-w-3xl xl:max-w-6xl mx-auto p-4 sm:p-6">
         <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-6 xl:items-start">
         <div className="space-y-6 min-w-0">
+        <InstallPrompt />
         {/* Greeting */}
         {(profileName || headshotUrl) && (
           <div className="flex items-center gap-3">
