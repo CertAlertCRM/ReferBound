@@ -194,7 +194,7 @@ export default function ProfilePage() {
     else alert((await res.json()).error ?? "Upload failed");
   }
 
-  const field = (key: keyof Profile, label: string, placeholder: string) => {
+  const field = (key: Exclude<keyof Profile, "sms_new_lead">, label: string, placeholder: string) => {
     const isPhone = key === "phone";
     const isEmail = key === "email";
     const isOffice = key === "office";
