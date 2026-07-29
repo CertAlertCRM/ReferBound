@@ -480,7 +480,11 @@ export default async function PartnerPortal({ params }: { params: { token: strin
         <a href="/" className="hover:underline">
           Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Bound</span></span>
         </a>
-        {" · "}Statuses update in real time
+        {" · "}a{" "}
+        <a href="https://stonebind.com" className="hover:underline">
+          Stonebind™
+        </a>{" "}
+        tool{" · "}Statuses update in real time
         <span className="mt-1 inline-flex items-center gap-1">
           Are you an insurance agent?{" "}
           <a href="/" className="link !text-xs">

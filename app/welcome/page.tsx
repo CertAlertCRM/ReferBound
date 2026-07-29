@@ -139,7 +139,11 @@ export default function WelcomePage() {
       </section>
 
       <footer className="text-center text-xs text-ink-muted pb-10">
-        © 2026 ReferBound · Built by agents, for agents
+        © 2026 Cert Alert CRM LLC · ReferBound is a{" "}
+        <a href="https://stonebind.com" className="hover:underline font-medium text-ink-secondary">
+          Stonebind™
+        </a>{" "}
+        tool · Built by agents, for agents
         <span className="block mt-1">
           Already have an account?{" "}
           <a href="/login" className="link !text-xs">
