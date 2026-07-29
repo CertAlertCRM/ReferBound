@@ -174,6 +174,23 @@ alter table reset_codes enable row level security;
 -- Outbound webhook / Zapier bridge (see migration_11)
 alter table accounts add column if not exists webhook_url text;
 
+-- Lender workspace / referral board (see migration_15)
+create table if not exists lender_hubs (
+  id uuid primary key default gen_random_uuid(),
+  email text unique not null,
+  token text unique not null default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
+  created_at timestamptz not null default now()
+);
+alter table lender_hubs enable row level security;
+
+-- Export tracking (see migration_14)
+alter table referrals add column if not exists exported_at timestamptz;
+
+-- Reviews, thank-yous, optional recaps (see migration_13)
+alter table agent_profile add column if not exists google_review_url text;
+alter table accounts add column if not exists thankyou_cadence text not null default 'off';
+alter table partners add column if not exists monthly_summary boolean not null default true;
+
 -- Agency team seats (see migration_12)
 alter table accounts add column if not exists team_owner_id uuid references accounts(id) on delete cascade;
 create index if not exists idx_accounts_team_owner on accounts(team_owner_id);

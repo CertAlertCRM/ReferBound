@@ -4,7 +4,9 @@ import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/lib/db";
 import { currentAccountId } from "@/lib/auth";
 import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
-import { isAtRisk, fmtDate, daysUntil } from "@/lib/helpers";
+import { isAtRisk, fmtDate, daysUntil, timeAgo } from "@/lib/helpers";
+import { ShareCard } from "./share-card";
+import { HubCard } from "./hub-card";
 import { PartnerSubmitForm } from "./submit-form";
 import { AutoRefresh } from "./auto-refresh";
 import { ReferralMessages } from "./referral-messages";
@@ -111,6 +113,64 @@ export default async function PartnerPortal({ params }: { params: { token: strin
     messagesByRef.set(m.referral_id, list);
   }
 
+  // Latest agent touch per referral (calls/texts/emails to the client) —
+  // partner-visible proof the file is actively being worked.
+  const { data: touches } = refIds.length
+    ? await db()
+        .from("activity_log")
+        .select("referral_id, detail, created_at")
+        .in("referral_id", refIds)
+        .eq("event_type", "touch")
+        .order("created_at", { ascending: false })
+        .limit(100)
+    : { data: [] as any[] };
+  const latestTouchByRef = new Map<string, { detail: string; created_at: string }>();
+  for (const t of touches ?? []) {
+    if (!latestTouchByRef.has(t.referral_id)) {
+      latestTouchByRef.set(t.referral_id, { detail: t.detail, created_at: t.created_at });
+    }
+  }
+
+  // Speed receipts: how fast this agent turns THIS partner's referrals.
+  // Bragging material for the partner ("my insurance guy quotes in hours").
+  const { data: speedEvents } = refIds.length
+    ? await db()
+        .from("status_events")
+        .select("referral_id, status, created_at")
+        .in("referral_id", refIds)
+        .in("status", ["new", "quoted", "bound"])
+        .order("created_at", { ascending: true })
+    : { data: [] as any[] };
+  const firstEvent = new Map<string, number>();
+  for (const e of speedEvents ?? []) {
+    const k = `${e.referral_id}:${e.status}`;
+    if (!firstEvent.has(k)) firstEvent.set(k, new Date(e.created_at).getTime());
+  }
+  const quoteHours: number[] = [];
+  const bindHours: number[] = [];
+  let onTime = 0;
+  let onTimeTotal = 0;
+  for (const r of refs) {
+    const t0 = firstEvent.get(`${r.id}:new`) ?? new Date(r.created_at).getTime();
+    const tq = firstEvent.get(`${r.id}:quoted`);
+    const tb = firstEvent.get(`${r.id}:bound`);
+    if (tq && tq > t0) quoteHours.push((tq - t0) / 3600000);
+    if (tb && tb > t0) bindHours.push((tb - t0) / 3600000);
+    if (tb && r.closing_date) {
+      onTimeTotal++;
+      if (new Date(tb) <= new Date(r.closing_date + "T23:59:59")) onTime++;
+    }
+  }
+  const fmtHours = (arr: number[]) => {
+    if (!arr.length) return null;
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return avg <= 48 ? `${Math.max(1, Math.round(avg))}h` : `${Math.round((avg / 24) * 10) / 10}d`;
+  };
+  const avgQuote = fmtHours(quoteHours);
+  const avgBind = fmtHours(bindHours);
+  const onTimeRate = onTimeTotal > 0 ? Math.round((onTime / onTimeTotal) * 100) : null;
+  const showSpeed = avgQuote !== null || avgBind !== null;
+
   // Prefer the agent's saved profile for partner-facing names; fall back to env config.
   const { data: prof } = await db()
     .from("agent_profile")
@@ -152,21 +212,33 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const closedRefs = refs.filter(isClosedRef);
 
   return (
-    <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
-      {agentView && (
-        <div className="card px-4 py-2.5 flex items-center justify-between bg-brand-light/60 border-brand-200">
-          <p className="text-xs font-medium text-brand-800">
-            You&apos;re viewing this portal as the agent — this bar is invisible to your partner.
-          </p>
-          <Link href="/" className="link shrink-0">
-            <IconArrowLeft size={13} /> Back to dashboard
-          </Link>
-        </div>
-      )}
+    <main className="pb-2">
       <AutoRefresh />
-      {/* Hero header */}
-      <header className="card overflow-hidden">
-        <div className="bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-6 py-6 text-white">
+
+      {/* Full-bleed co-branded hero — this band owns the top of the viewport */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 text-white">
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(55% 90% at 85% 0%, rgba(96,138,250,0.45), transparent 65%), radial-gradient(45% 70% at 5% 100%, rgba(16,185,129,0.16), transparent 60%)",
+          }}
+        />
+        <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-16 sm:pb-20">
+          {agentView && (
+            <div className="mb-6 rounded-xl bg-white/10 border border-white/15 backdrop-blur px-4 py-2.5 flex items-center justify-between gap-3">
+              <p className="text-xs font-medium text-brand-100">
+                You&apos;re viewing this portal as the agent — this bar is invisible to your partner.
+              </p>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-white hover:text-brand-100 transition-colors shrink-0"
+              >
+                <IconArrowLeft size={13} /> Back to dashboard
+              </Link>
+            </div>
+          )}
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-100">
@@ -178,17 +250,17 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 <img
                   src={partnerLogoUrl}
                   alt={partner.name}
-                  className="mt-4 h-16 sm:h-20 max-w-[300px] object-contain object-left bg-white rounded-xl px-4 py-2.5 shadow-lg"
+                  className="mt-5 h-20 sm:h-24 max-w-[340px] object-contain object-left bg-white rounded-xl px-4 py-2.5 shadow-lg"
                 />
               )}
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-3">
                 {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
               </h1>
-              <p className="text-sm text-brand-100 mt-1.5">
+              <p className="text-sm text-brand-100 mt-2 max-w-md">
                 Every client you&apos;ve referred to {agentName}, updated in real time. Documents land here the moment policies are bound.
               </p>
               {(prof?.phone || prof?.email) && (
-                <p className="text-xs text-brand-100 mt-2.5 flex items-center flex-wrap gap-x-3 gap-y-1">
+                <p className="text-xs text-brand-100 mt-3 flex items-center flex-wrap gap-x-3 gap-y-1">
                   <span>Reach {agentName?.split(" ")[0]} directly:</span>
                   {prof?.phone && (
                     <span className="font-semibold inline-flex items-center gap-1">
@@ -208,12 +280,16 @@ export default async function PartnerPortal({ params }: { params: { token: strin
               <img
                 src={headshotUrl}
                 alt={agentName ?? "Agent"}
-                className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-[3px] border-white shadow-xl shrink-0"
+                className="w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover border-4 border-white/90 shadow-xl shrink-0"
               />
             )}
           </div>
         </div>
-        <div className="grid grid-cols-3 divide-x divide-slate-100">
+      </div>
+
+      {/* Content column — stats card floats up over the hero seam */}
+      <div className="relative max-w-2xl mx-auto px-4 sm:px-6 -mt-10 sm:-mt-12 space-y-5">
+        <div className="card grid grid-cols-3 divide-x divide-slate-100 shadow-lift">
           {[
             { n: refs.length, label: "Referred" },
             { n: active.length, label: "In progress" },
@@ -225,7 +301,31 @@ export default async function PartnerPortal({ params }: { params: { token: strin
             </div>
           ))}
         </div>
-      </header>
+
+        {showSpeed && (
+          <div className="card px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+              {agencyName} on your referrals
+            </p>
+            <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-xs text-ink-secondary">
+              {avgQuote && (
+                <span>
+                  <span className="font-bold text-ink text-sm">{avgQuote}</span> avg to quote
+                </span>
+              )}
+              {avgBind && (
+                <span>
+                  <span className="font-bold text-ink text-sm">{avgBind}</span> avg to bound
+                </span>
+              )}
+              {onTimeRate !== null && (
+                <span>
+                  <span className={`font-bold text-sm ${onTimeRate >= 90 ? "text-emerald-600" : "text-ink"}`}>{onTimeRate}%</span> ready by closing
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
       <PartnerSubmitForm token={partner.token} partnerType={partner.partner_type ?? "lender"} />
 
@@ -305,6 +405,17 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                   </p>
                 )}
 
+                {latestTouchByRef.has(r.id) && !SAFE_STATUSES.includes(r.status) && r.status !== "lost" && (
+                  <p className="mt-3 text-[11px] text-ink-secondary bg-slate-50 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
+                    <span className="live-dot" aria-hidden />
+                    <span>
+                      <span className="font-semibold">{latestTouchByRef.get(r.id)!.detail}</span>
+                      {" · "}
+                      {timeAgo(latestTouchByRef.get(r.id)!.created_at)}
+                    </span>
+                  </p>
+                )}
+
                 {docs.length === 0 ? null : (
                   <div className="mt-3.5 flex flex-wrap gap-2">
                     {docs.map((d: any) => (
@@ -361,6 +472,10 @@ export default async function PartnerPortal({ params }: { params: { token: strin
         </div>
       )}
 
+      <HubCard />
+
+      <ShareCard agentName={agentName ?? APP_CONFIG.agentName} agencyName={agencyName ?? APP_CONFIG.agencyName} />
+
       <footer className="text-center text-xs text-ink-muted pt-4 pb-8">
         <a href="/" className="hover:underline">
           Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Bound</span></span>
@@ -373,6 +488,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           </a>
         </span>
       </footer>
+      </div>
     </main>
   );
 }

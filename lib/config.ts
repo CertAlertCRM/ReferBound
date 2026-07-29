@@ -27,7 +27,7 @@ export const STATUS_LABELS: Record<string, string> = {
   new: "New lead",
   quoting: "Working on quote",
   quoted: "Quoted",
-  application: "Application in progress",
+  application: "Working with client",
   bound: "Bound ✔",
   docs_delivered: "EOI & docs delivered",
   lost: "Not written",

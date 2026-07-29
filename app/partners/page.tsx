@@ -12,6 +12,7 @@ type Partner = {
   emails: string[];
   logoUrl: string | null;
   partner_type: string;
+  monthly_summary: boolean;
   referrals: { count: number }[];
 };
 
@@ -26,6 +27,7 @@ export default function PartnersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmails, setEditEmails] = useState("");
+  const [editRecap, setEditRecap] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
 
   async function load() {
@@ -83,6 +85,7 @@ export default function PartnersPage() {
     setEditName(p.name);
     setEditEmails(p.emails.join(", "));
     setEditType(p.partner_type ?? "lender");
+    setEditRecap(p.monthly_summary !== false);
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -92,7 +95,7 @@ export default function PartnersPage() {
     const res = await fetch(`/api/partners/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -179,6 +182,21 @@ export default function PartnersPage() {
                         <option key={k} value={k}>{v}</option>
                       ))}
                     </select>
+                  </label>
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-brand"
+                      checked={editRecap}
+                      onChange={(e) => setEditRecap(e.target.checked)}
+                    />
+                    <span>
+                      <span className="text-sm font-medium block">Send the monthly recap email</span>
+                      <span className="text-xs text-ink-muted">
+                        Their monthly referral summary. Turn off for partners who&apos;d rather just
+                        have the live portal and great service — status and document emails still send.
+                      </span>
+                    </span>
                   </label>
                   <div className="flex gap-2">
                     <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={editSaving}>

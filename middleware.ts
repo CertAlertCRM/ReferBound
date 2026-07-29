@@ -11,8 +11,10 @@ const PUBLIC_PREFIXES = [
   "/forgot",
   "/welcome",
   "/p/",
+  "/hub/",
   "/api/auth/",
   "/api/p/",
+  "/api/hub/",
   "/api/cron/",
   "/api/docs/",
   "/api/waitlist",
@@ -20,6 +22,12 @@ const PUBLIC_PREFIXES = [
   "/_next",
   "/favicon.ico",
   "/icon.svg",
+  // PWA assets — must load before sign-in for install prompts to work.
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-512-maskable.png",
+  "/apple-touch-icon.png",
 ];
 
 async function hmacHex(payload: string, secret: string): Promise<string> {

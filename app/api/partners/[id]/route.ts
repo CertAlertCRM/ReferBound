@@ -26,6 +26,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("partner_type" in body && PARTNER_TYPES[body.partner_type]) {
     patch.partner_type = body.partner_type;
   }
+  if ("monthly_summary" in body) {
+    patch.monthly_summary = Boolean(body.monthly_summary);
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   }

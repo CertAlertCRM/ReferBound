@@ -14,7 +14,11 @@ type SendArgs = {
     | "monthly_summary"
     | "message"
     | "agent_digest"
-    | "welcome";
+    | "welcome"
+    | "review_request"
+    | "thank_you"
+    | "partner_closings"
+    | "hub_link";
   to: string[];
   subject: string;
   html: string;
@@ -82,6 +86,71 @@ function wrap(body: string): string {
   ${body}
   <p style="margin-top:32px;font-size:12px;color:#888">Sent by ${APP_CONFIG.agencyName} via ${APP_CONFIG.productName}</p>
 </div>`;
+}
+
+export function partnerClosingsEmail(
+  partnerName: string,
+  items: { name: string; closing: string; statusLabel: string; done: boolean }[],
+  portalUrl: string
+) {
+  const ready = items.filter((i) => i.done);
+  const open = items.filter((i) => !i.done);
+  return wrap(`
+    <h2 style="margin:0 0 12px">Your closings — next 14 days</h2>
+    <p style="font-size:15px">Hi ${partnerName} team — insurance status on everything closing soon:</p>
+    ${
+      open.length
+        ? `<p style="font-size:14px;font-weight:600;margin:16px 0 6px">⚠ Still in motion</p>
+           <ul style="font-size:14px;line-height:1.7;margin:0;padding-left:20px">
+             ${open.map((i) => `<li><strong>${i.name}</strong> — closes ${i.closing} · ${i.statusLabel}</li>`).join("")}
+           </ul>`
+        : ""
+    }
+    ${
+      ready.length
+        ? `<p style="font-size:14px;font-weight:600;margin:16px 0 6px">✓ Insurance ready</p>
+           <ul style="font-size:14px;line-height:1.7;margin:0;padding-left:20px">
+             ${ready.map((i) => `<li><strong>${i.name}</strong> — closes ${i.closing}</li>`).join("")}
+           </ul>`
+        : ""
+    }
+    <p style="margin-top:18px"><a href="${portalUrl}" style="color:#1d4ed8;font-weight:600">Open your live portal</a> for documents and details.</p>
+  `);
+}
+
+export function hubLinkEmail(hubUrl: string) {
+  return wrap(`
+    <h2 style="margin:0 0 12px">Your referral board</h2>
+    <p style="font-size:15px">Here's your personal link — every insurance agent you work with on ReferBound, every referral, one page:</p>
+    <p style="margin:20px 0"><a href="${hubUrl}" style="background:#1d4ed8;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open my board</a></p>
+    <p style="font-size:13px;color:#555">Bookmark it — no login, always live. This link is private to this email address; don't forward it.</p>
+  `);
+}
+
+export function reviewRequestEmail(
+  clientName: string,
+  agentName: string,
+  agencyName: string | null,
+  reviewUrl: string
+) {
+  const firstName = clientName.split(" ")[0];
+  return wrap(`
+    <h2 style="margin:0 0 12px">Thanks for trusting ${agencyName || "us"} with your insurance</h2>
+    <p style="font-size:15px">Hi ${firstName},</p>
+    <p style="font-size:15px">It was a pleasure getting your coverage in place. If you had a good experience working with ${agentName}, a quick Google review would mean a lot — it's the best way to help other families find us.</p>
+    <p style="margin:20px 0"><a href="${reviewUrl}" style="background:#1d4ed8;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Leave a review — takes 60 seconds</a></p>
+    <p style="font-size:13px;color:#555">And if anything wasn't right, just reply to this email — ${agentName} reads every one.</p>
+  `);
+}
+
+export function thankYouEmail(partnerName: string, agentName: string, periodLabel: string) {
+  return wrap(`
+    <h2 style="margin:0 0 12px">Thank you</h2>
+    <p style="font-size:15px">Hi ${partnerName} team,</p>
+    <p style="font-size:15px">No numbers, no updates — just a genuine thank-you. The clients you've trusted us with ${periodLabel} mean a lot, and we work hard to make sure every one of them reflects well on you.</p>
+    <p style="font-size:15px">If there's ever anything we can do better — faster turnarounds, different updates, anything — just reply. This inbox reaches ${agentName} directly.</p>
+    <p style="font-size:15px">— ${agentName}</p>
+  `);
 }
 
 export function welcomeEmail(name: string | null, appUrl: string, isTeamMember: boolean) {

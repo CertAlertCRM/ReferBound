@@ -24,6 +24,16 @@ type Referral = {
 
 type Partner = { id: string; name: string };
 
+type ActivityItem = {
+  id: number;
+  referral_id: string;
+  event_type: string;
+  detail: string | null;
+  actor: string;
+  created_at: string;
+  client_name: string | null;
+};
+
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const d = new Date(dateStr + "T00:00:00");
@@ -51,6 +61,7 @@ function nextStatus(status: string): string | null {
 export default function Dashboard() {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [feed, setFeed] = useState<ActivityItem[]>([]);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,13 +79,15 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const [rRes, pRes, profRes] = await Promise.all([
+    const [rRes, pRes, profRes, aRes] = await Promise.all([
       fetch("/api/referrals"),
       fetch("/api/partners"),
       fetch("/api/profile"),
+      fetch("/api/activity"),
     ]);
     if (rRes.ok) setReferrals((await rRes.json()).referrals ?? []);
     if (pRes.ok) setPartners((await pRes.json()).partners ?? []);
+    if (aRes.ok) setFeed((await aRes.json()).activity ?? []);
     if (profRes.ok) {
       const { profile, headshotUrl } = await profRes.json();
       setProfileName(profile?.display_name ?? null);
@@ -144,7 +157,9 @@ export default function Dashboard() {
   return (
     <>
       <TopNav active="referrals" />
-      <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+      <main className="max-w-3xl xl:max-w-6xl mx-auto p-4 sm:p-6">
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-6 xl:items-start">
+        <div className="space-y-6 min-w-0">
         {/* Greeting */}
         {(profileName || headshotUrl) && (
           <div className="flex items-center gap-3">
@@ -195,8 +210,12 @@ export default function Dashboard() {
               <IconPlus size={15} /> Log lead
             </button>
             {referrals.length > 0 && (
-              <a href="/api/export" className="btn-ghost !py-1.5 text-xs justify-center" title="Download all referrals as a CSV">
-                <IconDownload size={13} /> Export CSV
+              <a
+                href="/api/export?scope=new"
+                className="btn-ghost !py-1.5 text-xs justify-center"
+                title="Downloads only leads that haven't been exported before — no re-keying duplicates into your CRM"
+              >
+                <IconDownload size={13} /> Export new
               </a>
             )}
           </div>
@@ -286,9 +305,100 @@ export default function Dashboard() {
             <Section title="Not written" items={groups.lost} advance={advance} busyId={busyId} collapsible />
           </>
         )}
+        </div>
+
+        {/* Desktop rail — the margins earn their keep on wide screens */}
+        <aside className="hidden xl:block space-y-4 sticky top-6">
+          {groups.risk.length > 0 && (
+            <div className="card p-4 border-red-200">
+              <h3 className="section-label text-red-600 mb-2.5">Needs attention</h3>
+              <ul className="space-y-2">
+                {groups.risk.slice(0, 4).map((r) => (
+                  <li key={r.id}>
+                    <Link href={`/deal/${r.id}`} className="block group">
+                      <p className="text-sm font-semibold group-hover:text-brand transition-colors">
+                        {r.client_name}
+                      </p>
+                      <p className="text-[11px] text-red-600">
+                        closes {r.closing_date} · {STATUS_LABELS[r.status] ?? r.status}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="card p-4">
+            <h3 className="section-label mb-2.5">Latest activity</h3>
+            {feed.length === 0 ? (
+              <p className="text-xs text-ink-muted">
+                Everything that happens — leads, status moves, emails, messages — shows up here.
+              </p>
+            ) : (
+              <ul className="space-y-2.5">
+                {feed.slice(0, 8).map((a) => (
+                  <li key={a.id} className="flex gap-2.5">
+                    <span
+                      className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                        a.actor === "partner"
+                          ? "bg-brand"
+                          : a.actor === "system"
+                            ? "bg-amber-400"
+                            : "bg-slate-300"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <Link
+                        href={`/deal/${a.referral_id}`}
+                        className="text-xs text-ink-secondary hover:text-ink transition-colors line-clamp-2 block"
+                      >
+                        {a.detail ?? a.event_type}
+                      </Link>
+                      <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(a.created_at)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="card p-4">
+            <h3 className="section-label mb-2.5">Quick actions</h3>
+            <div className="space-y-1.5">
+              <Link href="/partners" className="link !text-xs block">
+                Add or manage partners →
+              </Link>
+              <Link href="/stats" className="link !text-xs block">
+                Partner ROI &amp; trends →
+              </Link>
+              <a
+                href="/api/export?scope=new"
+                className="link !text-xs block"
+                title="Only leads not previously exported"
+              >
+                Export new leads (CSV) →
+              </a>
+              <a href="/api/export?scope=all" className="link !text-xs block">
+                Export everything (CSV) →
+              </a>
+            </div>
+          </div>
+        </aside>
+        </div>
       </main>
     </>
   );
+}
+
+function timeAgo(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? "yesterday" : `${days}d ago`;
 }
 
 function GettingStarted({ profileDone, partnerDone }: { profileDone: boolean; partnerDone: boolean }) {

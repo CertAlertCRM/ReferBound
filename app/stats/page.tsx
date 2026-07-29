@@ -8,7 +8,16 @@ type Stats = {
   total: number;
   byStatus: Record<string, number>;
   premiumTotal: number;
-  partnerBreakdown: { name: string; premium: number; referred: number; bound: number }[];
+  partnerBreakdown: {
+    name: string;
+    premium: number;
+    referred: number;
+    bound: number;
+    lost: number;
+    closeRatio: number | null;
+    avgDaysToBound: number | null;
+  }[];
+  monthly: { label: string; referred: number; bound: number; premium: number }[];
   fromPartnerPortal: number;
   avgLogSeconds: number | null;
   avgHoursToBound: number | null;
@@ -94,19 +103,82 @@ export default function StatsPage() {
           ))}
         </div>
 
+        {stats.monthly.some((m) => m.referred > 0 || m.bound > 0) && (
+          <section className="card p-5">
+            <h2 className="section-label mb-1">Last 6 months</h2>
+            <p className="text-xs text-ink-muted mb-4">
+              Referred vs bound per month — premium credited to the month it bound.
+            </p>
+            {(() => {
+              const max = Math.max(1, ...stats.monthly.map((m) => Math.max(m.referred, m.bound)));
+              return (
+                <div className="grid grid-cols-6 gap-2 items-end">
+                  {stats.monthly.map((m) => (
+                    <div key={m.label} className="flex flex-col items-center gap-1.5">
+                      <p className="text-[10px] font-semibold text-ink h-4">
+                        {m.premium > 0 ? `$${Math.round(m.premium / 100) / 10}k` : ""}
+                      </p>
+                      <div className="flex items-end gap-1 h-24 w-full justify-center">
+                        <div
+                          className="w-3.5 rounded-t bg-brand-200"
+                          style={{ height: `${Math.max(m.referred > 0 ? 8 : 2, (m.referred / max) * 96)}px` }}
+                          title={`${m.referred} referred`}
+                        />
+                        <div
+                          className="w-3.5 rounded-t bg-brand"
+                          style={{ height: `${Math.max(m.bound > 0 ? 8 : 2, (m.bound / max) * 96)}px` }}
+                          title={`${m.bound} bound`}
+                        />
+                      </div>
+                      <p className="text-[10px] text-ink-muted">{m.label}</p>
+                      <p className="text-[10px] text-ink-secondary -mt-1">
+                        {m.referred}·{m.bound}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="flex items-center gap-4 mt-3 text-[10px] text-ink-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-brand-200 inline-block" /> Referred
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-brand inline-block" /> Bound
+              </span>
+            </div>
+          </section>
+        )}
+
         {stats.partnerBreakdown.length > 0 && (
           <section className="card p-5">
-            <h2 className="section-label mb-3">By partner</h2>
-            <ul className="space-y-2 text-sm">
+            <h2 className="section-label mb-1">Partner ROI</h2>
+            <p className="text-xs text-ink-muted mb-3">
+              Which relationships are worth the coffee meetings — never shown to partners.
+            </p>
+            <ul className="divide-y divide-slate-100">
               {stats.partnerBreakdown.map((p) => (
-                <li key={p.name} className="flex justify-between items-baseline">
-                  <span className="text-ink">{p.name}</span>
-                  <span className="text-ink-secondary text-xs">
-                    {p.referred} referred · {p.bound} bound ·{" "}
-                    <span className="font-semibold text-ink">
+                <li key={p.name} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm font-semibold text-ink">{p.name}</span>
+                    <span className="text-sm font-semibold text-ink">
                       {p.premium > 0 ? `$${Math.round(p.premium).toLocaleString()}` : "$0"}
                     </span>
-                  </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-ink-secondary">
+                    <span>{p.referred} referred</span>
+                    <span>{p.bound} bound</span>
+                    {p.closeRatio !== null && (
+                      <span
+                        className={
+                          p.closeRatio >= 50 ? "text-emerald-600 font-medium" : undefined
+                        }
+                      >
+                        {p.closeRatio}% close ratio
+                      </span>
+                    )}
+                    {p.avgDaysToBound !== null && <span>{p.avgDaysToBound}d avg to bind</span>}
+                  </div>
                 </li>
               ))}
             </ul>

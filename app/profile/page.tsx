@@ -3,7 +3,17 @@
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { formatPhoneInput } from "@/lib/format";
-import { IconDownload, IconZap } from "../icons";
+import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX, IconMail } from "../icons";
+
+type Team = {
+  role: "owner" | "member";
+  plan?: string;
+  members?: { id: string; email: string; display_name: string | null; created_at: string }[];
+  seatLimit?: number;
+  seatsUsed?: number;
+  inviteUrl?: string | null;
+  ownerEmail?: string;
+};
 
 type Profile = {
   display_name: string | null;
@@ -11,9 +21,10 @@ type Profile = {
   office: string | null;
   phone: string | null;
   email: string | null;
+  google_review_url: string | null;
 };
 
-const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "" };
+const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "" };
 
 export default function ProfilePage() {
   const [form, setForm] = useState<Profile>(EMPTY);
@@ -27,6 +38,12 @@ export default function ProfilePage() {
   const [webhookSaving, setWebhookSaving] = useState(false);
   const [testState, setTestState] = useState<"idle" | "sending" | "ok" | "failed">("idle");
   const [testError, setTestError] = useState("");
+  const [cadence, setCadence] = useState("off");
+  const [cadenceSaved, setCadenceSaved] = useState(false);
+  const [team, setTeam] = useState<Team | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [removeBusy, setRemoveBusy] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -46,6 +63,7 @@ export default function ProfilePage() {
             office: profile.office ?? "",
             phone: profile.phone ?? "",
             email: profile.email ?? "",
+            google_review_url: profile.google_review_url ?? "",
           };
           setForm(loaded);
           setBaseline(loaded);
@@ -56,12 +74,62 @@ export default function ProfilePage() {
     });
     fetch("/api/integrations").then(async (res) => {
       if (res.ok) {
-        const { webhook_url } = await res.json();
+        const { webhook_url, thankyou_cadence } = await res.json();
         setWebhook(webhook_url ?? "");
         setWebhookBaseline(webhook_url ?? "");
+        setCadence(thankyou_cadence ?? "off");
       }
     });
+    loadTeam();
   }, []);
+
+  async function saveCadence(value: string) {
+    setCadence(value);
+    const res = await fetch("/api/integrations", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thankyou_cadence: value }),
+    });
+    if (res.ok) {
+      setCadenceSaved(true);
+      setTimeout(() => setCadenceSaved(false), 1500);
+    } else {
+      alert((await res.json()).error ?? "Failed to save");
+    }
+  }
+
+  async function loadTeam() {
+    const r = await fetch("/api/team");
+    if (r.ok) setTeam(await r.json());
+  }
+
+  async function makeInvite() {
+    setInviteBusy(true);
+    const r = await fetch("/api/team", { method: "POST" });
+    setInviteBusy(false);
+    if (r.ok) {
+      const { inviteUrl } = await r.json();
+      setTeam((t) => (t ? { ...t, inviteUrl } : t));
+    } else {
+      alert((await r.json()).error ?? "Couldn't create the invite link");
+    }
+  }
+
+  async function copyInvite() {
+    if (!team?.inviteUrl) return;
+    await navigator.clipboard.writeText(team.inviteUrl);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 1500);
+  }
+
+  async function removeMember(id: string, email: string) {
+    if (!confirm(`Remove ${email} from your team? They keep their login but lose access to the agency's shared partners and referrals.`)) return;
+    setRemoveBusy(id);
+    const r = await fetch(`/api/team?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    setRemoveBusy(null);
+    if (r.ok) loadTeam();
+    else alert((await r.json()).error ?? "Couldn't remove that member");
+  }
 
   async function saveWebhook(e: React.FormEvent) {
     e.preventDefault();
@@ -217,10 +285,132 @@ export default function ProfilePage() {
                 {field("phone", "Phone", "804-555-1234")}
                 {field("email", "Email", "you@example.com")}
               </div>
+              <label className="block">
+                <span className="section-label">Google review link</span>
+                <input
+                  className="input mt-1.5"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://g.page/r/…/review"
+                  value={form.google_review_url ?? ""}
+                  onChange={(e) => setForm({ ...form, google_review_url: e.target.value })}
+                />
+                <span className="text-xs text-ink-muted mt-1 block">
+                  Google Business Profile → &ldquo;Ask for reviews&rdquo; → copy the short link.
+                  Powers the one-tap review request on bound deals.
+                </span>
+              </label>
               <button className="btn-primary" disabled={saving || !dirty}>
                 {saving ? "Saving…" : dirty ? "Save profile" : "Saved ✓"}
               </button>
             </form>
+
+            {team?.role === "member" && (
+              <section className="card p-5 flex items-start gap-3">
+                <IconUsers size={16} className="text-brand mt-0.5 shrink-0" />
+                <p className="text-sm text-ink-secondary">
+                  You&apos;re part of the agency team run by{" "}
+                  <span className="font-medium text-ink">{team.ownerEmail}</span> — you share the
+                  same partners, referrals, and this agency profile.
+                </p>
+              </section>
+            )}
+
+            {team?.role === "owner" && team.plan === "agency" && (
+              <section className="card p-6 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <IconUsers size={16} className="text-brand" /> Your team
+                  </h2>
+                  <span className="text-xs text-ink-muted">
+                    {team.seatsUsed} of {team.seatLimit} seats used
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 p-4 space-y-2">
+                  <p className="text-sm font-semibold">Invite a teammate</p>
+                  <p className="text-xs text-ink-secondary">
+                    Send them this link — they create their own login and instantly share your
+                    partners, referrals, and agency profile. Generating a new link disables the
+                    old one.
+                  </p>
+                  {team.inviteUrl ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <code className="text-[11px] bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 break-all flex-1 min-w-0">
+                        {team.inviteUrl}
+                      </code>
+                      <button type="button" className="btn-ghost shrink-0" onClick={copyInvite}>
+                        {inviteCopied ? <IconCheck size={13} className="text-emerald-600" /> : <IconCopy size={13} />}
+                        {inviteCopied ? "Copied" : "Copy"}
+                      </button>
+                      <button type="button" className="btn-ghost shrink-0" onClick={makeInvite} disabled={inviteBusy}>
+                        {inviteBusy ? "…" : "New link"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn-primary" onClick={makeInvite} disabled={inviteBusy}>
+                      {inviteBusy ? "Creating…" : "Create invite link"}
+                    </button>
+                  )}
+                </div>
+
+                {(team.members?.length ?? 0) > 0 && (
+                  <ul className="divide-y divide-slate-100">
+                    {team.members!.map((m) => (
+                      <li key={m.id} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{m.display_name || m.email}</p>
+                          {m.display_name && <p className="text-xs text-ink-muted truncate">{m.email}</p>}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-ghost !py-1 text-xs shrink-0"
+                          onClick={() => removeMember(m.id, m.email)}
+                          disabled={removeBusy === m.id}
+                        >
+                          <IconX size={12} /> {removeBusy === m.id ? "Removing…" : "Remove"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+
+            <section className="card p-6 space-y-3">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <IconMail size={16} className="text-brand" /> Partner touches
+                </h2>
+                <p className="text-sm text-ink-secondary mt-1">
+                  Short, automatic thank-you notes to your active partners — no numbers, no
+                  metrics, just appreciation with your name on it.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {[
+                  { v: "off", l: "Off" },
+                  { v: "monthly", l: "Monthly" },
+                  { v: "quarterly", l: "Quarterly" },
+                ].map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    className={`${cadence === o.v ? "btn-primary" : "btn-ghost"} !px-4 !py-1.5 text-xs`}
+                    onClick={() => saveCadence(o.v)}
+                  >
+                    {o.l}
+                  </button>
+                ))}
+                {cadenceSaved && (
+                  <span className="text-xs text-emerald-600 font-medium">Saved ✓</span>
+                )}
+              </div>
+              <p className="text-xs text-ink-muted">
+                Sends on the 1st to partners who&apos;ve referred at least one client. Separate from
+                the monthly recap — this one never mentions your numbers.
+              </p>
+            </section>
 
             <section className="card p-6 space-y-4">
               <div>
@@ -238,12 +428,18 @@ export default function ProfilePage() {
                   <IconDownload size={15} /> Spreadsheet export
                 </p>
                 <p className="text-xs text-ink-secondary mt-1">
-                  Download all your referrals as a CSV — opens in Excel or Google Sheets, and
-                  imports into any AMS that accepts a file.
+                  Opens in Excel or Google Sheets, and imports into any AMS that accepts a file.
+                  &ldquo;New&rdquo; skips anything you&apos;ve already exported, so you never re-key
+                  a duplicate — each export stamps the leads it includes.
                 </p>
-                <a href="/api/export" className="btn-ghost mt-3 inline-flex">
-                  <IconDownload size={15} /> Export referrals (CSV)
-                </a>
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  <a href="/api/export?scope=new" className="btn-primary inline-flex">
+                    <IconDownload size={15} /> Export new leads
+                  </a>
+                  <a href="/api/export?scope=all" className="btn-ghost inline-flex">
+                    Export everything
+                  </a>
+                </div>
               </div>
 
               <form onSubmit={saveWebhook} className="rounded-xl border border-slate-100 p-4 space-y-3">

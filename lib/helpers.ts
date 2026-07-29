@@ -29,6 +29,16 @@ export function fmtDateTime(dateStr: string): string {
   });
 }
 
+export function timeAgo(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? "yesterday" : `${days}d ago`;
+}
+
 export function appUrl(): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }

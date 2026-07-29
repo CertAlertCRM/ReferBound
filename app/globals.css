@@ -4,8 +4,17 @@
 
 body {
   @apply bg-slate-50 text-ink antialiased font-sans;
-  background-image: radial-gradient(80% 40% at 50% 0%, rgba(37, 71, 235, 0.05), transparent);
-  background-repeat: no-repeat;
+  /* Composed whitespace: a brand wash from the top, two soft corner glows,
+     and a barely-there dot grid that only shows in the open space between
+     cards. Fixed attachment so the ambience doesn't scroll away. */
+  background-image:
+    radial-gradient(90% 42% at 50% 0%, rgba(37, 71, 235, 0.07), transparent 70%),
+    radial-gradient(42% 34% at 92% 12%, rgba(16, 185, 129, 0.05), transparent 70%),
+    radial-gradient(46% 34% at 4% 92%, rgba(37, 71, 235, 0.05), transparent 70%),
+    radial-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1.2px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 24px 24px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-attachment: fixed, fixed, fixed, fixed;
 }
 
 @layer components {

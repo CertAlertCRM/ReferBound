@@ -69,6 +69,9 @@ export default function DealPage() {
   const [docEnd, setDocEnd] = useState("");
   const [lostReason, setLostReason] = useState("");
   const [showLost, setShowLost] = useState(false);
+  const [reviewState, setReviewState] = useState<"idle" | "sending" | "sent" | "already">("idle");
+  const [touchBusy, setTouchBusy] = useState<string | null>(null);
+  const [touchDone, setTouchDone] = useState<string | null>(null);
 
   async function load() {
     const [res, actRes, msgRes] = await Promise.all([
@@ -154,6 +157,40 @@ export default function DealPage() {
   useEffect(() => {
     load();
   }, [id]);
+
+  async function logTouch(type: string) {
+    setTouchBusy(type);
+    const res = await fetch(`/api/referrals/${id}/activity`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    });
+    setTouchBusy(null);
+    if (res.ok) {
+      setTouchDone(type);
+      setTimeout(() => setTouchDone(null), 1500);
+      load();
+    } else {
+      alert((await res.json()).error ?? "Couldn't log that");
+    }
+  }
+
+  async function requestReview() {
+    setReviewState("sending");
+    const res = await fetch(`/api/referrals/${id}/review-request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const { already } = await res.json();
+      setReviewState(already ? "already" : "sent");
+      load();
+    } else {
+      setReviewState("idle");
+      alert((await res.json()).error ?? "Couldn't send the review request");
+    }
+  }
 
   async function setStatus(status: string, extra: Record<string, unknown> = {}) {
     if (status === "docs_delivered" && r && r.documents.length === 0) {
@@ -324,6 +361,62 @@ export default function DealPage() {
                 : "Upload the EOI (and RCE) below, then mark “EOI & docs delivered” to send their one combined bound + documents email."}
             </p>
           )}
+          {["bound", "docs_delivered"].includes(r.status) && (
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              {reviewState === "sent" || reviewState === "already" ? (
+                <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+                  {reviewState === "already"
+                    ? "A review request was already sent to this client."
+                    : `Review request sent to ${r.client_name.split(" ")[0]} ✓`}
+                </p>
+              ) : (
+                <>
+                  <button
+                    className="btn-ghost !px-3 !py-1.5 text-xs"
+                    onClick={requestReview}
+                    disabled={reviewState === "sending" || !r.client_email}
+                    title={
+                      !r.client_email
+                        ? "Add the client's email first"
+                        : "Emails the client your Google review link — they just got covered, it's the perfect moment"
+                    }
+                  >
+                    {reviewState === "sending" ? "Sending…" : "★ Ask for a Google review"}
+                  </button>
+                  {!r.client_email && (
+                    <span className="text-[11px] text-ink-muted">needs the client&apos;s email</span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Quick touch log — one tap, lands on the timeline AND the partner's portal */}
+        <section className="card p-5 space-y-2.5">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <h2 className="section-label">Log a touch</h2>
+            <p className="text-[11px] text-ink-muted">
+              Shows on {r.partners?.name ?? "your partner"}&apos;s portal as proof the file is being worked
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { t: "call", l: "Called client" },
+              { t: "text", l: "Texted client" },
+              { t: "email", l: "Emailed client" },
+              { t: "voicemail", l: "Left voicemail" },
+            ].map((b) => (
+              <button
+                key={b.t}
+                className={`${touchDone === b.t ? "btn-primary" : "btn-ghost"} !px-3 !py-1.5 text-xs`}
+                onClick={() => logTouch(b.t)}
+                disabled={touchBusy !== null}
+              >
+                {touchBusy === b.t ? "Logging…" : touchDone === b.t ? "Logged ✓" : b.l}
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Documents */}

@@ -39,7 +39,7 @@ export async function PUT(req: NextRequest) {
     .maybeSingle();
   const rowId = existing?.id ?? account.id;
   const row: Record<string, unknown> = { id: rowId, account_id: account.id, updated_at: new Date().toISOString() };
-  for (const f of ["display_name", "agency_name", "office", "phone", "email"]) {
+  for (const f of ["display_name", "agency_name", "office", "phone", "email", "google_review_url"]) {
     if (f in body) row[f] = String(body[f] ?? "").trim() || null;
   }
 

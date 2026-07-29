@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { AT_RISK_DAYS, SAFE_STATUSES, STATUS_LABELS } from "@/lib/config";
-import { sendEmail, atRiskEmail, agentDigestEmail } from "@/lib/email";
+import { sendEmail, atRiskEmail, agentDigestEmail, partnerClosingsEmail } from "@/lib/email";
 import { appUrl, fmtDate } from "@/lib/helpers";
 import { logActivity } from "@/lib/activity";
 
@@ -121,5 +121,56 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ checked: atRisk?.length ?? 0, alerted: sent, digestsSent });
+  // ── Monday partner closings digest (next 14 days, per partner) ────────────
+  // The email a processor forwards around the office: everything closing in
+  // the next two weeks with insurance status at a glance. Quiet if nothing
+  // is closing. Runs only on Mondays (UTC).
+  let closingsDigests = 0;
+  if (new Date().getUTCDay() === 1) {
+    const horizon14 = new Date(today.getTime() + 14 * 86400000);
+    const { data: closingRefs } = await db()
+      .from("referrals")
+      .select("id, client_name, closing_date, status, partner_id, partners(name, token, emails)")
+      .not("closing_date", "is", null)
+      .gte("closing_date", iso(today))
+      .lte("closing_date", iso(horizon14))
+      .neq("status", "lost");
+
+    const byPartner = new Map<string, { partner: any; items: any[] }>();
+    for (const r of closingRefs ?? []) {
+      const partner = (r as any).partners;
+      if (!partner?.emails?.length) continue;
+      const key = (r as any).partner_id;
+      if (!byPartner.has(key)) byPartner.set(key, { partner, items: [] });
+      byPartner.get(key)!.items.push({
+        name: r.client_name,
+        closing: fmtDate(r.closing_date),
+        statusLabel: STATUS_LABELS[r.status] ?? r.status,
+        done: SAFE_STATUSES.includes(r.status),
+      });
+    }
+
+    for (const { partner, items } of byPartner.values()) {
+      const subject = `Your closings this week — ${items.length} with insurance status`;
+      const { data: already } = await db()
+        .from("email_log")
+        .select("id")
+        .eq("kind", "partner_closings")
+        .eq("subject", subject)
+        .contains("recipients", [partner.emails[0]])
+        .gte("created_at", since)
+        .limit(1);
+      if (already && already.length > 0) continue;
+
+      await sendEmail({
+        kind: "partner_closings",
+        to: partner.emails,
+        subject,
+        html: partnerClosingsEmail(partner.name, items, `${appUrl()}/p/${partner.token}`),
+      });
+      closingsDigests++;
+    }
+  }
+
+  return NextResponse.json({ checked: atRisk?.length ?? 0, alerted: sent, digestsSent, closingsDigests });
 }
