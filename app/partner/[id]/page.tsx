@@ -17,6 +17,7 @@ import {
   IconX,
 } from "../../icons";
 import { PartnerInviteButton } from "../../partner-invite";
+import { LeadPrefillBox } from "../../lead-prefill";
 
 // The partner workspace: one partner, all their leads, bulk actions, and a
 // log-lead form already pointed at them. Reached by clicking a partner on the
@@ -72,7 +73,17 @@ export default function PartnerWorkspacePage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ client_name: "", client_phone: "", closing_date: "", notes: "" });
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [form, setForm] = useState({
+    client_name: "",
+    coborrower_name: "",
+    client_phone: "",
+    client_email: "",
+    client_dob: "",
+    property_address: "",
+    closing_date: "",
+    notes: "",
+  });
 
   async function load() {
     const [pRes, rRes, cRes] = await Promise.all([
@@ -201,6 +212,21 @@ export default function PartnerWorkspacePage() {
     if (res.ok) setContacts((c) => c.filter((x) => x.id !== cid));
   }
 
+  async function rotateLink() {
+    if (!partner) return;
+    const ok = confirm(
+      `Rotate ${partner.name}'s magic link? Every link and QR code you've already shared stops working immediately — you'll need to send the new one. Use this if the link got out beyond the team.`
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/partners/${id}/rotate`, { method: "POST" });
+    if (res.ok) {
+      const { short_code } = await res.json();
+      await navigator.clipboard.writeText(`${window.location.origin}/p/${short_code}`).catch(() => {});
+      alert("Link rotated — the new link is on your clipboard. Old links are dead.");
+      load();
+    } else alert((await res.json()).error ?? "Couldn't rotate the link");
+  }
+
   async function deletePartner() {
     if (!partner) return;
     const n = refs.length;
@@ -223,14 +249,33 @@ export default function PartnerWorkspacePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, partner_id: id }),
     });
-    setSaving(false);
-    if (res.ok) {
-      setForm({ client_name: "", client_phone: "", closing_date: "", notes: "" });
-      setShowAdd(false);
-      load();
-    } else {
+    if (!res.ok) {
+      setSaving(false);
       alert((await res.json()).error ?? "Failed to save");
+      return;
     }
+    const { referral } = await res.json();
+    // Attach the prefill source doc to the new lead automatically.
+    if (pendingFile && referral?.id) {
+      const fd = new FormData();
+      fd.append("file", pendingFile);
+      fd.append("kind", "loan_1003");
+      await fetch(`/api/referrals/${referral.id}/docs`, { method: "POST", body: fd }).catch(() => {});
+    }
+    setSaving(false);
+    setForm({
+      client_name: "",
+      coborrower_name: "",
+      client_phone: "",
+      client_email: "",
+      client_dob: "",
+      property_address: "",
+      closing_date: "",
+      notes: "",
+    });
+    setPendingFile(null);
+    setShowAdd(false);
+    load();
   }
 
   const stats = useMemo(() => {
@@ -393,9 +438,14 @@ export default function PartnerWorkspacePage() {
                         Cancel
                       </button>
                     </div>
-                    <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs !text-red-600" onClick={deletePartner}>
-                      <IconTrash size={12} /> Delete partner…
-                    </button>
+                    <div className="flex gap-2">
+                      <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={rotateLink}>
+                        ↻ Rotate magic link…
+                      </button>
+                      <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs !text-red-600" onClick={deletePartner}>
+                        <IconTrash size={12} /> Delete partner…
+                      </button>
+                    </div>
                   </div>
                 </form>
               ) : (
@@ -478,6 +528,18 @@ export default function PartnerWorkspacePage() {
                     Cancel
                   </button>
                 </div>
+                <LeadPrefillBox
+                  onFile={setPendingFile}
+                  onFields={(f) =>
+                    setForm((prev) => {
+                      const next = { ...prev };
+                      for (const k of Object.keys(next) as (keyof typeof next)[]) {
+                        if (f[k] && !next[k]) next[k] = k === "client_phone" ? formatPhoneInput(f[k]) : f[k];
+                      }
+                      return next;
+                    })
+                  }
+                />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     className="input"
@@ -485,7 +547,12 @@ export default function PartnerWorkspacePage() {
                     value={form.client_name}
                     onChange={(e) => setForm({ ...form, client_name: e.target.value })}
                     required
-                    autoFocus
+                  />
+                  <input
+                    className="input"
+                    placeholder="Co-borrower (optional)"
+                    value={form.coborrower_name}
+                    onChange={(e) => setForm({ ...form, coborrower_name: e.target.value })}
                   />
                   <input
                     className="input"
@@ -494,6 +561,22 @@ export default function PartnerWorkspacePage() {
                     value={form.client_phone}
                     onChange={(e) => setForm({ ...form, client_phone: formatPhoneInput(e.target.value) })}
                   />
+                  <input
+                    className="input"
+                    type="email"
+                    placeholder="Client email"
+                    value={form.client_email}
+                    onChange={(e) => setForm({ ...form, client_email: e.target.value })}
+                  />
+                  <label className="block">
+                    <span className="text-xs text-ink-secondary">Date of birth</span>
+                    <input
+                      className="input mt-1"
+                      type="date"
+                      value={form.client_dob}
+                      onChange={(e) => setForm({ ...form, client_dob: e.target.value })}
+                    />
+                  </label>
                   <label className="block">
                     <span className="text-xs text-ink-secondary">Closing date</span>
                     <input
@@ -503,15 +586,18 @@ export default function PartnerWorkspacePage() {
                       onChange={(e) => setForm({ ...form, closing_date: e.target.value })}
                     />
                   </label>
-                  <label className="block">
-                    <span className="text-xs text-ink-secondary">Notes</span>
-                    <input
-                      className="input mt-1"
-                      placeholder="Anything worth remembering"
-                      value={form.notes}
-                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    />
-                  </label>
+                  <input
+                    className="input sm:col-span-2"
+                    placeholder="Property address (street, city, state, zip)"
+                    value={form.property_address}
+                    onChange={(e) => setForm({ ...form, property_address: e.target.value })}
+                  />
+                  <input
+                    className="input sm:col-span-2"
+                    placeholder="Notes — anything worth remembering"
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  />
                 </div>
                 <button className="btn-primary" disabled={saving}>
                   {saving ? "Saving…" : "Log lead"}

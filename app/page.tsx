@@ -6,6 +6,7 @@ import { STATUSES, STATUS_LABELS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
 import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck } from "./icons";
+import { LeadPrefillBox } from "./lead-prefill";
 
 type Referral = {
   id: string;
@@ -70,13 +71,19 @@ export default function Dashboard() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const formOpenedAt = useRef<number>(0);
-  const [form, setForm] = useState({
+  const EMPTY_LEAD = {
     client_name: "",
+    coborrower_name: "",
     client_phone: "",
+    client_email: "",
+    client_dob: "",
+    property_address: "",
     partner_id: "",
     closing_date: "",
     notes: "",
-  });
+  };
+  const [form, setForm] = useState({ ...EMPTY_LEAD });
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function load() {
@@ -114,14 +121,24 @@ export default function Dashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, log_seconds }),
     });
-    setSaving(false);
-    if (res.ok) {
-      setForm({ client_name: "", client_phone: "", partner_id: form.partner_id, closing_date: "", notes: "" });
-      setShowAdd(false);
-      load();
-    } else {
+    if (!res.ok) {
+      setSaving(false);
       alert((await res.json()).error ?? "Failed to save");
+      return;
     }
+    const { referral } = await res.json();
+    // Attach the prefill source doc (the 1003 the LO emailed) automatically.
+    if (pendingFile && referral?.id) {
+      const fd = new FormData();
+      fd.append("file", pendingFile);
+      fd.append("kind", "loan_1003");
+      await fetch(`/api/referrals/${referral.id}/docs`, { method: "POST", body: fd }).catch(() => {});
+    }
+    setSaving(false);
+    setForm({ ...EMPTY_LEAD, partner_id: form.partner_id });
+    setPendingFile(null);
+    setShowAdd(false);
+    load();
   }
 
   async function advance(r: Referral) {
@@ -230,15 +247,33 @@ export default function Dashboard() {
                 Cancel
               </button>
             </div>
-            <input
-              className="input"
-              placeholder="Client name *"
-              value={form.client_name}
-              onChange={(e) => setForm({ ...form, client_name: e.target.value })}
-              autoFocus
-              required
+            <LeadPrefillBox
+              onFile={setPendingFile}
+              onFields={(f) =>
+                setForm((prev) => {
+                  const next = { ...prev };
+                  for (const k of Object.keys(next) as (keyof typeof next)[]) {
+                    if (k === "partner_id") continue;
+                    if (f[k] && !next[k]) next[k] = k === "client_phone" ? formatPhoneInput(f[k]) : f[k];
+                  }
+                  return next;
+                })
+              }
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                className="input"
+                placeholder="Client name *"
+                value={form.client_name}
+                onChange={(e) => setForm({ ...form, client_name: e.target.value })}
+                required
+              />
+              <input
+                className="input"
+                placeholder="Co-borrower (optional)"
+                value={form.coborrower_name}
+                onChange={(e) => setForm({ ...form, coborrower_name: e.target.value })}
+              />
               <select
                 className="input"
                 value={form.partner_id}
@@ -258,8 +293,28 @@ export default function Dashboard() {
                 value={form.client_phone}
                 onChange={(e) => setForm({ ...form, client_phone: formatPhoneInput(e.target.value) })}
               />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                className="input"
+                type="email"
+                placeholder="Client email"
+                value={form.client_email}
+                onChange={(e) => setForm({ ...form, client_email: e.target.value })}
+              />
+              <label className="block">
+                <span className="section-label">Date of birth</span>
+                <input
+                  type="date"
+                  className="input mt-1.5"
+                  value={form.client_dob}
+                  onChange={(e) => setForm({ ...form, client_dob: e.target.value })}
+                />
+              </label>
+              <input
+                className="input sm:col-span-2"
+                placeholder="Property address (street, city, state, zip)"
+                value={form.property_address}
+                onChange={(e) => setForm({ ...form, property_address: e.target.value })}
+              />
               <label className="block">
                 <span className="section-label">Closing date</span>
                 <input
