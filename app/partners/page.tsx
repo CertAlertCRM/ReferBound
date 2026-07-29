@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
 import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
@@ -316,8 +317,8 @@ export default function PartnersPage() {
                       )}
                       <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
                     </label>
-                    <div>
-                      <p className="font-semibold">
+                    <Link href={`/partner/${p.id}`} className="block group/name min-w-0">
+                      <p className="font-semibold group-hover/name:text-brand transition-colors">
                         {p.name}{" "}
                         <span className="badge bg-slate-100 text-slate-700 align-middle ml-1">
                           {PARTNER_TYPES[p.partner_type] ?? "Lender"}
@@ -326,16 +327,17 @@ export default function PartnersPage() {
                       <p className="text-xs text-ink-muted mt-0.5">
                         {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
                         {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
+                        <span className="text-brand font-medium"> · open workspace →</span>
                       </p>
-                    </div>
+                    </Link>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => startEdit(p)}>
                       <IconPencil size={12} /> Edit
                     </button>
-                    <a className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.short_code || p.token}`} target="_blank">
+                    <Link className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.short_code || p.token}`}>
                       <IconExternal size={12} /> View portal
-                    </a>
+                    </Link>
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => showQr(p)}>
                       ▦ QR
                     </button>
