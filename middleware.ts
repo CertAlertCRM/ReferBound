@@ -15,6 +15,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth/",
   "/api/p/",
   "/api/hub/",
+  "/api/feedback",
   "/api/cron/",
   "/api/docs/",
   "/api/waitlist",

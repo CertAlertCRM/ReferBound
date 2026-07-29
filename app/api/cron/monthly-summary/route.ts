@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { SAFE_STATUSES, APP_CONFIG } from "@/lib/config";
+import { SAFE_STATUSES } from "@/lib/config";
 import { sendEmail, monthlySummaryEmail, thankYouEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 
@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
     }
 
     const agentName =
-      nameByAccount.get((partner as any).account_id) || APP_CONFIG.agentName;
+      nameByAccount.get((partner as any).account_id) || "Your agent";
 
     await sendEmail({
       kind: "monthly_summary",
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
   for (const acct of accounts ?? []) {
     if (acct.thankyou_cadence === "quarterly" && !isQuarterStart) continue;
     const periodLabel = acct.thankyou_cadence === "quarterly" ? "this past quarter" : "this past month";
-    const agentName = nameByAccount.get(acct.id) || APP_CONFIG.agentName;
+    const agentName = nameByAccount.get(acct.id) || "Your agent";
 
     for (const partner of (partners ?? []).filter((p) => (p as any).account_id === acct.id)) {
       if (!partner.emails || partner.emails.length === 0) continue;

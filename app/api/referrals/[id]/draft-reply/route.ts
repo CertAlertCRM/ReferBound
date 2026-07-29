@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { askClaude } from "@/lib/ai";
-import { APP_CONFIG, STATUS_LABELS } from "@/lib/config";
+import { STATUS_LABELS } from "@/lib/config";
 import { getAccount, ownedReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): draft a short partner update grounded
@@ -52,7 +52,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     currentStatus: STATUS_LABELS[referral.status] ?? referral.status,
     closingDate: referral.closing_date,
     propertyAddress: referral.property_address,
-    agentName: prof?.display_name || APP_CONFIG.agentName,
+    agentName: prof?.display_name || "the agent",
     partnerName: (referral as any).partners?.name,
     recentMessagesNewestFirst: (msgs ?? []).map((m) => `${m.sender}: ${m.body}`),
     recentActivityNewestFirst: (activity ?? []).map((a) => a.detail),

@@ -174,6 +174,10 @@ alter table reset_codes enable row level security;
 -- Outbound webhook / Zapier bridge (see migration_11)
 alter table accounts add column if not exists webhook_url text;
 
+-- Short magic links (see migration_16)
+alter table partners add column if not exists short_code text unique
+  default substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
+
 -- Lender workspace / referral board (see migration_15)
 create table if not exists lender_hubs (
   id uuid primary key default gen_random_uuid(),

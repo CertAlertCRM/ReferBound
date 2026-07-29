@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { sendEmail, messageEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 import { appUrl } from "@/lib/helpers";
-import { APP_CONFIG } from "@/lib/config";
 import { getAccount, ownedReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): read the thread / reply to the partner.
@@ -51,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select("display_name")
     .eq("account_id", account.id)
     .maybeSingle();
-  const agentName = prof?.display_name || APP_CONFIG.agentName;
+  const agentName = prof?.display_name || "Your agent";
 
   await logActivity(referral.id, "email_sent", `Reply from ${agentName}: “${text.slice(0, 120)}”`, "agent");
 

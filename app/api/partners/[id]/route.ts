@@ -43,3 +43,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ partner: data });
 }
+
+// Delete a partner. Their magic link dies immediately and every referral they
+// sent cascades away with them (FK on delete cascade) — the UI double-confirms
+// with the referral count before calling this.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const account = await getAccount();
+  if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const { error } = await db()
+    .from("partners")
+    .delete()
+    .eq("id", params.id)
+    .eq("account_id", account.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

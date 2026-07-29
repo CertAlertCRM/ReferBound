@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { STATUS_LABELS, STATUSES } from "@/lib/config";
 import { IconAlert } from "./icons";
+import { FeedbackWidget } from "./feedback-widget";
 
 // ── Status colors: dot + tinted pill, label always present ──────────────────
 const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
@@ -84,6 +85,7 @@ export function TopNav({
     </Link>
   );
   return (
+    <>
     <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-200/80">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <Link href="/">
@@ -108,5 +110,8 @@ export function TopNav({
         </nav>
       </div>
     </header>
+    {/* Sibling of the header — backdrop-blur would trap a fixed child inside it */}
+    <FeedbackWidget source="agent" />
+    </>
   );
 }

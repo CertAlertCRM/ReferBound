@@ -18,7 +18,8 @@ type SendArgs = {
     | "review_request"
     | "thank_you"
     | "partner_closings"
-    | "hub_link";
+    | "hub_link"
+    | "feedback";
   to: string[];
   subject: string;
   html: string;
@@ -86,8 +87,17 @@ export async function sendEmail({ referralId, kind, to, subject, html }: SendArg
 function wrap(body: string): string {
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">
   ${body}
-  <p style="margin-top:32px;font-size:12px;color:#888">Sent by ${APP_CONFIG.agencyName} via ${APP_CONFIG.productName}</p>
+  <p style="margin-top:32px;font-size:12px;color:#888">Sent via ${APP_CONFIG.productName}</p>
 </div>`;
+}
+
+export function feedbackEmail(source: string, fromLabel: string, message: string) {
+  const safe = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return wrap(`
+    <h2 style="margin:0 0 12px">Product feedback — ${source}</h2>
+    <p style="font-size:13px;color:#555">${fromLabel}</p>
+    <div style="margin-top:14px;padding:16px 18px;border-left:3px solid #2547eb;background:#f6f8ff;border-radius:0 10px 10px 0;font-size:15px;line-height:1.7;white-space:pre-wrap">${safe}</div>
+  `);
 }
 
 export function partnerClosingsEmail(

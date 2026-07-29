@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { getAccount, ownedReferral } from "@/lib/account";
 import { sendEmail, reviewRequestEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
-import { APP_CONFIG } from "@/lib/config";
 
 // One-tap Google review request to the CLIENT, sent at the happiest moment —
 // right after their policy is bound. Uses the agent's own Google review link
@@ -46,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ ok: true, already: true });
   }
 
-  const agentName = prof?.display_name || APP_CONFIG.agentName;
+  const agentName = prof?.display_name || "your agent";
   const result = await sendEmail({
     referralId: referral.id,
     kind: "review_request",

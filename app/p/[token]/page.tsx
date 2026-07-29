@@ -7,6 +7,7 @@ import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@
 import { isAtRisk, fmtDate, daysUntil, timeAgo } from "@/lib/helpers";
 import { ShareCard } from "./share-card";
 import { HubCard } from "./hub-card";
+import { FeedbackWidget } from "../../feedback-widget";
 import { PartnerSubmitForm } from "./submit-form";
 import { AutoRefresh } from "./auto-refresh";
 import { ReferralMessages } from "./referral-messages";
@@ -25,10 +26,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: { token: string } }) {
+  const slug = params.token.replace(/[^a-zA-Z0-9]/g, "");
   const { data: partner } = await db()
     .from("partners")
     .select("name")
-    .eq("token", params.token)
+    .or(`token.eq.${slug},short_code.eq.${slug}`)
     .maybeSingle();
   return {
     title: partner ? `${partner.name} — Live Referral Portal` : "Referral Portal",
@@ -68,11 +70,14 @@ function Progress({ status }: { status: string }) {
 
 export default async function PartnerPortal({ params }: { params: { token: string } }) {
   noStore(); // opt this render out of every Next.js cache layer — always live data
+  // Accept both the original long token and the compact short code — old
+  // links a partner already bookmarked keep working forever.
+  const slug = params.token.replace(/[^a-zA-Z0-9]/g, "");
   const { data: partner } = await db()
     .from("partners")
     .select("id, name, token, logo_path, partner_type, account_id")
-    .eq("token", params.token)
-    .single();
+    .or(`token.eq.${slug},short_code.eq.${slug}`)
+    .maybeSingle();
   if (!partner) notFound();
 
   let partnerLogoUrl: string | null = null;
@@ -177,8 +182,10 @@ export default async function PartnerPortal({ params }: { params: { token: strin
     .select("display_name, agency_name, phone, email, headshot_path")
     .eq("account_id", (partner as any).account_id)
     .maybeSingle();
-  const agencyName = prof?.agency_name || APP_CONFIG.agencyName;
-  const agentName = prof?.display_name || APP_CONFIG.agentName;
+  // Per-account only — never fall back to env branding, which belongs to the
+  // founding agency and must not leak onto other accounts' portals.
+  const agentName = prof?.display_name || "your agent";
+  const agencyName = prof?.agency_name || prof?.display_name || "Your Insurance Agent";
 
   let headshotUrl: string | null = null;
   if (prof?.headshot_path) {
@@ -474,7 +481,9 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
       <HubCard />
 
-      <ShareCard agentName={agentName ?? APP_CONFIG.agentName} agencyName={agencyName ?? APP_CONFIG.agencyName} />
+      <ShareCard agentName={agentName} agencyName={agencyName} />
+
+      <FeedbackWidget source="partner" context={`portal: ${partner.name}`} />
 
       <footer className="text-center text-xs text-ink-muted pt-4 pb-8">
         <a href="/" className="hover:underline">

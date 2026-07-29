@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { askClaude, parseJsonLoose } from "@/lib/ai";
-import { APP_CONFIG } from "@/lib/config";
 
 // Public (token-guarded): draft the partner's warm introduction email
 // connecting their client with the agent. If the partner has saved a template,
@@ -56,8 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     db().from("accounts").select("email").eq("id", (partner as any).account_id).maybeSingle(),
   ]);
 
-  const agentName = prof?.display_name || APP_CONFIG.agentName;
-  const agencyName = prof?.agency_name || APP_CONFIG.agencyName;
+  const agentName = prof?.display_name || "your insurance agent";
+  const agencyName = prof?.agency_name || prof?.display_name || "their agency";
   const agentEmail = prof?.email || ownerAccount?.email || "";
   const clientFirst = referral.client_name.split(" ")[0];
 

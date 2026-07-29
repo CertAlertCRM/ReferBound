@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
-import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus } from "../icons";
+import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
 
 type Partner = {
   id: string;
@@ -13,6 +13,7 @@ type Partner = {
   logoUrl: string | null;
   partner_type: string;
   monthly_summary: boolean;
+  short_code: string | null;
   referrals: { count: number }[];
 };
 
@@ -64,9 +65,25 @@ export default function PartnersPage() {
   }
 
   async function copy(p: Partner) {
-    await navigator.clipboard.writeText(`${window.location.origin}/p/${p.token}`);
+    // Prefer the compact short link — same portal, way cleaner in a text.
+    await navigator.clipboard.writeText(`${window.location.origin}/p/${p.short_code || p.token}`);
     setCopied(p.id);
     setTimeout(() => setCopied(null), 1500);
+  }
+
+  async function deletePartner(p: Partner) {
+    const n = p.referrals?.[0]?.count ?? 0;
+    const ok = confirm(
+      `Delete ${p.name}? Their magic link stops working immediately and ${
+        n === 0 ? "" : `their ${n} referral${n === 1 ? "" : "s"}, documents, and messages are `
+      }permanently removed. This can't be undone.`
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/partners/${p.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setEditingId(null);
+      load();
+    } else alert((await res.json()).error ?? "Failed to delete");
   }
 
   async function uploadLogo(p: Partner, e: React.ChangeEvent<HTMLInputElement>) {
@@ -213,6 +230,15 @@ export default function PartnersPage() {
                   <p className="text-xs text-ink-muted">
                     The magic link stays the same — edits here don&apos;t break anything you&apos;ve already sent.
                   </p>
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      className="btn-ghost !px-3 !py-1.5 text-xs !text-red-600"
+                      onClick={() => deletePartner(p)}
+                    >
+                      <IconTrash size={12} /> Delete partner…
+                    </button>
+                  </div>
                 </form>
               ) : (
                 <div className="flex items-center justify-between gap-3 flex-wrap">
