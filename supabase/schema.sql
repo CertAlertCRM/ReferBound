@@ -183,6 +183,10 @@ alter table partner_contacts add column if not exists notify_channel text not nu
 -- Custom partner-type label for "Other" (see migration_23)
 alter table partners add column if not exists type_label text;
 
+-- Directed team invites to existing accounts (see migration_24)
+alter table team_invites add column if not exists invited_email text;
+create index if not exists idx_team_invites_email on team_invites(invited_email);
+
 -- Per-partner thank-you cadence (see migration_18)
 alter table partners add column if not exists thankyou_cadence text not null default 'off';
 

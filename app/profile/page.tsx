@@ -13,6 +13,8 @@ type Team = {
   seatsUsed?: number;
   inviteUrl?: string | null;
   ownerEmail?: string;
+  pendingInvites?: { code: string; invited_email: string }[];
+  incomingInvite?: { code: string; ownerEmail: string } | null;
 };
 
 type Profile = {
@@ -104,6 +106,60 @@ export default function ProfilePage() {
     await navigator.clipboard.writeText(team.inviteUrl);
     setInviteCopied(true);
     setTimeout(() => setInviteCopied(false), 1500);
+  }
+
+  // Owner: invite an existing agent account by email (they accept from here).
+  const [addEmail, setAddEmail] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addDone, setAddDone] = useState("");
+  const [respondBusy, setRespondBusy] = useState(false);
+
+  async function addExistingAgent() {
+    const email = addEmail.trim();
+    if (!email) return;
+    setAddBusy(true);
+    setAddDone("");
+    const r = await fetch("/api/team/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    setAddBusy(false);
+    if (r.ok) {
+      setAddEmail("");
+      setAddDone(email);
+      setTimeout(() => setAddDone(""), 3000);
+      loadTeam();
+    } else alert((await r.json()).error ?? "Couldn't send the invite");
+  }
+
+  async function cancelPending(code: string) {
+    await fetch(`/api/team/add?code=${encodeURIComponent(code)}`, { method: "DELETE" });
+    loadTeam();
+  }
+
+  async function respondToInvite(code: string, accept: boolean) {
+    if (
+      accept &&
+      !confirm(
+        "Join this agency? Your partners and referrals move into the agency's shared book, and you'll share the agency profile. Your seat is covered by their plan — if you're paying for Pro yourself, cancel your own subscription from the Billing page after joining."
+      )
+    )
+      return;
+    setRespondBusy(true);
+    const r = await fetch("/api/team/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, accept }),
+    });
+    setRespondBusy(false);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.joined && d.hadPaidPlan) {
+        alert("You're on the team! One housekeeping item: you were on a paid plan — open Billing → 'Open billing portal' to cancel your own subscription, since the agency covers you now.");
+      }
+      window.location.reload();
+    } else alert((await r.json()).error ?? "Couldn't respond to the invite");
   }
 
   async function removeMember(id: string, email: string) {
@@ -346,6 +402,37 @@ export default function ProfilePage() {
               </section>
             )}
 
+            {/* Incoming agency invite — solo agents see this and choose */}
+            {team?.incomingInvite && (
+              <section className="card p-6 border-brand ring-1 ring-brand/30 space-y-3">
+                <h2 className="font-semibold flex items-center gap-2">
+                  <IconUsers size={16} className="text-brand" /> Agency invitation
+                </h2>
+                <p className="text-sm text-ink-secondary">
+                  <span className="font-medium text-ink">{team.incomingInvite.ownerEmail}</span>{" "}
+                  invited you to join their agency team. If you accept, your partners and
+                  referrals move into the agency&apos;s shared book (magic links keep working),
+                  and your seat is covered by their plan.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    className="btn-primary !py-2 text-xs"
+                    disabled={respondBusy}
+                    onClick={() => respondToInvite(team.incomingInvite!.code, true)}
+                  >
+                    {respondBusy ? "…" : "Join the agency"}
+                  </button>
+                  <button
+                    className="btn-ghost !py-2 text-xs"
+                    disabled={respondBusy}
+                    onClick={() => respondToInvite(team.incomingInvite!.code, false)}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </section>
+            )}
+
             {team?.role === "owner" && team.plan === "agency" && (
               <section className="card p-6 space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -381,6 +468,42 @@ export default function ProfilePage() {
                     <button type="button" className="btn-primary" onClick={makeInvite} disabled={inviteBusy}>
                       {inviteBusy ? "Creating…" : "Create invite link"}
                     </button>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-100 p-4 space-y-2">
+                  <p className="text-sm font-semibold">Add an agent who&apos;s already on ReferBound</p>
+                  <p className="text-xs text-ink-secondary">
+                    Already signed up solo? Enter their account email — they&apos;ll get an invite to
+                    accept from their profile. When they join, their partners and referrals move
+                    into your shared book.
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      className="input !py-2 text-sm flex-1 min-w-[220px]"
+                      type="email"
+                      placeholder="agent@theiragency.com"
+                      value={addEmail}
+                      onChange={(e) => setAddEmail(e.target.value)}
+                    />
+                    <button type="button" className="btn-ghost !py-2 text-xs shrink-0" onClick={addExistingAgent} disabled={addBusy}>
+                      {addBusy ? "Sending…" : "Send invite"}
+                    </button>
+                  </div>
+                  {addDone && (
+                    <p className="text-xs text-emerald-700 font-medium">✓ Invite sent to {addDone} — they accept from their profile page.</p>
+                  )}
+                  {(team.pendingInvites?.length ?? 0) > 0 && (
+                    <ul className="pt-1 space-y-1">
+                      {team.pendingInvites!.map((inv) => (
+                        <li key={inv.code} className="flex items-center justify-between gap-2 text-xs text-ink-secondary">
+                          <span>⏳ {inv.invited_email} — waiting on them</span>
+                          <button type="button" className="link !text-xs" onClick={() => cancelPending(inv.code)}>
+                            Cancel
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
 

@@ -20,7 +20,8 @@ type SendArgs = {
     | "partner_closings"
     | "hub_link"
     | "feedback"
-    | "portal_invite";
+    | "portal_invite"
+    | "team_invite";
   to: string[];
   subject: string;
   html: string;

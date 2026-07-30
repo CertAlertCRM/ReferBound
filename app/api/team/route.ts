@@ -23,11 +23,29 @@ export async function GET() {
     .eq("team_owner_id", account.id)
     .order("created_at", { ascending: true });
 
+  // Generic signup link only — directed email invites are a separate list.
   const { data: invite } = await db()
     .from("team_invites")
     .select("code")
     .eq("account_id", account.id)
+    .is("invited_email", null)
     .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Directed invites this owner has out to existing agents.
+  const { data: pending } = await db()
+    .from("team_invites")
+    .select("code, invited_email")
+    .eq("account_id", account.id)
+    .not("invited_email", "is", null)
+    .order("created_at", { ascending: true });
+
+  // An invite waiting for THIS account (solo agents see a join banner).
+  const { data: incoming } = await db()
+    .from("team_invites")
+    .select("code, accounts:account_id(email)")
+    .eq("invited_email", account.email.toLowerCase())
     .limit(1)
     .maybeSingle();
 
@@ -38,6 +56,10 @@ export async function GET() {
     seatLimit: TEAM_SEAT_LIMIT,
     seatsUsed: (members?.length ?? 0) + 1,
     inviteUrl: invite ? `${appUrl()}/signup?invite=${invite.code}` : null,
+    pendingInvites: pending ?? [],
+    incomingInvite: incoming
+      ? { code: incoming.code, ownerEmail: (incoming as any).accounts?.email ?? "an agency owner" }
+      : null,
   });
 }
 
@@ -54,7 +76,8 @@ export async function POST() {
   }
 
   // Rotate: old links stop working the moment a new one is created.
-  await db().from("team_invites").delete().eq("account_id", account.id);
+  // Directed email invites (invited_email set) are untouched by rotation.
+  await db().from("team_invites").delete().eq("account_id", account.id).is("invited_email", null);
   const { data: invite, error } = await db()
     .from("team_invites")
     .insert({ account_id: account.id })
