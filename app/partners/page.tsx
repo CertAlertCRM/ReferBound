@@ -52,6 +52,51 @@ export default function PartnersPage() {
     load();
   }, []);
 
+  // ── Smart paste ────────────────────────────────────────────────────────────
+  // Agents live in text threads with their partners. Paste anything — a text,
+  // an email signature, a contact card — and we pull out the name, emails,
+  // phone, and a partner-type guess. The person + mobile become the partner's
+  // first team contact automatically on save.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [parsed, setParsed] = useState<{ person: string | null; email: string | null; phone: string | null } | null>(null);
+
+  function smartParse(text: string) {
+    setPasteText(text);
+    if (!text.trim()) {
+      setParsed(null);
+      return;
+    }
+    const emailsFound = text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) ?? [];
+    const phoneFound = (text.match(/(\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}/g) ?? [])
+      .map((p) => p.trim())
+      .find((p) => p.replace(/\D/g, "").length >= 10) ?? null;
+
+    const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    const isNoise = (l: string) =>
+      l.includes("@") || /\d{3}[\s.\-)]/.test(l) || /^(cell|mobile|office|phone|fax|www\.|http)/i.test(l) || l.length > 60;
+    const COMPANY_HINT = /\b(loans?|lending|mortgage|home|financial|realty|real estate|properties|group|team|llc|inc|bank|credit union|cpa|account|tax|title|law|insurance)\b/i;
+
+    const personLine = lines.find((l) => !isNoise(l) && /^[A-Za-z'.\-]+\s+[A-Za-z'.\-]+/.test(l) && !COMPANY_HINT.test(l)) ?? null;
+    const companyLine = lines.find((l) => !isNoise(l) && COMPANY_HINT.test(l)) ?? null;
+
+    // Type guess from keywords anywhere in the paste.
+    const t = text.toLowerCase();
+    const guessedType = /nmls|loan|lender|lending|mortgage/.test(t)
+      ? "lender"
+      : /realtor|realty|real estate|broker|homes|listing/.test(t)
+        ? "realtor"
+        : /cpa|accountant|accounting|tax/.test(t)
+          ? "cpa"
+          : null;
+
+    const person = personLine ? personLine.replace(/,.*$/, "").trim() : null;
+    if (companyLine || person) setName(companyLine ?? person ?? "");
+    if (emailsFound.length) setEmails(emailsFound.join(", "));
+    if (guessedType) setPtype(guessedType);
+    setParsed({ person, email: emailsFound[0] ?? null, phone: phoneFound });
+  }
+
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -62,9 +107,22 @@ export default function PartnersPage() {
     });
     setSaving(false);
     if (res.ok) {
+      // Smart paste found a person? They become the first team contact —
+      // mobile included, SMS consent left off until they actually say yes.
+      const { partner } = await res.json();
+      if (partner?.id && parsed?.person && parsed?.email) {
+        await fetch(`/api/partners/${partner.id}/contacts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: parsed.person, email: parsed.email, phone: parsed.phone ?? "", sms_opt_in: false }),
+        }).catch(() => {});
+      }
       setName("");
       setEmails("");
       setTypeLabel("");
+      setPasteText("");
+      setParsed(null);
+      setPasteOpen(false);
       load();
     } else {
       const err = await res.json();
@@ -128,6 +186,24 @@ export default function PartnersPage() {
     const num = prompt("Mobile number to text the portal link to:");
     if (!num) return;
     sendTx(pid, { phone: num });
+  }
+
+  // Clone a built-out partner (contacts, settings, logo) with a fresh magic
+  // link and no leads — the test→official move without rekeying anything.
+  const [dupBusy, setDupBusy] = useState<string | null>(null);
+  async function duplicatePartner(p: Partner) {
+    setDupBusy(p.id);
+    const res = await fetch(`/api/partners/${p.id}/duplicate`, { method: "POST" });
+    setDupBusy(null);
+    if (res.ok) {
+      setEditingId(null);
+      load();
+    } else {
+      const err = await res.json();
+      if (err.upgrade) {
+        if (confirm(`${err.error}\n\nOpen the billing page to upgrade?`)) window.location.href = "/billing";
+      } else alert(err.error ?? "Couldn't duplicate");
+    }
   }
 
   async function deletePartner(p: Partner) {
@@ -194,7 +270,41 @@ export default function PartnersPage() {
         </div>
 
         <form onSubmit={add} className="card p-5 space-y-3">
-          <h2 className="section-label">Add a partner</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="section-label">Add a partner</h2>
+            <button
+              type="button"
+              className="link !text-xs"
+              onClick={() => setPasteOpen(!pasteOpen)}
+            >
+              📋 {pasteOpen ? "Hide smart paste" : "Smart paste their info"}
+            </button>
+          </div>
+          {pasteOpen && (
+            <div className="rounded-xl border border-brand-100 bg-brand-light/40 p-3 space-y-2">
+              <textarea
+                className="input !h-24 text-sm resize-y"
+                placeholder={"Paste anything — their text, email signature, or contact card.\ne.g.  Sarah Martin\nCowart Home Loans · NMLS 12345\nsmartin@cowart.com · (804) 555-1234"}
+                value={pasteText}
+                onChange={(e) => smartParse(e.target.value)}
+              />
+              {parsed && (
+                <p className="text-[11px] text-ink-secondary">
+                  Found:{" "}
+                  {[
+                    parsed.person && `👤 ${parsed.person}`,
+                    parsed.email && `✉ ${parsed.email}`,
+                    parsed.phone && `📱 ${parsed.phone}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "nothing yet — keep pasting"}
+                  {parsed.person && parsed.email && (
+                    <span className="text-brand-800 font-medium"> — they&apos;ll be added as the first team contact</span>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
           <input
             className="input"
             placeholder="Partner / team name (e.g., Cowart Home Loans)"
@@ -357,7 +467,16 @@ export default function PartnersPage() {
                   <p className="text-xs text-ink-muted">
                     The magic link stays the same — edits here don&apos;t break anything you&apos;ve already sent.
                   </p>
-                  <div className="pt-2 border-t border-slate-100">
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      className="btn-ghost !px-3 !py-1.5 text-xs"
+                      onClick={() => duplicatePartner(p)}
+                      disabled={dupBusy === p.id}
+                      title="Clone this partner — same settings, team contacts, and logo, but a fresh magic link and no leads. Perfect for making a test partner official."
+                    >
+                      <IconCopy size={12} /> {dupBusy === p.id ? "Duplicating…" : "Duplicate partner"}
+                    </button>
                     <button
                       type="button"
                       className="btn-ghost !px-3 !py-1.5 text-xs !text-red-600"
