@@ -25,6 +25,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   if ("partner_type" in body && PARTNER_TYPES[body.partner_type]) {
     patch.partner_type = body.partner_type;
+    // Custom label rides only with "Other"; switching to a built-in type clears it.
+    patch.type_label =
+      body.partner_type === "other"
+        ? String(body.type_label ?? "").trim().slice(0, 40) || null
+        : null;
   }
   if ("monthly_summary" in body) {
     patch.monthly_summary = Boolean(body.monthly_summary);

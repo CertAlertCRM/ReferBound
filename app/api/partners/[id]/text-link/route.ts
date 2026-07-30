@@ -17,7 +17,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.json().catch(() => null);
   const contactId = String(body?.contactId ?? "");
-  if (!contactId) return NextResponse.json({ error: "contactId required" }, { status: 400 });
+  const rawPhone = String(body?.phone ?? "").trim();
+  if (!contactId && !rawPhone) {
+    return NextResponse.json({ error: "contactId or phone required" }, { status: 400 });
+  }
 
   const { data: partner } = await db()
     .from("partners")
@@ -27,15 +30,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .maybeSingle();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const { data: contact } = await db()
-    .from("partner_contacts")
-    .select("id, name, phone")
-    .eq("id", contactId)
-    .eq("partner_id", partner.id)
-    .maybeSingle();
-  if (!contact) return NextResponse.json({ error: "contact not found" }, { status: 404 });
-  if (!toE164(contact.phone)) {
-    return NextResponse.json({ error: "This contact doesn't have a valid mobile number yet" }, { status: 400 });
+  // Either a saved contact's mobile, or a one-off number the agent just typed.
+  let phone: string | null = null;
+  let firstName: string | null = null;
+  if (contactId) {
+    const { data: contact } = await db()
+      .from("partner_contacts")
+      .select("id, name, phone")
+      .eq("id", contactId)
+      .eq("partner_id", partner.id)
+      .maybeSingle();
+    if (!contact) return NextResponse.json({ error: "contact not found" }, { status: 404 });
+    phone = contact.phone;
+    firstName = String(contact.name).split(" ")[0];
+  } else {
+    phone = rawPhone;
+  }
+  if (!toE164(phone)) {
+    return NextResponse.json({ error: "That's not a valid US mobile number" }, { status: 400 });
   }
 
   const { data: prof } = await db()
@@ -46,13 +58,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const agentName = prof?.display_name || "Your insurance agent";
 
   const url = `${appUrl()}/p/${partner.short_code ?? partner.token}`;
-  const firstName = String(contact.name).split(" ")[0];
   const { sent, error } = await sendSms({
     kind: "portal_link",
-    to: contact.phone,
-    body: `Hi ${firstName} — ${agentName} here. Your live referral portal for ${partner.name} is ready: ${url} — see every client you've sent and grab insurance docs anytime. Reply STOP to opt out.`,
+    to: phone,
+    body: `Hi${firstName ? ` ${firstName}` : ""} — ${agentName} here. Your live referral portal for ${partner.name} is ready: ${url} — see every client you've sent and grab insurance docs anytime. Reply STOP to opt out.`,
   });
   if (!sent) return NextResponse.json({ error: error ?? "text failed" }, { status: 502 });
 
-  return NextResponse.json({ ok: true, to: contact.name });
+  return NextResponse.json({ ok: true });
 }

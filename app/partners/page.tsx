@@ -14,6 +14,7 @@ type Partner = {
   emails: string[];
   logoUrl: string | null;
   partner_type: string;
+  type_label: string | null;
   monthly_summary: boolean;
   thankyou_cadence: string;
   short_code: string | null;
@@ -25,7 +26,9 @@ export default function PartnersPage() {
   const [name, setName] = useState("");
   const [emails, setEmails] = useState("");
   const [ptype, setPtype] = useState("lender");
+  const [typeLabel, setTypeLabel] = useState("");
   const [editType, setEditType] = useState("lender");
+  const [editTypeLabel, setEditTypeLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,12 +53,13 @@ export default function PartnersPage() {
     const res = await fetch("/api/partners", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, emails, partner_type: ptype }),
+      body: JSON.stringify({ name, emails, partner_type: ptype, type_label: typeLabel }),
     });
     setSaving(false);
     if (res.ok) {
       setName("");
       setEmails("");
+      setTypeLabel("");
       load();
     } else {
       const err = await res.json();
@@ -119,6 +123,7 @@ export default function PartnersPage() {
     setEditName(p.name);
     setEditEmails(p.emails.join(", "));
     setEditType(p.partner_type ?? "lender");
+    setEditTypeLabel(p.type_label ?? "");
     setEditRecap(p.monthly_summary !== false);
     setEditCadence(p.thankyou_cadence ?? "off");
   }
@@ -130,7 +135,7 @@ export default function PartnersPage() {
     const res = await fetch(`/api/partners/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap, thankyou_cadence: editCadence }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, type_label: editTypeLabel, monthly_summary: editRecap, thankyou_cadence: editCadence }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -167,6 +172,15 @@ export default function PartnersPage() {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+              {ptype === "other" && (
+                <input
+                  className="input mt-1.5"
+                  placeholder="Call it anything — e.g., Networking group"
+                  maxLength={40}
+                  value={typeLabel}
+                  onChange={(e) => setTypeLabel(e.target.value)}
+                />
+              )}
             </label>
             <label className="block">
               <span className="section-label">Notification emails</span>
@@ -250,6 +264,15 @@ export default function PartnersPage() {
                             <option key={k} value={k}>{v}</option>
                           ))}
                         </select>
+                        {editType === "other" && (
+                          <input
+                            className="input mt-1.5"
+                            placeholder="Call it anything — e.g., Networking group"
+                            maxLength={40}
+                            value={editTypeLabel}
+                            onChange={(e) => setEditTypeLabel(e.target.value)}
+                          />
+                        )}
                       </label>
                     </div>
                   </div>
@@ -338,7 +361,7 @@ export default function PartnersPage() {
                       <p className="font-semibold group-hover/name:text-brand transition-colors">
                         {p.name}{" "}
                         <span className="badge bg-slate-100 text-slate-700 align-middle ml-1">
-                          {PARTNER_TYPES[p.partner_type] ?? "Lender"}
+                          {p.type_label || (PARTNER_TYPES[p.partner_type] ?? "Lender")}
                         </span>
                       </p>
                       <p className="text-xs text-ink-muted mt-0.5">

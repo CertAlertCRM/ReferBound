@@ -32,6 +32,7 @@ type Partner = {
   emails: string[];
   logoUrl: string | null;
   partner_type: string;
+  type_label: string | null;
   monthly_summary: boolean;
   thankyou_cadence: string;
   referrals: { count: number }[];
@@ -58,6 +59,8 @@ export default function PartnerWorkspacePage() {
   const [editName, setEditName] = useState("");
   const [editEmails, setEditEmails] = useState("");
   const [editType, setEditType] = useState("lender");
+  const [editTypeLabel, setEditTypeLabel] = useState("");
+  const [txOpen, setTxOpen] = useState(false);
   const [editRecap, setEditRecap] = useState(true);
   const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
@@ -189,6 +192,7 @@ export default function PartnerWorkspacePage() {
     setEditName(partner.name);
     setEditEmails(partner.emails.join(", "));
     setEditType(partner.partner_type ?? "lender");
+    setEditTypeLabel(partner.type_label ?? "");
     setEditRecap(partner.monthly_summary !== false);
     setEditCadence(partner.thankyou_cadence ?? "off");
     setEditing(true);
@@ -200,7 +204,7 @@ export default function PartnerWorkspacePage() {
     const res = await fetch(`/api/partners/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, monthly_summary: editRecap, thankyou_cadence: editCadence }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, type_label: editTypeLabel, monthly_summary: editRecap, thankyou_cadence: editCadence }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -273,6 +277,23 @@ export default function PartnerWorkspacePage() {
     setTextBusy(null);
     if (res.ok) {
       setTextSent(cid);
+      setTimeout(() => setTextSent(null), 2500);
+    } else alert((await res.json()).error ?? "Couldn't send the text");
+  }
+
+  // One-off: text the link to a number the agent types in (no saved contact).
+  async function textLinkToNumber() {
+    const num = prompt("Mobile number to text the portal link to:");
+    if (!num) return;
+    setTextBusy("adhoc");
+    const res = await fetch(`/api/partners/${id}/text-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: num }),
+    });
+    setTextBusy(null);
+    if (res.ok) {
+      setTextSent("adhoc");
       setTimeout(() => setTextSent(null), 2500);
     } else alert((await res.json()).error ?? "Couldn't send the text");
   }
@@ -439,6 +460,15 @@ export default function PartnerWorkspacePage() {
                             <option key={k} value={k}>{v}</option>
                           ))}
                         </select>
+                        {editType === "other" && (
+                          <input
+                            className="input mt-1.5"
+                            placeholder="Call it anything — e.g., Networking group"
+                            maxLength={40}
+                            value={editTypeLabel}
+                            onChange={(e) => setEditTypeLabel(e.target.value)}
+                          />
+                        )}
                       </label>
                     </div>
                   </div>
@@ -632,7 +662,7 @@ export default function PartnerWorkspacePage() {
                     <h1 className="text-xl font-bold tracking-tight truncate">
                       {partner.name}{" "}
                       <span className="badge bg-slate-100 text-slate-700 align-middle ml-1">
-                        {PARTNER_TYPES[partner.partner_type] ?? "Lender"}
+                        {partner.type_label || (PARTNER_TYPES[partner.partner_type] ?? "Lender")}
                       </span>
                     </h1>
                     {partner.emails.length > 0 && (
@@ -650,6 +680,51 @@ export default function PartnerWorkspacePage() {
                   <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={showQr}>
                     ▦ QR
                   </button>
+                  {/* Text the magic link — front and center, not buried in edit mode */}
+                  <div className="relative">
+                    <button
+                      className="btn-ghost !px-3 !py-1.5 text-xs"
+                      onClick={() => setTxOpen(!txOpen)}
+                      disabled={textBusy !== null}
+                    >
+                      <IconMessage size={12} />{" "}
+                      {textSent ? "Sent ✓" : textBusy ? "Sending…" : "Text link"}
+                    </button>
+                    {txOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 z-30 card p-2 w-60 space-y-0.5 shadow-lift">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted px-2 pt-1 pb-1.5">
+                          Text the portal link to…
+                        </p>
+                        {contacts.filter((c) => c.phone).map((c) => (
+                          <button
+                            key={c.id}
+                            className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 transition-colors"
+                            onClick={() => {
+                              setTxOpen(false);
+                              textPortalLink(c.id);
+                            }}
+                          >
+                            <span className="font-medium">{c.name}</span>
+                            <span className="text-ink-muted"> · {c.phone}</span>
+                          </button>
+                        ))}
+                        {contacts.filter((c) => c.phone).length === 0 && (
+                          <p className="text-[11px] text-ink-muted px-2 py-1.5">
+                            No contacts with a mobile yet — add one in Edit, or:
+                          </p>
+                        )}
+                        <button
+                          className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 text-brand font-semibold transition-colors"
+                          onClick={() => {
+                            setTxOpen(false);
+                            textLinkToNumber();
+                          }}
+                        >
+                          Enter a number…
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <PartnerInviteButton partnerId={partner.id} partnerName={partner.name} />
                   <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={copyLink}>
                     {copied ? <IconCheck size={12} /> : <IconCopy size={12} />} {copied ? "Copied" : "Copy magic link"}

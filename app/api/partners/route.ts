@@ -9,7 +9,7 @@ export async function GET() {
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data, error } = await db()
     .from("partners")
-    .select("id, name, token, short_code, emails, logo_path, partner_type, monthly_summary, thankyou_cadence, created_at, referrals(count)")
+    .select("id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, created_at, referrals(count)")
     .eq("account_id", account.id)
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -57,9 +57,13 @@ export async function POST(req: NextRequest) {
     .map((e: string) => e.trim().toLowerCase())
     .filter((e: string) => EMAIL_RE.test(e));
   const partner_type = PARTNER_TYPES[body.partner_type] ? body.partner_type : "lender";
+  // Custom display label only makes sense with "Other" — the built-in types
+  // already have names, and flow logic keys off partner_type either way.
+  const type_label =
+    partner_type === "other" ? String(body.type_label ?? "").trim().slice(0, 40) || null : null;
   const { data, error } = await db()
     .from("partners")
-    .insert({ name: body.name.trim(), emails, partner_type, account_id: account.id })
+    .insert({ name: body.name.trim(), emails, partner_type, type_label, account_id: account.id })
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
