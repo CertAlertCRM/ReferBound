@@ -249,12 +249,12 @@ export default function PartnersPage() {
                         />
                       </label>
                       <label className="block">
-                        <span className="section-label">Notification emails (comma-separated)</span>
+                        <span className="section-label">Notification emails</span>
                         <input
                           className="input mt-1.5"
                           value={editEmails}
                           onChange={(e) => setEditEmails(e.target.value)}
-                          placeholder="lo@lender.com, processor@lender.com"
+                          placeholder="Comma-separated: lo@lender.com, processor@…"
                         />
                       </label>
                       <label className="block">
