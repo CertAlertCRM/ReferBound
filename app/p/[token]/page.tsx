@@ -264,7 +264,11 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 <img
                   src={partnerLogoUrl}
                   alt={partner.name}
-                  className="mt-5 h-20 sm:h-24 max-w-[340px] object-contain object-left bg-white rounded-xl px-4 py-2.5 shadow-lg"
+                  // Fixed chip: same generous size for every logo. Without a set
+                  // width, square logos collapse to a small box while wide
+                  // wordmarks get a banner — object-contain scales any shape up
+                  // to fill this frame instead.
+                  className="mt-5 h-24 sm:h-28 w-[260px] sm:w-[320px] object-contain bg-white rounded-xl px-5 py-3 shadow-lg"
                 />
               )}
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-3">
