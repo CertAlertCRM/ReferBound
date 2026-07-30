@@ -17,7 +17,7 @@ export async function GET() {
     .select("id, referral_id, event_type, detail, actor, created_at, referrals!inner(account_id, client_name)")
     .eq("referrals.account_id", account.id)
     .order("created_at", { ascending: false })
-    .limit(12);
+    .limit(16);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { STATUSES, STATUS_LABELS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
-import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck } from "./icons";
+import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck, IconUsers, IconZap, IconFile } from "./icons";
 import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
 
@@ -178,7 +178,7 @@ export default function Dashboard() {
     <>
       <TopNav active="referrals" />
       <main className="max-w-3xl xl:max-w-6xl mx-auto p-4 sm:p-6">
-        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-6 xl:items-start">
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-6 xl:items-start">
         <div className="space-y-6 min-w-0">
         <InstallPrompt />
         {/* Greeting */}
@@ -373,7 +373,7 @@ export default function Dashboard() {
         {/* Desktop rail — the margins earn their keep on wide screens */}
         <aside className="hidden xl:block space-y-4 sticky top-6">
           {groups.risk.length > 0 && (
-            <div className="card p-4 border-red-200">
+            <div className="card p-5 border-red-200">
               <h3 className="section-label text-red-600 mb-2.5">Needs attention</h3>
               <ul className="space-y-2">
                 {groups.risk.slice(0, 4).map((r) => (
@@ -392,18 +392,18 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div className="card p-4">
-            <h3 className="section-label mb-2.5">Latest activity</h3>
+          <div className="card p-5">
+            <h3 className="section-label mb-3">Latest activity</h3>
             {feed.length === 0 ? (
-              <p className="text-xs text-ink-muted">
+              <p className="text-sm text-ink-muted">
                 Everything that happens — leads, status moves, emails, messages — shows up here.
               </p>
             ) : (
-              <ul className="space-y-2.5">
-                {feed.slice(0, feedOpen ? 12 : 4).map((a) => (
+              <ul className="space-y-3">
+                {feed.slice(0, feedOpen ? 16 : 6).map((a) => (
                   <li key={a.id} className="flex gap-2.5">
                     <span
-                      className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                      className={`mt-[7px] w-2 h-2 rounded-full shrink-0 ${
                         a.actor === "partner"
                           ? "bg-brand"
                           : a.actor === "system"
@@ -414,8 +414,11 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <Link
                         href={`/deal/${a.referral_id}`}
-                        className="text-xs text-ink-secondary hover:text-ink transition-colors line-clamp-2 block"
+                        className="text-[13px] text-ink-secondary hover:text-ink transition-colors line-clamp-2 block leading-snug"
                       >
+                        {a.client_name && (
+                          <span className="font-semibold text-ink">{a.client_name} — </span>
+                        )}
                         {a.detail ?? a.event_type}
                       </Link>
                       <p className="text-[11px] text-ink-muted mt-0.5">{timeAgo(a.created_at)}</p>
@@ -424,10 +427,10 @@ export default function Dashboard() {
                 ))}
               </ul>
             )}
-            {feed.length > 4 && (
+            {feed.length > 6 && (
               <button
                 type="button"
-                className="link !text-xs mt-3"
+                className="link !text-xs mt-3.5"
                 onClick={() => setFeedOpen(!feedOpen)}
               >
                 {feedOpen ? (
@@ -436,32 +439,51 @@ export default function Dashboard() {
                   </>
                 ) : (
                   <>
-                    <IconChevronDown size={12} /> Show more ({Math.min(feed.length, 12) - 4})
+                    <IconChevronDown size={12} /> Show more ({Math.min(feed.length, 16) - 6})
                   </>
                 )}
               </button>
             )}
           </div>
 
-          <div className="card p-4">
-            <h3 className="section-label mb-2.5">Quick actions</h3>
-            <div className="space-y-1.5">
-              <Link href="/partners" className="link !text-xs block">
-                Add or manage partners →
-              </Link>
-              <Link href="/stats" className="link !text-xs block">
-                Partner ROI &amp; trends →
-              </Link>
-              <a
-                href="/api/export?scope=new"
-                className="link !text-xs block"
-                title="Only leads not previously exported"
-              >
-                Export new leads (CSV) →
-              </a>
-              <a href="/api/export?scope=all" className="link !text-xs block">
-                Export everything (CSV) →
-              </a>
+          <div className="card p-5">
+            <h3 className="section-label mb-2">Quick actions</h3>
+            <div className="-mx-2">
+              {[
+                { href: "/partners", icon: IconUsers, label: "Add or manage partners" },
+                { href: "/stats", icon: IconZap, label: "Partner ROI & trends" },
+                {
+                  href: "/api/export?scope=new",
+                  icon: IconDownload,
+                  label: "Export new leads (CSV)",
+                  title: "Only leads not previously exported",
+                  plain: true,
+                },
+                { href: "/api/export?scope=all", icon: IconFile, label: "Export everything (CSV)", plain: true },
+              ].map((x) =>
+                x.plain ? (
+                  <a
+                    key={x.label}
+                    href={x.href}
+                    title={x.title}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium text-ink-secondary hover:text-brand hover:bg-brand-light/50 transition-colors"
+                  >
+                    <x.icon size={15} className="text-ink-muted shrink-0" />
+                    {x.label}
+                    <IconArrowRight size={13} className="ml-auto text-ink-muted" />
+                  </a>
+                ) : (
+                  <Link
+                    key={x.label}
+                    href={x.href}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium text-ink-secondary hover:text-brand hover:bg-brand-light/50 transition-colors"
+                  >
+                    <x.icon size={15} className="text-ink-muted shrink-0" />
+                    {x.label}
+                    <IconArrowRight size={13} className="ml-auto text-ink-muted" />
+                  </Link>
+                )
+              )}
             </div>
           </div>
         </aside>
