@@ -400,7 +400,7 @@ export default function Dashboard() {
               </p>
             ) : (
               <ul className="space-y-3">
-                {feed.slice(0, feedOpen ? 16 : 6).map((a) => (
+                {feed.slice(0, feedOpen ? 16 : 5).map((a) => (
                   <li key={a.id} className="flex gap-2.5">
                     <span
                       className={`mt-[7px] w-2 h-2 rounded-full shrink-0 ${
@@ -427,7 +427,7 @@ export default function Dashboard() {
                 ))}
               </ul>
             )}
-            {feed.length > 6 && (
+            {feed.length > 5 && (
               <button
                 type="button"
                 className="link !text-xs mt-3.5"
@@ -439,7 +439,7 @@ export default function Dashboard() {
                   </>
                 ) : (
                   <>
-                    <IconChevronDown size={12} /> Show more ({Math.min(feed.length, 16) - 6})
+                    <IconChevronDown size={12} /> Show more ({Math.min(feed.length, 16) - 5})
                   </>
                 )}
               </button>
