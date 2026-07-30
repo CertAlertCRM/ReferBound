@@ -16,6 +16,8 @@ Hard rules:
 - 1–3 sentences, conversational but professional. No greeting line, no signature.
 - If the partner asked a question you don't have the facts to answer, acknowledge
   it and say the agent will follow up with specifics — do not make up an answer.
+- NEVER suggest the portal replaces calls, texts, or personal contact, and never
+  imply the partner shouldn't call — always welcome a call or conversation.
 - Respond with ONLY the message text. No quotes around it, no commentary.`;
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {

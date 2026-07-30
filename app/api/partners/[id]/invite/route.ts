@@ -19,7 +19,12 @@ Hard rules:
 - Use ONLY the supplied facts. No invented claims, statistics, or promises.
 - Explain plainly what the portal does: live status on every client they refer,
   documents the moment policies are bound, no login needed — just the link.
-- Encourage them to bookmark it and send their next referral through it.
+- NEVER frame the portal as replacing, reducing, or eliminating calls, texts,
+  voicemails, or personal contact. Many partners love picking up the phone —
+  the portal is an always-available ADDITION to however they prefer to work,
+  never a substitute for the relationship.
+- Encourage them to bookmark it and send their next referral through it —
+  or keep sending referrals exactly how they always have; either way works.
 - Include the portal link on its own line.
 - Warm, professional, brief (5-8 sentences). Plain text only, no markdown.
 - Sign off with the agent's name.

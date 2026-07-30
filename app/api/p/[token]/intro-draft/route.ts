@@ -22,6 +22,8 @@ Hard rules:
   reply-all or expect the agent's call.
 - Plain text only. No markdown, no placeholders like [NAME] — if a detail is
   missing, write around it naturally.
+- Never disparage or discourage phone calls, texts, or personal contact —
+  encourage the client and agent to connect however they prefer.
 
 Respond with ONLY a JSON object (no fences):
 {"subject": string, "body": string}`;

@@ -18,16 +18,16 @@ export function ShareCard({ agentName, agencyName }: { agentName: string; agency
 
   const subject = encodeURIComponent("This referral portal is worth a look");
   const body = encodeURIComponent(
-    `Hey,\n\nMy insurance partner (${agentName} at ${agencyName}) set me up with a live portal for the clients I send over — real-time status on every referral, documents the moment policies bind, no logins, no "any update?" calls.\n\nIf you work with an insurance agent, tell them to check out ReferBound — the first partner is free:\n${shareUrl}\n\nWorth passing along.`
+    `Hey,\n\nMy insurance partner (${agentName} at ${agencyName}) set me up with a live portal for the clients I send over — I can see where every referral stands anytime I want, and the insurance documents show up there the moment policies bind. No login, just a link.\n\nIf you work with an insurance agent, tell them to check out ReferBound — the first partner is free:\n${shareUrl}\n\nWorth passing along.`
   );
 
   return (
     <div className="card p-5">
       <p className="font-semibold text-sm">Know someone who&apos;d want this?</p>
       <p className="text-xs text-ink-secondary mt-1">
-        If a colleague works with an insurance agent still doing updates by text and voicemail,
-        pass this along — any agent can set up a portal like this one for their partners. First
-        partner is free.
+        If a colleague would love this kind of live view into their referrals, pass it along — any
+        insurance agent can set up a portal like this one for their partners. First partner is
+        free.
       </p>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
         <a href={`mailto:?subject=${subject}&body=${body}`} className="btn-ghost !py-1.5 text-xs">
