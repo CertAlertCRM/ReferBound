@@ -14,8 +14,10 @@ export async function POST(req: NextRequest) {
   if (!file.type.startsWith("image/")) {
     return NextResponse.json({ error: "headshot must be an image" }, { status: 400 });
   }
-  if (file.size > 5 * 1024 * 1024) {
-    return NextResponse.json({ error: "image too large (5MB max)" }, { status: 400 });
+  // Generous cap: the profile page resizes client-side, so this only catches
+  // raw fallback uploads from browsers that couldn't decode the image.
+  if (file.size > 10 * 1024 * 1024) {
+    return NextResponse.json({ error: "photo too large (10MB max) — try a smaller one" }, { status: 400 });
   }
 
   const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");

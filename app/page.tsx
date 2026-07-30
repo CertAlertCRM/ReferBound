@@ -5,7 +5,7 @@ import Link from "next/link";
 import { STATUSES, STATUS_LABELS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
-import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck, IconUsers, IconZap, IconFile } from "./icons";
+import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck, IconUsers, IconZap, IconFile, IconX } from "./icons";
 import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
 
@@ -157,6 +157,25 @@ export default function Dashboard() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: ns }),
+    });
+    setBusyId(null);
+    load();
+  }
+
+  // Mark a deal "Not written" right from the list — no email goes to the
+  // partner (that conversation deserves a personal touch); it just moves to
+  // the Not written section and the portal shows it honestly.
+  async function markLost(r: Referral) {
+    const reason = prompt(
+      `Mark ${r.client_name} as “Not written”? No email goes to your partner.\n\nOptional reason (shows in your records):`,
+      ""
+    );
+    if (reason === null) return;
+    setBusyId(r.id);
+    await fetch(`/api/referrals/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "lost", lost_reason: reason.trim() || null }),
     });
     setBusyId(null);
     load();
@@ -362,10 +381,10 @@ export default function Dashboard() {
           <GettingStarted profileDone={Boolean(profileName)} partnerDone={partners.length > 0} />
         ) : (
           <>
-            <Section title="Closing soon — not bound" items={groups.risk} advance={advance} busyId={busyId} highlight />
-            <Section title="Active" items={groups.active} advance={advance} busyId={busyId} />
-            <Section title="Bound & delivered" items={groups.done} advance={advance} busyId={busyId} collapsible />
-            <Section title="Not written" items={groups.lost} advance={advance} busyId={busyId} collapsible />
+            <Section title="Closing soon — not bound" items={groups.risk} advance={advance} markLost={markLost} busyId={busyId} highlight />
+            <Section title="Active" items={groups.active} advance={advance} markLost={markLost} busyId={busyId} />
+            <Section title="Bound & delivered" items={groups.done} advance={advance} markLost={markLost} busyId={busyId} collapsible />
+            <Section title="Not written" items={groups.lost} advance={advance} markLost={markLost} busyId={busyId} collapsible />
           </>
         )}
         </div>
@@ -591,6 +610,7 @@ function Section({
   title,
   items,
   advance,
+  markLost,
   busyId,
   highlight,
   collapsible,
@@ -598,6 +618,7 @@ function Section({
   title: string;
   items: Referral[];
   advance: (r: Referral) => void;
+  markLost: (r: Referral) => void;
   busyId: string | null;
   highlight?: boolean;
   collapsible?: boolean;
@@ -697,6 +718,17 @@ function Section({
                         <IconArrowRight size={12} />
                       </>
                     )}
+                  </button>
+                )}
+                {!["bound", "docs_delivered", "lost"].includes(r.status) && (
+                  <button
+                    onClick={() => markLost(r)}
+                    disabled={busyId === r.id}
+                    className="shrink-0 text-ink-muted hover:text-red-600 transition-colors px-1"
+                    title="Mark as Not written — no email goes out; it moves to the Not written section"
+                    aria-label={`Mark ${r.client_name} as not written`}
+                  >
+                    <IconX size={14} />
                   </button>
                 )}
               </div>
