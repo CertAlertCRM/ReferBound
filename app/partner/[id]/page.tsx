@@ -15,6 +15,7 @@ import {
   IconTrash,
   IconPencil,
   IconX,
+  IconMessage,
 } from "../../icons";
 import { PartnerInviteButton } from "../../partner-invite";
 import { LeadPrefillBox } from "../../lead-prefill";
@@ -61,8 +62,24 @@ export default function PartnerWorkspacePage() {
   const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
   const [contacts, setContacts] = useState<
-    { id: string; name: string; email: string; role: string | null; phone?: string | null; sms_opt_in?: boolean }[]
+    {
+      id: string;
+      name: string;
+      email: string;
+      role: string | null;
+      phone?: string | null;
+      sms_opt_in?: boolean;
+      notify_channel?: string;
+    }[]
   >([]);
+  // Inline contact editor (add a mobile later, SMS consent, channel choice)
+  const [ecId, setEcId] = useState<string | null>(null);
+  const [ecPhone, setEcPhone] = useState("");
+  const [ecSms, setEcSms] = useState(false);
+  const [ecChannel, setEcChannel] = useState("both");
+  const [ecBusy, setEcBusy] = useState(false);
+  const [textBusy, setTextBusy] = useState<string | null>(null);
+  const [textSent, setTextSent] = useState<string | null>(null);
   const [cName, setCName] = useState("");
   const [cEmail, setCEmail] = useState("");
   const [cRole, setCRole] = useState("");
@@ -221,6 +238,43 @@ export default function PartnerWorkspacePage() {
       const { contact } = await res.json();
       setContacts((c) => [...c, contact]);
     } else alert((await res.json()).error ?? "Couldn't add contact");
+  }
+
+  function openContactEdit(c: (typeof contacts)[number]) {
+    setEcId(c.id);
+    setEcPhone(c.phone ?? "");
+    setEcSms(Boolean(c.sms_opt_in));
+    setEcChannel(c.notify_channel ?? "both");
+  }
+
+  async function saveContactEdit() {
+    if (!ecId) return;
+    setEcBusy(true);
+    const res = await fetch(`/api/partners/${id}/contacts`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cid: ecId, phone: ecPhone, sms_opt_in: ecSms, notify_channel: ecChannel }),
+    });
+    setEcBusy(false);
+    if (res.ok) {
+      const { contact } = await res.json();
+      setContacts((cs) => cs.map((x) => (x.id === contact.id ? contact : x)));
+      setEcId(null);
+    } else alert((await res.json()).error ?? "Couldn't save");
+  }
+
+  async function textPortalLink(cid: string) {
+    setTextBusy(cid);
+    const res = await fetch(`/api/partners/${id}/text-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactId: cid }),
+    });
+    setTextBusy(null);
+    if (res.ok) {
+      setTextSent(cid);
+      setTimeout(() => setTextSent(null), 2500);
+    } else alert((await res.json()).error ?? "Couldn't send the text");
   }
 
   async function removeContact(cid: string) {
@@ -422,15 +476,87 @@ export default function PartnerWorkspacePage() {
                     {contacts.length > 0 && (
                       <ul className="space-y-1.5">
                         {contacts.map((c) => (
-                          <li key={c.id} className="flex items-center justify-between gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-                            <span className="min-w-0 truncate">
-                              <span className="font-medium">{c.name}</span>
-                              {c.role && <span className="text-ink-muted"> · {c.role}</span>}
-                              <span className="text-xs text-ink-muted"> · {c.email}</span>
-                            </span>
-                            <button type="button" className="text-ink-muted hover:text-red-600 shrink-0" onClick={() => removeContact(c.id)} title="Remove contact">
-                              <IconX size={13} />
-                            </button>
+                          <li key={c.id} className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate">
+                                <span className="font-medium">{c.name}</span>
+                                {c.role && <span className="text-ink-muted"> · {c.role}</span>}
+                                <span className="text-xs text-ink-muted"> · {c.email}</span>
+                                {c.phone && <span className="text-xs text-ink-muted"> · 📱 {c.phone}</span>}
+                                {c.phone && c.sms_opt_in && (
+                                  <span className="badge bg-emerald-50 text-emerald-700 ml-1.5 !text-[10px]">
+                                    {c.notify_channel === "sms" ? "text only" : c.notify_channel === "email" ? "email only" : "email + text"}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="flex items-center gap-2 shrink-0">
+                                {c.phone && (
+                                  <button
+                                    type="button"
+                                    className="link !text-[11px]"
+                                    onClick={() => textPortalLink(c.id)}
+                                    disabled={textBusy === c.id}
+                                    title={`Text ${c.name} the portal link`}
+                                  >
+                                    <IconMessage size={12} />{" "}
+                                    {textSent === c.id ? "Sent ✓" : textBusy === c.id ? "Sending…" : "Text link"}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="text-ink-muted hover:text-brand shrink-0"
+                                  onClick={() => (ecId === c.id ? setEcId(null) : openContactEdit(c))}
+                                  title="Edit mobile & notifications"
+                                >
+                                  <IconPencil size={13} />
+                                </button>
+                                <button type="button" className="text-ink-muted hover:text-red-600 shrink-0" onClick={() => removeContact(c.id)} title="Remove contact">
+                                  <IconX size={13} />
+                                </button>
+                              </span>
+                            </div>
+                            {ecId === c.id && (
+                              <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <input
+                                    className="input !py-2 text-sm"
+                                    type="tel"
+                                    placeholder="Mobile"
+                                    value={ecPhone}
+                                    onChange={(e) => setEcPhone(formatPhoneInput(e.target.value))}
+                                  />
+                                  <select
+                                    className="input !py-2 text-sm"
+                                    value={ecChannel}
+                                    onChange={(e) => setEcChannel(e.target.value)}
+                                    title="How this contact hears about their leads at quote & docs-ready"
+                                  >
+                                    <option value="both">Notify by email + text</option>
+                                    <option value="email">Notify by email only</option>
+                                    <option value="sms">Notify by text only</option>
+                                  </select>
+                                </div>
+                                {ecPhone && (
+                                  <label className="flex items-center gap-2 cursor-pointer text-[11px] text-ink-secondary">
+                                    <input type="checkbox" className="accent-brand" checked={ecSms} onChange={(e) => setEcSms(e.target.checked)} />
+                                    They&apos;re OK receiving texts (msg &amp; data rates may apply; reply STOP anytime)
+                                  </label>
+                                )}
+                                {ecChannel === "sms" && (!ecPhone || !ecSms) && (
+                                  <p className="text-[11px] text-amber-700">
+                                    Text-only needs a mobile + their OK — until then, updates fall back to email.
+                                  </p>
+                                )}
+                                <div className="flex gap-2">
+                                  <button type="button" className="btn-primary !py-1.5 !px-3 text-xs" onClick={saveContactEdit} disabled={ecBusy}>
+                                    {ecBusy ? "Saving…" : "Save"}
+                                  </button>
+                                  <button type="button" className="btn-ghost !py-1.5 !px-3 text-xs" onClick={() => setEcId(null)}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>

@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", params.id)
     .eq("account_id", account.id)
-    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in), documents(kind, file_name)")
+    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in, notify_channel), documents(kind, file_name)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -86,38 +86,48 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (NOTIFY_STATUSES.has(referral.status) && referral.partners) {
       const portalUrl = `${appUrl()}/p/${referral.partners.token}`;
-      // Route deal-specific emails to whoever sent THIS lead; fall back to the
-      // partner's team list when no sender is on file.
-      const recipients: string[] = (referral as any).partner_contacts?.email
-        ? [(referral as any).partner_contacts.email]
+      // Route deal-specific notices to whoever sent THIS lead, over the
+      // channel(s) the agent chose for them: email, text, or both. A contact
+      // set to text-only without a usable/consented phone falls back to email
+      // rather than silently hearing nothing. No contact on the lead = the
+      // partner's team email list, as before.
+      const contact = (referral as any).partner_contacts;
+      const smsCapable = Boolean(contact?.sms_opt_in && contact?.phone);
+      const channel = contact?.notify_channel ?? "both";
+      const wantsSms = smsCapable && channel !== "email";
+      const wantsEmail = !contact || channel !== "sms" || !smsCapable;
+
+      const recipients: string[] = contact?.email
+        ? [contact.email]
         : (referral.partners.emails ?? []);
-      if (referral.status === "docs_delivered") {
-        const docList = (referral.documents ?? []).map(
-          (d: any) => DOC_KINDS[d.kind] ?? d.file_name
-        );
-        await sendEmail({
-          referralId: referral.id,
-          kind: "docs_ready",
-          to: recipients,
-          subject: `${referral.client_name}: insurance documents ready`,
-          html: docsReadyEmail(referral.client_name, docList, portalUrl),
-        });
-      } else if (referral.status !== "lost") {
-        await sendEmail({
-          referralId: referral.id,
-          kind: "status_update",
-          to: recipients,
-          subject: `${referral.client_name}: insurance update`,
-          html: statusUpdateEmail(referral.client_name, referral.status, portalUrl),
-        });
+      if (wantsEmail) {
+        if (referral.status === "docs_delivered") {
+          const docList = (referral.documents ?? []).map(
+            (d: any) => DOC_KINDS[d.kind] ?? d.file_name
+          );
+          await sendEmail({
+            referralId: referral.id,
+            kind: "docs_ready",
+            to: recipients,
+            subject: `${referral.client_name}: insurance documents ready`,
+            html: docsReadyEmail(referral.client_name, docList, portalUrl),
+          });
+        } else if (referral.status !== "lost") {
+          await sendEmail({
+            referralId: referral.id,
+            kind: "status_update",
+            to: recipients,
+            subject: `${referral.client_name}: insurance update`,
+            html: statusUpdateEmail(referral.client_name, referral.status, portalUrl),
+          });
+        }
       }
       // "lost" is intentionally not emailed to the partner in the pilot —
       // that conversation deserves a personal touch. It's logged either way.
 
       // Opt-in text to the contact who sent this lead, at the two moments
       // LOs actually care about: quote's out, and docs are ready.
-      const contact = (referral as any).partner_contacts;
-      if (contact?.sms_opt_in && contact?.phone) {
+      if (wantsSms) {
         await sendSms({
           referralId: referral.id,
           kind: `status_${referral.status}`,

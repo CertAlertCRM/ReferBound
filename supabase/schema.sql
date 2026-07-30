@@ -177,6 +177,9 @@ alter table accounts add column if not exists webhook_url text;
 -- Annual billing / Founder Annual (see migration_21)
 alter table accounts add column if not exists billing_interval text not null default 'monthly';
 
+-- Per-contact notification channel (see migration_22)
+alter table partner_contacts add column if not exists notify_channel text not null default 'both';
+
 -- Per-partner thank-you cadence (see migration_18)
 alter table partners add column if not exists thankyou_cadence text not null default 'off';
 
