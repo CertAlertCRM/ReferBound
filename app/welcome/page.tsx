@@ -104,6 +104,9 @@ export default function WelcomePage() {
           <p className="text-center text-xs text-ink-muted mt-3">
             What your lending partner sees — live, from one link, no login.
           </p>
+          <p className="text-center text-sm font-semibold text-ink mt-2">
+            Your best lender knows five insurance agents. Be the one with the portal.
+          </p>
         </div>
       </section>
 

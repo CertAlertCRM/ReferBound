@@ -72,6 +72,25 @@ export default function DealPage() {
   const [reviewState, setReviewState] = useState<"idle" | "sending" | "sent" | "already">("idle");
   const [touchBusy, setTouchBusy] = useState<string | null>(null);
   const [touchDone, setTouchDone] = useState<string | null>(null);
+  const [teamContacts, setTeamContacts] = useState<{ id: string; name: string; role: string | null }[]>([]);
+
+  useEffect(() => {
+    const pid = (r as any)?.partner_id;
+    if (!pid) return;
+    fetch(`/api/partners/${pid}/contacts`)
+      .then(async (res) => res.ok && setTeamContacts((await res.json()).contacts ?? []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(r as any)?.partner_id]);
+
+  async function setContact(contactId: string) {
+    await fetch(`/api/referrals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contact_id: contactId || null }),
+    });
+    load();
+  }
 
   async function load() {
     const [res, actRes, msgRes] = await Promise.all([
@@ -268,9 +287,26 @@ export default function DealPage() {
             <div>
               <h1 className="text-xl font-bold tracking-tight">{r.client_name}</h1>
               <p className="text-sm text-ink-secondary mt-0.5">
-                Referred by {(r as any).partner_contacts?.name
-                  ? `${(r as any).partner_contacts.name} at ${r.partners?.name ?? "—"}`
-                  : (r.partners?.name ?? "—")}
+                Referred by{" "}
+                {teamContacts.length > 0 ? (
+                  <select
+                    className="inline-block bg-transparent border-b border-dashed border-slate-300 text-sm text-ink-secondary focus:outline-none cursor-pointer"
+                    value={(r as any).contact_id ?? ""}
+                    onChange={(e) => setContact(e.target.value)}
+                    title="Who at the partner sent this lead? Their updates route to that person."
+                  >
+                    <option value="">{r.partners?.name ?? "—"} (whole team)</option>
+                    {teamContacts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} at {r.partners?.name ?? "—"}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <>{(r as any).partner_contacts?.name
+                    ? `${(r as any).partner_contacts.name} at ${r.partners?.name ?? "—"}`
+                    : (r.partners?.name ?? "—")}</>
+                )}
                 {r.source === "partner" && " · via portal"}
               </p>
             </div>

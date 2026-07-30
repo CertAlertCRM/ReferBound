@@ -31,6 +31,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.premium = Number.isFinite(n) && n > 0 ? n : null;
   }
 
+  // Attribute (or re-attribute) the lead to a partner-team contact — used for
+  // leads that arrived by text/call where the sender never self-identified.
+  if ("contact_id" in body) {
+    if (!body.contact_id) {
+      patch.contact_id = null;
+    } else {
+      const { data: refRow } = await db()
+        .from("referrals")
+        .select("partner_id")
+        .eq("id", params.id)
+        .eq("account_id", account.id)
+        .maybeSingle();
+      const { data: c } = await db()
+        .from("partner_contacts")
+        .select("id, partner_id")
+        .eq("id", String(body.contact_id))
+        .maybeSingle();
+      if (!refRow || !c || c.partner_id !== refRow.partner_id) {
+        return NextResponse.json({ error: "contact doesn't belong to this partner" }, { status: 400 });
+      }
+      patch.contact_id = c.id;
+    }
+  }
+
   let statusChanged = false;
   if (body.status) {
     const valid = [...STATUSES, "lost"].includes(body.status);

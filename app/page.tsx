@@ -17,6 +17,7 @@ type Referral = {
   status: string;
   source: string;
   created_at: string;
+  updated_at: string | null;
   premium: number | null;
   client_dob: string | null;
   property_address: string | null;
@@ -498,8 +499,15 @@ function GettingStarted({ profileDone, partnerDone }: { profileDone: boolean; pa
     },
     {
       done: false,
-      title: "Send them their magic link",
-      body: "Copy the link from the Partners page and text or email it over. No login on their end — they'll see every referral live, and they can submit new ones straight to you.",
+      title: "Log the deals already in motion",
+      body: "Add the two or three referrals you're working right now — before you share anything. Their first look at the portal should be alive, never empty.",
+      href: "/",
+      cta: "Log a lead",
+    },
+    {
+      done: false,
+      title: "Then send them their magic link",
+      body: "Text or email it over — no login on their end. They'll see live status on every referral (yes, including when things sit — that's the point: partners assume worse in silence than they ever learn from the truth).",
       href: "/partners",
       cta: "Copy magic link",
     },
@@ -636,6 +644,17 @@ function Section({
                       <> · closes {r.closing_date}{days !== null && days >= 0 ? ` (${days}d)` : ""}</>
                     )}
                     {r.documents?.length > 0 && <> · {r.documents.length} doc{r.documents.length > 1 ? "s" : ""}</>}
+                    {(() => {
+                      // Quiet-deal nudge: the partner can see this sitting still.
+                      if (["bound", "docs_delivered", "lost"].includes(r.status)) return null;
+                      const ref = r.updated_at ?? r.created_at;
+                      const quietDays = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+                      return quietDays >= 4 ? (
+                        <span className="text-amber-700 font-medium" title="No update in a while — your partner's portal shows the last-updated date. A one-tap touch log counts.">
+                          {" "}· quiet {quietDays}d
+                        </span>
+                      ) : null;
+                    })()}
                   </p>
                 </div>
                 {ns && r.status !== "lost" && (

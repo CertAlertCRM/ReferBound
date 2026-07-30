@@ -100,6 +100,10 @@ export function PartnerInviteButton({
                   <p className="text-xs text-ink-muted mt-0.5">
                     Edit anything, then send{recipients.length > 0 ? ` to ${recipients.join(", ")}` : ""}.
                   </p>
+                  <p className="text-[11px] text-brand-800 bg-brand-light/60 rounded-lg px-2.5 py-1.5 mt-2">
+                    💡 Log their in-flight referrals first — their first look should show live deals,
+                    not an empty page.
+                  </p>
                 </div>
                 <input className="input text-sm" value={subject} onChange={(e) => setSubject(e.target.value)} />
                 <textarea
