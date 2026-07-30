@@ -159,6 +159,36 @@ export default function DealPage() {
     );
   }
 
+  // One-off cleanup: remove an accidental document or message. The portal
+  // stops showing it immediately; emails already delivered can't be recalled.
+  async function deleteDoc(docId: string, label: string) {
+    if (
+      !confirm(
+        `Remove "${label}"? It disappears from ${r?.partners?.name ?? "the partner"}'s portal immediately. If an email about it already went out, that email can't be recalled.`
+      )
+    )
+      return;
+    const res = await fetch(`/api/docs/${docId}`, { method: "DELETE" });
+    if (res.ok) load();
+    else alert((await res.json()).error ?? "Couldn't delete");
+  }
+
+  async function deleteMsg(messageId: string) {
+    if (
+      !confirm(
+        "Remove this message from the thread? It disappears from the portal immediately. If it already went out by email, that email can't be recalled."
+      )
+    )
+      return;
+    const res = await fetch(`/api/referrals/${id}/messages`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId }),
+    });
+    if (res.ok) load();
+    else alert((await res.json()).error ?? "Couldn't delete");
+  }
+
   async function sendReply(e: React.FormEvent) {
     e.preventDefault();
     setReplySending(true);
@@ -496,6 +526,14 @@ export default function DealPage() {
                     <a className="link" href={`/api/docs/${d.id}/download`} target="_blank">
                       <IconDownload size={13} /> Download
                     </a>
+                    <button
+                      className="text-ink-muted hover:text-red-600 transition-colors"
+                      onClick={() => deleteDoc(d.id, d.file_name)}
+                      title="Remove this document (wrong file? uploaded to the wrong deal?)"
+                      aria-label={`Delete ${d.file_name}`}
+                    >
+                      <IconTrash size={13} />
+                    </button>
                   </span>
                 </li>
               ))}
@@ -577,18 +615,28 @@ export default function DealPage() {
               {(showAllMsgs ? msgs : msgs.slice(-3)).map((m) => (
                 <div
                   key={m.id}
-                  className={`text-sm rounded-xl px-3.5 py-2.5 max-w-[85%] ${
+                  className={`group text-sm rounded-xl px-3.5 py-2.5 max-w-[85%] ${
                     m.sender === "agent" ? "bg-brand-light ml-auto" : "bg-slate-100"
                   }`}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5">
-                    {m.sender === "agent" ? "You" : r.partners?.name ?? "Partner"} ·{" "}
-                    {new Date(m.created_at).toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5 flex items-center gap-2">
+                    <span>
+                      {m.sender === "agent" ? "You" : r.partners?.name ?? "Partner"} ·{" "}
+                      {new Date(m.created_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <button
+                      className="ml-auto text-ink-muted/60 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      onClick={() => deleteMsg(m.id)}
+                      title="Remove this message"
+                      aria-label="Delete message"
+                    >
+                      <IconTrash size={12} />
+                    </button>
                   </p>
                   {m.body}
                 </div>
