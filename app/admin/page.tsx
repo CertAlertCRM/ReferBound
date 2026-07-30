@@ -16,6 +16,7 @@ type Summary = {
     byPlan: Record<string, number>;
     paying: number;
     viaStripe: number;
+    founderAnnual: number;
     mrr: number;
     partners: number;
     referrals: number;
@@ -30,6 +31,7 @@ type Summary = {
   accounts: {
     email: string;
     plan: string;
+    annual: boolean;
     isMember: boolean;
     partners: number;
     referrals: number;
@@ -102,7 +104,11 @@ export default function AdminPage() {
         {/* Money row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { v: `$${t.mrr.toLocaleString()}`, l: "MRR", hint: `${t.paying} paying · ${t.viaStripe} via Stripe` },
+            {
+              v: `$${t.mrr.toLocaleString()}`,
+              l: "MRR",
+              hint: `${t.paying} paying · ${t.viaStripe} via Stripe${t.founderAnnual ? ` · ${t.founderAnnual} founding annual` : ""}`,
+            },
             { v: String(t.accounts), l: "Accounts", hint: `${t.owners} owners · ${t.teamMembers} team seats` },
             {
               v: `${t.byPlan.free ?? 0} / ${t.byPlan.pro ?? 0} / ${t.byPlan.agency ?? 0}`,
@@ -204,7 +210,11 @@ export default function AdminPage() {
                   <td className="py-2 pr-3 truncate max-w-[220px]">{a.email}</td>
                   <td className="py-2 pr-3">
                     <span className={`badge ${a.plan === "free" ? "bg-slate-100 text-slate-700" : "bg-brand-light text-brand-700"}`}>
-                      {a.isMember ? "team seat" : (PLAN_LABELS[a.plan] ?? a.plan)}
+                      {a.isMember
+                        ? "team seat"
+                        : a.annual
+                          ? `${PLAN_LABELS[a.plan] ?? a.plan} · annual`
+                          : (PLAN_LABELS[a.plan] ?? a.plan)}
                     </span>
                   </td>
                   <td className="py-2 text-right">{a.partners}</td>

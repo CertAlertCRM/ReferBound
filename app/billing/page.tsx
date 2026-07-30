@@ -11,7 +11,8 @@ type Billing = {
   subscriptionStatus: string | null;
   managed: boolean;
   ownerEmail: string | null;
-  links: { pro: string | null; agency: string | null; portal: string | null };
+  billingInterval: "monthly" | "annual";
+  links: { pro: string | null; agency: string | null; founder: string | null; portal: string | null };
 };
 
 const TIERS = [
@@ -95,12 +96,45 @@ export default function BillingPage() {
           <h1 className="text-xl font-bold tracking-tight">Plan & billing</h1>
           <p className="text-sm text-ink-secondary mt-1">
             You&apos;re on the <span className="font-semibold">{billing.planLabel}</span> plan
+            {billing.billingInterval === "annual" && (
+              <span> — Founding Member, $199/year</span>
+            )}
             {billing.subscriptionStatus === "past_due" && (
               <span className="text-red-600"> — payment past due</span>
             )}
             .
           </p>
         </div>
+
+        {/* Founding-member annual offer. Shown to free accounts only — an
+            existing monthly subscriber switching via a Payment Link would
+            create a second subscription, so they go through the Stripe
+            billing portal instead. */}
+        {billing.plan === "free" && billing.links.founder && (
+          <div className="card p-5 border-amber-300 ring-1 ring-amber-200 bg-gradient-to-r from-amber-50/70 to-white">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-700">
+                  Founding member offer
+                </p>
+                <p className="font-bold mt-1">
+                  Pro for <span className="text-xl tracking-tight">$199</span>
+                  <span className="text-sm font-semibold">/year</span>{" "}
+                  <span className="text-sm font-normal text-ink-secondary">
+                    — over two months free vs $20/mo
+                  </span>
+                </p>
+                <p className="text-xs text-ink-secondary mt-1">
+                  Everything in Pro, at the founding rate. Your price stays $199/yr for as long as
+                  you keep the plan — even after public pricing goes up.
+                </p>
+              </div>
+              <a href={billing.links.founder} className="btn-primary whitespace-nowrap shrink-0">
+                Become a founding member
+              </a>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {TIERS.map((t) => {

@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 // whether to show the Admin button at all.
 
 const PLAN_PRICE: Record<string, number> = { free: 0, pro: 20, agency: 99 };
+// Founder Annual: $199/yr, counted as monthly-equivalent revenue in MRR.
+const FOUNDER_ANNUAL_PRICE = 199;
 
 function isAdmin(email: string): boolean {
   const admin = (process.env.ADMIN_EMAIL || process.env.AGENT_EMAIL || "").toLowerCase();
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
   const s = db();
   const [{ data: accounts }, { data: partners }, { data: referrals }, { data: emails }] =
     await Promise.all([
-      s.from("accounts").select("id, email, plan, created_at, team_owner_id, stripe_subscription_id"),
+      s.from("accounts").select("id, email, plan, billing_interval, created_at, team_owner_id, stripe_subscription_id"),
       s.from("partners").select("id, account_id, partner_type"),
       s.from("referrals").select("id, account_id, status, premium, created_at, source"),
       s.from("email_log").select("kind, sent, created_at"),
@@ -41,7 +43,15 @@ export async function GET(req: NextRequest) {
   const byPlan: Record<string, number> = { free: 0, pro: 0, agency: 0 };
   for (const a of owners) byPlan[a.plan] = (byPlan[a.plan] ?? 0) + 1;
   const paying = owners.filter((a) => (PLAN_PRICE[a.plan] ?? 0) > 0);
-  const mrr = paying.reduce((sum, a) => sum + (PLAN_PRICE[a.plan] ?? 0), 0);
+  const founderAnnual = paying.filter((a) => a.billing_interval === "annual").length;
+  // Annual accounts contribute their monthly equivalent ($199/12) to MRR.
+  const mrr = Math.round(
+    paying.reduce(
+      (sum, a) =>
+        sum + (a.billing_interval === "annual" ? FOUNDER_ANNUAL_PRICE / 12 : PLAN_PRICE[a.plan] ?? 0),
+      0
+    )
+  );
   const viaStripe = paying.filter((a) => a.stripe_subscription_id).length;
 
   // Signups per day, last 14 days (UTC).
@@ -73,6 +83,7 @@ export async function GET(req: NextRequest) {
     .map((a) => ({
       email: a.email,
       plan: a.plan,
+      annual: a.billing_interval === "annual",
       isMember: Boolean(a.team_owner_id),
       partners: partnersByAccount.get(a.id) ?? 0,
       referrals: refsByAccount.get(a.id)?.total ?? 0,
@@ -96,6 +107,7 @@ export async function GET(req: NextRequest) {
       byPlan,
       paying: paying.length,
       viaStripe,
+      founderAnnual,
       mrr,
       partners: parts.length,
       referrals: refs.length,

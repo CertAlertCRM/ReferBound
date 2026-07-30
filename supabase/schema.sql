@@ -174,6 +174,9 @@ alter table reset_codes enable row level security;
 -- Outbound webhook / Zapier bridge (see migration_11)
 alter table accounts add column if not exists webhook_url text;
 
+-- Annual billing / Founder Annual (see migration_21)
+alter table accounts add column if not exists billing_interval text not null default 'monthly';
+
 -- Per-partner thank-you cadence (see migration_18)
 alter table partners add column if not exists thankyou_cadence text not null default 'off';
 

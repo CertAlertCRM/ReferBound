@@ -42,12 +42,20 @@ export async function POST(req: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const accountId = obj.client_reference_id;
     if (accountId) {
-      // Plan by amount: $99 => agency, otherwise pro. (Amounts are in cents.)
-      const plan = (obj.amount_total ?? 0) >= 9900 ? "agency" : "pro";
+      // Plan by amount (cents). Exact prices, not thresholds — a threshold
+      // would misread the $199/yr Founder Annual (19900¢) as Agency:
+      //   $20/mo  (2000)  → pro, monthly
+      //   $99/mo  (9900)  → agency, monthly
+      //   $199/yr (19900) → pro, annual (founding rate — Pro features)
+      // If a price ever changes in Stripe, update this map in the same commit.
+      const cents = obj.amount_total ?? 0;
+      const plan = cents === 9900 ? "agency" : "pro";
+      const billing_interval = cents >= 19900 ? "annual" : "monthly";
       await db()
         .from("accounts")
         .update({
           plan,
+          billing_interval,
           stripe_customer_id: obj.customer ?? null,
           stripe_subscription_id: obj.subscription ?? null,
           subscription_status: "active",
@@ -60,7 +68,10 @@ export async function POST(req: NextRequest) {
     const status = obj.status; // active | past_due | canceled | unpaid ...
     if (obj.customer && status) {
       const patch: Record<string, unknown> = { subscription_status: status };
-      if (status === "canceled" || status === "unpaid") patch.plan = "free";
+      if (status === "canceled" || status === "unpaid") {
+        patch.plan = "free";
+        patch.billing_interval = "monthly";
+      }
       await db().from("accounts").update(patch).eq("stripe_customer_id", obj.customer);
     }
   }
@@ -69,7 +80,7 @@ export async function POST(req: NextRequest) {
     if (obj.customer) {
       await db()
         .from("accounts")
-        .update({ plan: "free", subscription_status: "canceled", stripe_subscription_id: null })
+        .update({ plan: "free", billing_interval: "monthly", subscription_status: "canceled", stripe_subscription_id: null })
         .eq("stripe_customer_id", obj.customer);
     }
   }
