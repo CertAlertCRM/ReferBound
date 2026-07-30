@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
-import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
+import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash, IconMessage } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
 
 type Partner = {
@@ -38,6 +38,11 @@ export default function PartnersPage() {
   const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
   const [qr, setQr] = useState<{ name: string; dataUrl: string; link: string } | null>(null);
+  // "Text link" dropdown state — contacts load on open, per partner.
+  const [txFor, setTxFor] = useState<string | null>(null);
+  const [txContacts, setTxContacts] = useState<{ id: string; name: string; phone: string }[] | null>(null);
+  const [txBusy, setTxBusy] = useState<string | null>(null);
+  const [txSent, setTxSent] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/partners");
@@ -90,6 +95,39 @@ export default function PartnersPage() {
       errorCorrectionLevel: "M",
     });
     setQr({ name: p.name, dataUrl: url, link });
+  }
+
+  async function openTx(p: Partner) {
+    if (txFor === p.id) {
+      setTxFor(null);
+      return;
+    }
+    setTxFor(p.id);
+    setTxContacts(null);
+    const res = await fetch(`/api/partners/${p.id}/contacts`);
+    const all = res.ok ? ((await res.json()).contacts ?? []) : [];
+    setTxContacts(all.filter((c: any) => c.phone));
+  }
+
+  async function sendTx(pid: string, payload: { contactId?: string; phone?: string }) {
+    setTxFor(null);
+    setTxBusy(pid);
+    const res = await fetch(`/api/partners/${pid}/text-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setTxBusy(null);
+    if (res.ok) {
+      setTxSent(pid);
+      setTimeout(() => setTxSent(null), 2500);
+    } else alert((await res.json()).error ?? "Couldn't send the text");
+  }
+
+  function txToNumber(pid: string) {
+    const num = prompt("Mobile number to text the portal link to:");
+    if (!num) return;
+    sendTx(pid, { phone: num });
   }
 
   async function deletePartner(p: Partner) {
@@ -381,6 +419,53 @@ export default function PartnersPage() {
                     <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => showQr(p)}>
                       ▦ QR
                     </button>
+                    <div className="relative">
+                      <button
+                        className="btn-ghost !px-3 !py-1.5 text-xs"
+                        onClick={() => openTx(p)}
+                        disabled={txBusy === p.id}
+                      >
+                        <IconMessage size={12} />{" "}
+                        {txSent === p.id ? "Sent ✓" : txBusy === p.id ? "Sending…" : "Text link"}
+                      </button>
+                      {txFor === p.id && (
+                        <div className="absolute right-0 top-full mt-1.5 z-30 card p-2 w-60 space-y-0.5 shadow-lift text-left">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted px-2 pt-1 pb-1.5">
+                            Text the portal link to…
+                          </p>
+                          {txContacts === null ? (
+                            <p className="text-[11px] text-ink-muted px-2 py-1.5">Loading contacts…</p>
+                          ) : (
+                            <>
+                              {txContacts.map((c) => (
+                                <button
+                                  key={c.id}
+                                  className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 transition-colors"
+                                  onClick={() => sendTx(p.id, { contactId: c.id })}
+                                >
+                                  <span className="font-medium">{c.name}</span>
+                                  <span className="text-ink-muted"> · {c.phone}</span>
+                                </button>
+                              ))}
+                              {txContacts.length === 0 && (
+                                <p className="text-[11px] text-ink-muted px-2 py-1.5">
+                                  No contacts with a mobile yet — or just:
+                                </p>
+                              )}
+                            </>
+                          )}
+                          <button
+                            className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 text-brand font-semibold transition-colors"
+                            onClick={() => {
+                              setTxFor(null);
+                              txToNumber(p.id);
+                            }}
+                          >
+                            Enter a number…
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <PartnerInviteButton partnerId={p.id} partnerName={p.name} />
                     <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
                       {copied === p.id ? (
