@@ -6,7 +6,7 @@ import { Wordmark } from "../components";
 export const metadata = {
   title: "ReferBound — Live referral tracking for insurance agents",
   description:
-    "Give your realtor, lender, and CPA partners a live window into every client they send you. Status updates, instant EOI delivery, closing-date protection.",
+    "Give your realtor, lender, and CPA partners a live window into every client they send you. Status updates, EOI delivery through the portal, closing-date alerts.",
 };
 
 const FEATURES = [
@@ -135,7 +135,7 @@ export default function WelcomePage() {
             </li>
             <li>
               <span className="font-semibold text-ink">3. Your partners watch it happen.</span>{" "}
-              Live statuses, automatic updates at the moments that matter, documents on bind — and a
+              Live statuses, automatic updates at the moments that matter, documents shortly after binding — and a
               thank-you summary every month with your name on it.
             </li>
           </ol>

@@ -271,7 +271,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
               </h1>
               <p className="text-sm text-brand-100 mt-2 max-w-md">
-                Every client you&apos;ve referred to {agentName}, updated in real time. Documents land here the moment policies are bound.
+                Every client you&apos;ve referred to {agentName}, updated in real time. Insurance documents post here as soon as they're ready after binding.
               </p>
               {(prof?.phone || prof?.email) && (
                 <p className="text-xs text-brand-100 mt-3 flex items-center flex-wrap gap-x-3 gap-y-1">

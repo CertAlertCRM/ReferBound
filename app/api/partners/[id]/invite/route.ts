@@ -18,7 +18,7 @@ referral portal and sharing its link.
 Hard rules:
 - Use ONLY the supplied facts. No invented claims, statistics, or promises.
 - Explain plainly what the portal does: live status on every client they refer,
-  documents the moment policies are bound, no login needed — just the link.
+  documents (EOI and related papers) posted shortly after binding, no login needed — just the link.
 - NEVER frame the portal as replacing, reducing, or eliminating calls, texts,
   voicemails, or personal contact. Many partners love picking up the phone —
   the portal is an always-available ADDITION to however they prefer to work,
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!subject || !draft) throw new Error("empty");
   } catch {
     subject = `Your live referral portal with ${agencyName}`;
-    draft = `Hi ${partner.name} team,\n\nI set up a live portal for the clients you send my way — real-time status on every referral, and documents the moment policies are bound. No login, no password; this link is all you need:\n\n${link}\n\nBookmark it, and feel free to send your next referral straight through it — takes about 30 seconds.\n\nThanks for the partnership,\n${agentName}`;
+    draft = `Hi ${partner.name} team,\n\nI set up a live portal for the clients you send my way — real-time status on every referral, and the insurance documents posted right after binding. No login, no password; this link is all you need:\n\n${link}\n\nBookmark it, and feel free to send your next referral straight through it — takes about 30 seconds.\n\nThanks for the partnership,\n${agentName}`;
   }
 
   return NextResponse.json({ subject, body: draft, link, recipients: partner.emails ?? [] });

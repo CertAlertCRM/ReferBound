@@ -322,7 +322,12 @@ export default function DealPage() {
 
         {/* Status controls */}
         <section className="card p-6 space-y-3.5">
-          <h2 className="section-label">Update status</h2>
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <h2 className="section-label">Update status</h2>
+            <p className="text-[11px] text-ink-muted">
+              ✉ = emails {r.partners?.name ?? "your partner"} · everything else updates silently
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             {STATUSES.map((s) => (
               <button
@@ -330,8 +335,16 @@ export default function DealPage() {
                 onClick={() => setStatus(s)}
                 disabled={busy || r.status === s}
                 className={`${r.status === s ? "btn-primary" : "btn-ghost"} !px-3 !py-1.5 text-xs`}
+                title={
+                  s === "quoted"
+                    ? `Sends ${r.partners?.name ?? "your partner"} a "quoted" email`
+                    : s === "docs_delivered"
+                      ? `Sends ${r.partners?.name ?? "your partner"} the one combined bound + documents email`
+                      : "Updates the portal silently — no email"
+                }
               >
                 {STATUS_LABELS[s]}
+                {(s === "quoted" || s === "docs_delivered") && <span aria-hidden> ✉</span>}
               </button>
             ))}
             <button

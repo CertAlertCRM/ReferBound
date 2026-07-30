@@ -643,11 +643,17 @@ function Section({
                     onClick={() => advance(r)}
                     disabled={busyId === r.id}
                     className="btn-ghost shrink-0 !px-3 !py-1.5 text-xs"
-                    title={`Advance to ${STATUS_LABELS[ns]}`}
+                    title={
+                      ns === "quoted" || ns === "docs_delivered"
+                        ? `Advance to ${STATUS_LABELS[ns]} — emails the partner`
+                        : `Advance to ${STATUS_LABELS[ns]} — updates the portal silently`
+                    }
                   >
                     {busyId === r.id ? "…" : (
                       <>
-                        {STATUS_LABELS[ns]} <IconArrowRight size={12} />
+                        {STATUS_LABELS[ns]}
+                        {(ns === "quoted" || ns === "docs_delivered") && <span aria-hidden> ✉</span>}{" "}
+                        <IconArrowRight size={12} />
                       </>
                     )}
                   </button>
