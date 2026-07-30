@@ -11,6 +11,8 @@ export async function logActivity(
     | "referral_submitted"
     | "status_changed"
     | "document_uploaded"
+    | "document_deleted"
+    | "message_deleted"
     | "email_sent"
     | "at_risk_flagged",
   detail: string,
