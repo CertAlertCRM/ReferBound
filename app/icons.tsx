@@ -151,6 +151,14 @@ export const IconMessage = (p: IconProps) => (
   </S>
 );
 
+export const IconMenu = (p: IconProps) => (
+  <S {...p}>
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="20" y2="12" />
+    <line x1="4" y1="18" x2="20" y2="18" />
+  </S>
+);
+
 export const IconX = (p: IconProps) => (
   <S {...p}>
     <path d="M18 6 6 18" />

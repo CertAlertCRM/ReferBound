@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { STATUS_LABELS, STATUSES } from "@/lib/config";
-import { IconAlert } from "./icons";
+import { IconAlert, IconMenu, IconX } from "./icons";
 import { FeedbackWidget } from "./feedback-widget";
 
 // ── Status colors: dot + tinted pill, label always present ──────────────────
@@ -76,12 +76,29 @@ export function TopNav({
   active?: "referrals" | "partners" | "stats" | "profile" | "billing" | "admin";
 }) {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     // Cheap authorization ping — only the founder account gets the Admin tab.
     fetch("/api/admin/summary?ping=1").then((r) => setIsAdmin(r.ok)).catch(() => {});
   }, []);
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
+  const links: { href: string; key: string; label: string }[] = [
+    { href: "/", key: "referrals", label: "Referrals" },
+    { href: "/partners", key: "partners", label: "Partners" },
+    { href: "/stats", key: "stats", label: "Stats" },
+    { href: "/profile", key: "profile", label: "Profile" },
+    { href: "/billing", key: "billing", label: "Billing" },
+    ...(isAdmin ? [{ href: "/admin", key: "admin", label: "Admin" }] : []),
+  ];
+
   const tab = (href: string, key: string, label: string) => (
     <Link
+      key={key}
       href={href}
       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
         active === key ? "bg-brand-light text-brand-700" : "text-ink-secondary hover:text-ink hover:bg-slate-100"
@@ -90,32 +107,60 @@ export function TopNav({
       {label}
     </Link>
   );
+
   return (
     <>
     <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-200/80">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <Link href="/">
+        <Link href="/" onClick={() => setMenuOpen(false)}>
           <Wordmark />
         </Link>
-        <nav className="flex items-center gap-1">
-          {tab("/", "referrals", "Referrals")}
-          {tab("/partners", "partners", "Partners")}
-          {tab("/stats", "stats", "Stats")}
-          {tab("/profile", "profile", "Profile")}
-          {tab("/billing", "billing", "Billing")}
-          {isAdmin && tab("/admin", "admin", "Admin")}
+
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-1">
+          {links.map((l) => tab(l.href, l.key, l.label))}
           <button
-            onClick={async () => {
-              await fetch("/api/auth/logout", { method: "POST" });
-              window.location.href = "/login";
-            }}
+            onClick={signOut}
             className="px-3 py-1.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors"
             title="Sign out"
           >
             Sign out
           </button>
         </nav>
+
+        {/* Mobile: hamburger — every destination reachable without side-scrolling */}
+        <button
+          className="md:hidden p-2 rounded-lg text-ink-secondary hover:text-ink hover:bg-slate-100 transition-colors"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+        >
+          {menuOpen ? <IconX size={20} /> : <IconMenu size={20} />}
+        </button>
       </div>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <nav className="md:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1 shadow-lift">
+          {links.map((l) => (
+            <Link
+              key={l.key}
+              href={l.href}
+              onClick={() => setMenuOpen(false)}
+              className={`block px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                active === l.key ? "bg-brand-light text-brand-700" : "text-ink-secondary hover:text-ink hover:bg-slate-100"
+              }`}
+            >
+              {l.label}
+            </Link>
+          ))}
+          <button
+            onClick={signOut}
+            className="block w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors"
+          >
+            Sign out
+          </button>
+        </nav>
+      )}
     </header>
     {/* Sibling of the header — backdrop-blur would trap a fixed child inside it */}
     <FeedbackWidget source="agent" />
