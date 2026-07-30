@@ -67,13 +67,35 @@ export default function PrivacyPage() {
             <strong className="text-ink">Vercel</strong> (hosting) ·{" "}
             <strong className="text-ink">Resend</strong> (email delivery) ·{" "}
             <strong className="text-ink">Stripe</strong> (payments — we never see your card
-            number) · <strong className="text-ink">Anthropic</strong> (AI features — documents
+            number) · <strong className="text-ink">Twilio</strong> (text-message delivery, for
+            opted-in contacts only) · <strong className="text-ink">Anthropic</strong> (AI features — documents
             and referral details you run through AI features are processed to generate the
             result, and are not used to train their models under our API terms).
           </p>
           <p>
             Each processes data only to provide their service to us. Beyond these, we share data
             only if the law requires it or to protect the service from abuse.
+          </p>
+        </Section>
+
+        <Section title="Text messages (SMS)">
+          <p>
+            Some notifications are available by text message — for example, letting a referral
+            partner know a client they sent has been quoted or that insurance documents are
+            ready. Texts are sent only to people who opt in by checking the SMS consent box when
+            submitting a referral or in their contact settings. Message frequency varies with
+            referral activity; message and data rates may apply. Reply{" "}
+            <strong className="text-ink">STOP</strong> at any time to opt out, or{" "}
+            <strong className="text-ink">HELP</strong> for help.
+          </p>
+          <p>
+            <strong className="text-ink">
+              No mobile information will be shared with third parties or affiliates for marketing
+              or promotional purposes.
+            </strong>{" "}
+            Phone numbers and SMS opt-in consent are never sold or shared for marketing;
+            text-messaging originator opt-in data and consent are shared only with our SMS
+            delivery provider (Twilio) to send the messages you asked for.
           </p>
         </Section>
 

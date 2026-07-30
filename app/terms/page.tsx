@@ -78,12 +78,30 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={5} title="Emails">
+        <Section n={5} title="Emails and text messages (SMS)">
           <p>
             The service sends transactional emails on your behalf to your partners and, when you
             request it, to your clients (for example, review requests). You&apos;re responsible
             for having a business relationship with the recipients. Partners can ask you — or us —
             to stop non-essential emails at any time.
+          </p>
+          <p>
+            <strong className="text-ink">SMS program terms.</strong> ReferBound Notifications
+            sends transactional text messages about referral activity — for example, that a
+            referred client has been quoted or that insurance documents are ready — to referral
+            partners and contacts who opt in by checking the SMS consent box. Consent is not a
+            condition of any purchase. Message frequency varies with referral activity. Message
+            and data rates may apply. Reply <strong className="text-ink">STOP</strong> at any
+            time to cancel and stop receiving texts; reply{" "}
+            <strong className="text-ink">HELP</strong> or email{" "}
+            <span className="text-ink font-medium">hello@stonebind.com</span> for help. Mobile
+            carriers are not liable for delayed or undelivered messages. How we handle phone
+            numbers and consent is described in the{" "}
+            <Link href="/privacy" className="link !text-sm">
+              Privacy Policy
+            </Link>{" "}
+            — mobile information is never shared with third parties or affiliates for marketing
+            or promotional purposes.
           </p>
         </Section>
 
