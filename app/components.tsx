@@ -77,10 +77,20 @@ export function TopNav({
 }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Support view marker — set by /api/admin/impersonate, shown as an amber bar
+  // so there's never ambiguity about whose account is on screen.
+  const [supportView, setSupportView] = useState<string | null>(null);
   useEffect(() => {
     // Cheap authorization ping — only the founder account gets the Admin tab.
     fetch("/api/admin/summary?ping=1").then((r) => setIsAdmin(r.ok)).catch(() => {});
+    const m = document.cookie.match(/(?:^|;\s*)rb_support_view=([^;]+)/);
+    setSupportView(m ? decodeURIComponent(m[1]) : null);
   }, []);
+
+  async function exitSupportView() {
+    await fetch("/api/admin/impersonate", { method: "DELETE" });
+    window.location.href = "/admin";
+  }
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -110,7 +120,15 @@ export function TopNav({
 
   return (
     <>
-    <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-200/80">
+    {supportView && (
+      <div className="sticky top-0 z-30 bg-amber-500 text-white text-xs font-semibold px-4 py-2 flex items-center justify-center gap-3 flex-wrap text-center">
+        <span>Support view — you&apos;re seeing {supportView}&apos;s live account</span>
+        <button onClick={exitSupportView} className="underline underline-offset-2 hover:opacity-80">
+          Return to my account
+        </button>
+      </div>
+    )}
+    <header className={`sticky ${supportView ? "top-8" : "top-0"} z-20 bg-white/85 backdrop-blur border-b border-slate-200/80`}>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <Link href="/" onClick={() => setMenuOpen(false)}>
           <Wordmark />

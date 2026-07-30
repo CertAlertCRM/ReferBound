@@ -62,6 +62,17 @@ export default function AdminPage() {
     } catch {}
   }
 
+  // Support view: become this agent (bannered, 2-hour session, one click back).
+  async function viewAs(email: string) {
+    const res = await fetch("/api/admin/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (res.ok) window.location.href = "/";
+    else alert((await res.json()).error ?? "Couldn't open support view");
+  }
+
   if (denied) {
     return (
       <>
@@ -202,6 +213,7 @@ export default function AdminPage() {
                 <th className="pb-2 font-semibold text-right">Referrals</th>
                 <th className="pb-2 font-semibold text-right">Bound</th>
                 <th className="pb-2 font-semibold text-right">Joined</th>
+                <th className="pb-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -221,6 +233,15 @@ export default function AdminPage() {
                   <td className="py-2 text-right">{a.referrals}</td>
                   <td className="py-2 text-right">{a.bound}</td>
                   <td className="py-2 text-right text-xs text-ink-muted">{a.created_at}</td>
+                  <td className="py-2 pl-3 text-right">
+                    <button
+                      className="link !text-xs whitespace-nowrap"
+                      onClick={() => viewAs(a.email)}
+                      title="See exactly what this agent sees — an amber banner marks the support view and takes you back"
+                    >
+                      View as →
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
