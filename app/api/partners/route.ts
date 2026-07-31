@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     if ((count ?? 0) >= limit) {
       return NextResponse.json(
         {
-          error: "The Free plan includes 1 partner. Upgrade to Pro for unlimited partners.",
+          error: "Free includes your first partner. Pro adds unlimited partners.",
           upgrade: true,
         },
         { status: 402 }

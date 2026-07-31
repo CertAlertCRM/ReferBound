@@ -189,6 +189,29 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- Referral Radar — partner prospects & pipeline (see migration_28)
+create table if not exists partner_prospects (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  name text,
+  company text,
+  email text,
+  phone text,
+  nmls text,
+  partner_type text not null default 'lender',
+  source text not null default 'manual',
+  status text not null default 'idea',
+  notes text,
+  deal_count integer not null default 0,
+  last_seen_at timestamptz,
+  converted_partner_id uuid references partners(id) on delete set null,
+  suggested_partner_id uuid references partners(id) on delete cascade,
+  dismissed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_prospects_account on partner_prospects(account_id, created_at desc);
+alter table partner_prospects enable row level security;
+
 -- Personalized notification voice (see migration_27)
 alter table agent_profile add column if not exists voice_notes text;
 alter table agent_profile add column if not exists notify_templates jsonb;

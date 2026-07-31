@@ -151,6 +151,19 @@ export default function HelpPage() {
             usually fast.
           </p>
         </Section>
+
+        <footer className="text-center text-xs text-ink-muted pb-4">
+          © 2026 Cert Alert CRM LLC · ReferBound is a Stonebind™ tool
+          <span className="block mt-1">
+            <a href="/terms" className="link-muted !text-xs">
+              Terms of Service
+            </a>
+            {" · "}
+            <a href="/privacy" className="link-muted !text-xs">
+              Privacy Policy
+            </a>
+          </span>
+        </footer>
       </main>
     </>
   );

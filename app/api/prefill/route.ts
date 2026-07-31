@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccount } from "@/lib/account";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { normalizePhone } from "@/lib/format";
+import { recordProspectFromDoc } from "@/lib/radar";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,25 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
   "client_email": string|null,
   "client_dob": string|null,
   "property_address": string|null,  // subject property, one line
-  "closing_date": string|null
+  "closing_date": string|null,
+  "loan_officer_name": string|null,    // originating loan officer / agent named on the document
+  "loan_officer_company": string|null, // their lender / brokerage / company name
+  "loan_officer_email": string|null,
+  "loan_officer_phone": string|null,
+  "loan_officer_nmls": string|null     // NMLS ID if shown
 }`;
+
+// Fields that belong to the referral form — the loan-officer block feeds
+// Referral Radar instead and is stripped before the form sees it.
+const FORM_FIELDS = [
+  "client_name",
+  "coborrower_name",
+  "client_phone",
+  "client_email",
+  "client_dob",
+  "property_address",
+  "closing_date",
+] as const;
 
 export async function POST(req: NextRequest) {
   const account = await getAccount();
@@ -58,7 +76,14 @@ export async function POST(req: NextRequest) {
     });
     const extracted = parseJsonLoose(raw);
     if (extracted.client_phone) extracted.client_phone = normalizePhone(extracted.client_phone);
-    return NextResponse.json({ fields: extracted });
+
+    // Radar: the LO on this 1003 may be someone who already sends this agent
+    // work but was never set up as a partner.
+    await recordProspectFromDoc(account.id, extracted);
+
+    const fields: Record<string, unknown> = {};
+    for (const f of FORM_FIELDS) fields[f] = extracted[f] ?? null;
+    return NextResponse.json({ fields });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

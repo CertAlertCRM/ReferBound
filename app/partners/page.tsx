@@ -6,6 +6,7 @@ import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
 import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash, IconMessage } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
+import { ReferralRadar } from "../referral-radar";
 
 type Partner = {
   id: string;
@@ -38,6 +39,10 @@ export default function PartnersPage() {
   const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
   const [qr, setQr] = useState<{ name: string; dataUrl: string; link: string } | null>(null);
+  // The partner-#2 milestone: an earned moment, not a cold wall.
+  const [upgrade, setUpgrade] = useState<string | null>(null);
+  const [founderLink, setFounderLink] = useState<string | null>(null);
+  const [proLink, setProLink] = useState<string | null>(null);
   // "Text link" dropdown state — contacts load on open, per partner.
   const [txFor, setTxFor] = useState<string | null>(null);
   const [txContacts, setTxContacts] = useState<{ id: string; name: string; phone: string }[] | null>(null);
@@ -50,7 +55,22 @@ export default function PartnersPage() {
   }
   useEffect(() => {
     load();
+    // Checkout links, ready for the moment they're actually earned.
+    fetch("/api/billing").then(async (r) => {
+      if (!r.ok) return;
+      const b = await r.json();
+      setFounderLink(b.links?.founder ?? null);
+      setProLink(b.links?.pro ?? null);
+    });
   }, []);
+
+  // Prefill the add-partner form from a Radar find or pipeline prospect.
+  function fromProspect(p: { name: string | null; company: string | null; email: string | null; partner_type: string }) {
+    setName(p.company || p.name || "");
+    setEmails(p.email ?? "");
+    setPtype(p.partner_type || "lender");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   // ── Smart paste ────────────────────────────────────────────────────────────
   // Agents live in text threads with their partners. Paste anything — a text,
@@ -126,13 +146,8 @@ export default function PartnersPage() {
       load();
     } else {
       const err = await res.json();
-      if (err.upgrade) {
-        if (confirm(`${err.error}\n\nOpen the billing page to upgrade?`)) {
-          window.location.href = "/billing";
-        }
-      } else {
-        alert(err.error ?? "Failed");
-      }
+      if (err.upgrade) setUpgrade(name.trim() || "your second partner");
+      else alert(err.error ?? "Failed");
     }
   }
 
@@ -200,9 +215,8 @@ export default function PartnersPage() {
       load();
     } else {
       const err = await res.json();
-      if (err.upgrade) {
-        if (confirm(`${err.error}\n\nOpen the billing page to upgrade?`)) window.location.href = "/billing";
-      } else alert(err.error ?? "Couldn't duplicate");
+      if (err.upgrade) setUpgrade(`${p.name} (copy)`);
+      else alert(err.error ?? "Couldn't duplicate");
     }
   }
 
@@ -268,6 +282,8 @@ export default function PartnersPage() {
             Each partner gets a private magic link — their live window into every referral they&apos;ve sent you.
           </p>
         </div>
+
+        <ReferralRadar onConvert={fromProspect} />
 
         <form onSubmit={add} className="card p-5 space-y-3">
           <div className="flex items-center justify-between gap-2">
@@ -602,6 +618,53 @@ export default function PartnersPage() {
               )}
             </div>
           ))}
+
+          {/* The partner-#2 milestone. They've already decided the product
+              works — this reads as a moment, not a toll booth. */}
+          {upgrade && (
+            <div
+              className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+              onClick={() => setUpgrade(null)}
+            >
+              <div className="card p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-700">
+                  Second partner
+                </p>
+                <h3 className="text-lg font-bold tracking-tight mt-1">This is where it compounds</h3>
+                <p className="text-sm text-ink-secondary mt-2 leading-relaxed">
+                  One partner is a relationship. Two is the start of a referral base — and the
+                  agents who build one stop depending on any single desk staying busy.{" "}
+                  <span className="text-ink font-medium">{upgrade}</span> is ready to go live as
+                  soon as you&apos;re on Pro.
+                </p>
+                <div className="mt-4 space-y-2">
+                  {founderLink && (
+                    <a href={founderLink} className="btn-primary w-full">
+                      Founding member — $199/year
+                    </a>
+                  )}
+                  {proLink && (
+                    <a href={proLink} className={founderLink ? "btn-ghost w-full" : "btn-primary w-full"}>
+                      Pro — $20/month
+                    </a>
+                  )}
+                  {!founderLink && !proLink && (
+                    <a href="/billing" className="btn-primary w-full">
+                      See plans
+                    </a>
+                  )}
+                  <button className="btn-ghost w-full" onClick={() => setUpgrade(null)}>
+                    Not yet
+                  </button>
+                </div>
+                <p className="text-[11px] text-ink-muted mt-3 text-center">
+                  {founderLink
+                    ? "The founding rate locks for as long as you keep the plan. Unlimited partners either way."
+                    : "Unlimited partners, everything you already use."}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* QR modal — scan-to-open magic link for coffee-meeting handoffs */}
           {qr && (

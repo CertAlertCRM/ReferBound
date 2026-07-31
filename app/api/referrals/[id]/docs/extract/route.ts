@@ -4,6 +4,7 @@ import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { logActivity } from "@/lib/activity";
 import { DOC_KINDS } from "@/lib/config";
 import { getAccount, ownedReferral } from "@/lib/account";
+import { recordProspectFromDoc } from "@/lib/radar";
 
 // Agent-only (protected by middleware): extract structured details from an
 // uploaded document (1003, dec page, EOI, HOI request…) and fill EMPTY fields
@@ -33,6 +34,11 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
   "policy_lines": string|null,       // e.g. "Homeowners", "Home + Flood"
   "effective_start": string|null,    // policy effective date
   "effective_end": string|null,      // policy expiration date
+  "loan_officer_name": string|null,    // originating loan officer / agent named on the document
+  "loan_officer_company": string|null, // their lender / brokerage / company name
+  "loan_officer_email": string|null,
+  "loan_officer_phone": string|null,
+  "loan_officer_nmls": string|null,    // NMLS ID if shown
   "doc_summary": string              // one sentence: what this document is
 }`;
 
@@ -144,6 +150,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await db().from("documents").update(docPatch).eq("id", doc.id);
     filled.push(...Object.keys(docPatch).map((k) => `document ${k.replace(/_/g, " ")}`));
   }
+
+  // Referral Radar: a loan officer on this document who isn't a partner yet is
+  // someone who already sends this agent business. Best-effort, never blocking.
+  await recordProspectFromDoc(account.id, extracted);
 
   await logActivity(
     params.id,
