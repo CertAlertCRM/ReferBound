@@ -84,6 +84,21 @@ export const IconUsers = (p: IconProps) => (
   </S>
 );
 
+export const IconUser = (p: IconProps) => (
+  <S {...p}>
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </S>
+);
+
+export const IconHelp = (p: IconProps) => (
+  <S {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
+  </S>
+);
+
 export const IconHome = (p: IconProps) => (
   <S {...p}>
     <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { STATUS_LABELS, STATUSES } from "@/lib/config";
 import { THEMES } from "@/lib/themes";
-import { IconAlert, IconMenu, IconX } from "./icons";
+import { IconAlert, IconMenu, IconX, IconHome, IconUsers, IconZap, IconUser } from "./icons";
 import { FeedbackWidget } from "./feedback-widget";
 
 // ── Status colors: dot + tinted pill, label always present ──────────────────
@@ -74,7 +74,7 @@ export function Wordmark({ size = "text-lg" }: { size?: string }) {
 export function TopNav({
   active,
 }: {
-  active?: "referrals" | "partners" | "stats" | "profile" | "billing" | "admin";
+  active?: "referrals" | "partners" | "stats" | "profile" | "billing" | "admin" | "help";
 }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -111,6 +111,47 @@ export function TopNav({
       .catch(() => {});
   }, []);
 
+  // Mobile: swipe left/right in the content area to move between the four
+  // main pages (same order as the bottom tab bar). Deliberately conservative —
+  // ignores edge swipes (the browser owns those for back/forward), swipes over
+  // inputs/tables, slow drags, and diagonal scrolls.
+  useEffect(() => {
+    const ORDER = ["referrals", "partners", "stats", "profile"] as const;
+    const HREFS: Record<string, string> = { referrals: "/", partners: "/partners", stats: "/stats", profile: "/profile" };
+    let sx = 0, sy = 0, st = 0, ok = false;
+    const onStart = (e: TouchEvent) => {
+      ok = false;
+      if (window.innerWidth >= 768 || !active || !ORDER.includes(active as any)) return;
+      const t = e.touches[0];
+      if (t.clientX < 28 || t.clientX > window.innerWidth - 28) return; // browser's edge gesture
+      const el = e.target as HTMLElement;
+      if (el.closest("input,textarea,select,table,pre,[data-noswipe]")) return;
+      sx = t.clientX; sy = t.clientY; st = Date.now(); ok = true;
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!ok) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx;
+      const dy = Math.abs(t.clientY - sy);
+      if (Date.now() - st > 500 || Math.abs(dx) < 90 || dy > 60) return;
+      const i = ORDER.indexOf(active as any);
+      const next = dx < 0 ? ORDER[i + 1] : ORDER[i - 1];
+      if (next) window.location.href = HREFS[next];
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchend", onEnd);
+    };
+  }, [active]);
+
+  // Reserve room for the fixed bottom tab bar on small screens.
+  useEffect(() => {
+    document.body.classList.add("has-bottomnav");
+    return () => document.body.classList.remove("has-bottomnav");
+  }, []);
+
   async function exitSupportView() {
     await fetch("/api/admin/impersonate", { method: "DELETE" });
     window.location.href = "/admin";
@@ -127,6 +168,7 @@ export function TopNav({
     { href: "/stats", key: "stats", label: "Stats" },
     { href: "/profile", key: "profile", label: "Profile" },
     { href: "/billing", key: "billing", label: "Billing" },
+    { href: "/help", key: "help", label: "Help" },
     ...(isAdmin ? [{ href: "/admin", key: "admin", label: "Admin" }] : []),
   ];
 
@@ -206,6 +248,30 @@ export function TopNav({
     </header>
     {/* Sibling of the header — backdrop-blur would trap a fixed child inside it */}
     <FeedbackWidget source="agent" />
+
+    {/* Mobile bottom tab bar — thumb-reach navigation, no menu required.
+        Billing / Help / Admin / Sign out stay in the hamburger. */}
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 pb-[env(safe-area-inset-bottom)]">
+      <div className="grid grid-cols-4">
+        {[
+          { href: "/", key: "referrals", label: "Referrals", Icon: IconHome },
+          { href: "/partners", key: "partners", label: "Partners", Icon: IconUsers },
+          { href: "/stats", key: "stats", label: "Stats", Icon: IconZap },
+          { href: "/profile", key: "profile", label: "Profile", Icon: IconUser },
+        ].map((t) => (
+          <Link
+            key={t.key}
+            href={t.href}
+            className={`flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[10px] font-semibold transition-colors ${
+              active === t.key ? "text-brand-700" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            <t.Icon size={19} />
+            {t.label}
+          </Link>
+        ))}
+      </div>
+    </nav>
     </>
   );
 }
