@@ -15,7 +15,19 @@ export type Account = {
   subscription_status: string | null;
   isTeamMember: boolean;
   ownerEmail: string | null; // set for team members
+  // Referral-earned Pro: an end date, not a plan change. Their real plan is
+  // untouched, so when the window lapses they land exactly where they were.
+  proUntil: string | null;
+  earnedPro: boolean;
 };
+
+// Pro earned through referrals (or a welcome window) still counts as Pro for
+// every feature gate — partner limits, team seats stay Agency-only.
+function effectivePlan(plan: string, proUntil: string | null): string {
+  if (plan !== "free") return plan;
+  if (proUntil && new Date(proUntil).getTime() > Date.now()) return "pro";
+  return plan;
+}
 
 // The signed-in account, or null. Route handlers should 401 on null
 // (the middleware already blocks unauthenticated page/API access, so null
@@ -25,7 +37,7 @@ export async function getAccount(): Promise<Account | null> {
   if (!id) return null;
   const { data: self } = await db()
     .from("accounts")
-    .select("id, email, display_name, plan, stripe_customer_id, subscription_status, team_owner_id")
+    .select("id, email, display_name, plan, stripe_customer_id, subscription_status, team_owner_id, pro_until")
     .eq("id", id)
     .maybeSingle();
   if (!self) return null;
@@ -33,7 +45,7 @@ export async function getAccount(): Promise<Account | null> {
   if (self.team_owner_id) {
     const { data: owner } = await db()
       .from("accounts")
-      .select("id, email, plan, stripe_customer_id, subscription_status")
+      .select("id, email, plan, stripe_customer_id, subscription_status, pro_until")
       .eq("id", self.team_owner_id)
       .maybeSingle();
     if (owner) {
@@ -42,26 +54,31 @@ export async function getAccount(): Promise<Account | null> {
         selfId: self.id,
         email: self.email,
         display_name: self.display_name,
-        plan: owner.plan,
+        plan: effectivePlan(owner.plan, owner.pro_until),
         stripe_customer_id: owner.stripe_customer_id,
         subscription_status: owner.subscription_status,
         isTeamMember: true,
         ownerEmail: owner.email,
+        proUntil: owner.pro_until ?? null,
+        earnedPro: owner.plan === "free" && effectivePlan(owner.plan, owner.pro_until) === "pro",
       };
     }
     // Owner row missing shouldn't happen (FK cascade) — fall through as solo.
   }
 
+  const plan = effectivePlan(self.plan, self.pro_until);
   return {
     id: self.id,
     selfId: self.id,
     email: self.email,
     display_name: self.display_name,
-    plan: self.plan,
+    plan,
     stripe_customer_id: self.stripe_customer_id,
     subscription_status: self.subscription_status,
     isTeamMember: false,
     ownerEmail: null,
+    proUntil: self.pro_until ?? null,
+    earnedPro: self.plan === "free" && plan === "pro",
   };
 }
 

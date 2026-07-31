@@ -6,6 +6,7 @@ import { sendEmail, welcomeEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { TEAM_SEAT_LIMIT } from "@/lib/account";
 import { rateLimit, clientIp, RATE_LIMITED } from "@/lib/ratelimit";
+import { grantProMonths, WELCOME_MONTHS } from "@/lib/referral";
 
 export async function POST(req: NextRequest) {
   if (!(await rateLimit(`signup-ip:${clientIp(req)}`, 6, 3600))) {
@@ -67,12 +68,35 @@ export async function POST(req: NextRequest) {
     teamOwnerId = owner.id;
   }
 
+  // Referral attribution — who sent them. Captured here or never: this is not
+  // reconstructable after the fact.
+  let referredBy: string | null = null;
+  const refCode = String(body?.ref ?? "").trim().toLowerCase();
+  if (refCode && !teamOwnerId) {
+    const { data: referrer } = await db()
+      .from("accounts")
+      .select("id")
+      .eq("referral_code", refCode)
+      .maybeSingle();
+    if (referrer) referredBy = referrer.id;
+  }
+
   const { data: account, error } = await db()
     .from("accounts")
-    .insert({ email, password_hash: hashPassword(password), display_name: displayName, team_owner_id: teamOwnerId })
+    .insert({
+      email,
+      password_hash: hashPassword(password),
+      display_name: displayName,
+      team_owner_id: teamOwnerId,
+      referred_by: referredBy,
+    })
     .select("id, email")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Referred agents start with a Pro window so they can stand up three or four
+  // partners immediately instead of one — the referral doubles as activation.
+  if (referredBy) await grantProMonths(account.id, WELCOME_MONTHS);
 
   if (!teamOwnerId) {
     // Pilot-data claim: rows created before accounts existed have no owner.

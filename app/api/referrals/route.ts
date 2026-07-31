@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
 import { getAccount } from "@/lib/account";
+import { maybeRewardReferrer } from "@/lib/referral";
 import { fireWebhook } from "@/lib/webhook";
 
 export async function GET() {
@@ -52,5 +53,8 @@ export async function POST(req: NextRequest) {
   await db().from("status_events").insert({ referral_id: data.id, status: "new" });
   await logActivity(data.id, "lead_logged", `Lead logged for ${data.client_name}`, "agent");
   await fireWebhook(account.id, "referral.created", data, partnerOwned);
+  // A partner plus a logged lead is real use — whoever referred this agent
+  // earns their reward now (idempotent; only ever fires once per pairing).
+  await maybeRewardReferrer(account.selfId);
   return NextResponse.json({ referral: data });
 }

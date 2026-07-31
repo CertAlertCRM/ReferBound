@@ -189,6 +189,23 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- Agent referral program (see migration_32)
+alter table accounts add column if not exists referral_code text unique
+  default substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
+alter table accounts add column if not exists referred_by uuid references accounts(id) on delete set null;
+alter table accounts add column if not exists pro_until timestamptz;
+create index if not exists idx_accounts_referred_by on accounts(referred_by);
+create table if not exists referral_rewards (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  referred_account_id uuid not null references accounts(id) on delete cascade,
+  months integer not null default 3,
+  kind text not null default 'referrer',
+  created_at timestamptz not null default now(),
+  unique (account_id, referred_account_id, kind)
+);
+alter table referral_rewards enable row level security;
+
 -- E&O prevention suite (see migration_31)
 alter table partners add column if not exists requirements jsonb;
 alter table referrals add column if not exists coverage_notes jsonb;

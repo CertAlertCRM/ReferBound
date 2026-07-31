@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { IconCheck, IconExternal, IconUsers } from "../icons";
+import { ReferCard } from "../refer-card";
 
 type Billing = {
   plan: string;
@@ -12,6 +13,8 @@ type Billing = {
   managed: boolean;
   ownerEmail: string | null;
   billingInterval: "monthly" | "annual";
+  earnedPro?: boolean;
+  proUntil?: string | null;
   links: { pro: string | null; agency: string | null; founder: string | null; portal: string | null };
 };
 
@@ -96,8 +99,19 @@ export default function BillingPage() {
           <h1 className="text-xl font-bold tracking-tight">Plan & billing</h1>
           <p className="text-sm text-ink-secondary mt-1">
             You&apos;re on the <span className="font-semibold">{billing.planLabel}</span> plan
-            {billing.billingInterval === "annual" && (
+            {billing.billingInterval === "annual" && !billing.earnedPro && (
               <span> — Founding Member, $199/year</span>
+            )}
+            {billing.earnedPro && billing.proUntil && (
+              <span>
+                {" "}
+                — earned through referrals, through{" "}
+                {new Date(billing.proUntil).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
             )}
             {billing.subscriptionStatus === "past_due" && (
               <span className="text-red-600"> — payment past due</span>
@@ -210,6 +224,8 @@ export default function BillingPage() {
             </a>
           </div>
         )}
+
+        <ReferCard />
 
         <p className="text-xs text-ink-muted">
           Payments are processed by Stripe. Plans activate automatically within a minute of checkout —

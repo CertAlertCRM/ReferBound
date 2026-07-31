@@ -38,7 +38,9 @@ export async function GET() {
 
   return NextResponse.json({
     plan: account.plan,
-    planLabel: PLAN_LABELS[account.plan] ?? account.plan,
+    planLabel: account.earnedPro ? "Pro (earned)" : PLAN_LABELS[account.plan] ?? account.plan,
+    earnedPro: account.earnedPro,
+    proUntil: account.proUntil,
     email: account.email,
     subscriptionStatus: account.subscription_status,
     managed: false,

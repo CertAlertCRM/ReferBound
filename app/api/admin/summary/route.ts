@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const s = db();
   const [{ data: accounts }, { data: partners }, { data: referrals }, { data: emails }] =
     await Promise.all([
-      s.from("accounts").select("id, email, plan, billing_interval, created_at, team_owner_id, stripe_subscription_id"),
+      s.from("accounts").select("id, email, plan, billing_interval, created_at, team_owner_id, stripe_subscription_id, referred_by, pro_until"),
       s.from("partners").select("id, account_id, partner_type"),
       s.from("referrals").select("id, account_id, status, premium, created_at, source, backfilled"),
       s.from("email_log").select("kind, sent, created_at"),
@@ -111,6 +111,12 @@ export async function GET(req: NextRequest) {
       paying: paying.length,
       viaStripe,
       founderAnnual,
+      // How much of the base came from agents referring agents — the number
+      // that tells you whether this thing spreads on its own yet.
+      viaReferral: accts.filter((a) => a.referred_by).length,
+      onEarnedPro: accts.filter(
+        (a) => a.plan === "free" && a.pro_until && new Date(a.pro_until).getTime() > Date.now()
+      ).length,
       mrr,
       partners: parts.length,
       referrals: liveRefs.length,

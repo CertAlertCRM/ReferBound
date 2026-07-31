@@ -11,12 +11,15 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [invite, setInvite] = useState("");
+  const [ref, setRef] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    setInvite(new URLSearchParams(window.location.search).get("invite") ?? "");
+    const q = new URLSearchParams(window.location.search);
+    setInvite(q.get("invite") ?? "");
+    setRef(q.get("ref") ?? "");
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -26,7 +29,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_name: name, email, password, invite_code: invite || undefined }),
+      body: JSON.stringify({ display_name: name, email, password, invite_code: invite || undefined, ref: ref || undefined }),
     });
     setBusy(false);
     if (res.ok) {
@@ -48,6 +51,15 @@ export default function SignupPage() {
             {invite ? "Join your agency's team" : "Create your account — free for your first partner"}
           </p>
         </div>
+        {ref && !invite && (
+          <div className="card px-4 py-3 mb-4 bg-brand-light/60 border-brand-200">
+            <p className="text-xs text-brand-800">
+              <span className="font-semibold">An agent sent you here</span> — your first month of
+              Pro is on the house, so you can set up every referral partner you work with right
+              away, not just one.
+            </p>
+          </div>
+        )}
         {invite && (
           <div className="card px-4 py-3 mb-4 flex items-center gap-2.5 bg-brand-light/60 border-brand-200">
             <IconUsers size={16} className="text-brand-700 shrink-0" />

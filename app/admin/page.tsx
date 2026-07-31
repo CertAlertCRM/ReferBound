@@ -17,6 +17,8 @@ type Summary = {
     paying: number;
     viaStripe: number;
     founderAnnual: number;
+    viaReferral: number;
+    onEarnedPro: number;
     mrr: number;
     partners: number;
     referrals: number;
@@ -121,7 +123,11 @@ export default function AdminPage() {
               l: "MRR",
               hint: `${t.paying} paying · ${t.viaStripe} via Stripe${t.founderAnnual ? ` · ${t.founderAnnual} founding annual` : ""}`,
             },
-            { v: String(t.accounts), l: "Accounts", hint: `${t.owners} owners · ${t.teamMembers} team seats` },
+            {
+              v: String(t.accounts),
+              l: "Accounts",
+              hint: `${t.owners} owners · ${t.teamMembers} seats${t.viaReferral ? ` · ${t.viaReferral} referred` : ""}`,
+            },
             {
               v: `${t.byPlan.free ?? 0} / ${t.byPlan.pro ?? 0} / ${t.byPlan.agency ?? 0}`,
               l: "Free / Pro / Agency",
