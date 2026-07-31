@@ -151,11 +151,13 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
       {insight && (
         <div
           className={`rounded-xl border px-4 py-3 ${
-            insight.tone === "amber" ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60"
+            insight.tone === "amber"
+              ? "border-amber-400 bg-amber-100"
+              : "border-emerald-400 bg-emerald-100"
           }`}
         >
           <p className="text-sm font-semibold text-ink">{insight.headline}</p>
-          <p className="text-xs text-ink-secondary mt-1 leading-relaxed">{insight.body}</p>
+          <p className="text-xs text-ink mt-1 leading-relaxed opacity-80">{insight.body}</p>
         </div>
       )}
 
@@ -219,7 +221,7 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
                 {contactGaps.map((p) => (
                   <li
                     key={p.id}
-                    className="rounded-xl border border-amber-200 bg-amber-50/50 px-3.5 py-2.5 flex items-start justify-between gap-3"
+                    className="rounded-xl border border-amber-400 bg-amber-100 px-3.5 py-2.5 flex items-start justify-between gap-3"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate">
