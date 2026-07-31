@@ -19,6 +19,7 @@ import {
   IconTrash,
   IconFile,
   IconAlert,
+  IconCheck,
 } from "../../icons";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string; purged_at?: string | null };
