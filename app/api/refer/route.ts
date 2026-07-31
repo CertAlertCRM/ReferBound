@@ -19,9 +19,12 @@ export async function GET() {
 
   const { data: me } = await db()
     .from("accounts")
-    .select("referral_code, pro_until")
+    .select("referral_code, pro_until, plan, plan_amount_cents")
     .eq("id", account.id)
     .maybeSingle();
+  // Free accounts accrue Pro months; paying ones already have their perk in
+  // the price. Both get a link worth sharing.
+  const earnsRewards = me?.plan === "free";
 
   const { data: invited } = await db()
     .from("accounts")
@@ -48,6 +51,7 @@ export async function GET() {
     managed: false,
     code: me?.referral_code ?? null,
     link: me?.referral_code ? `${appUrl()}/signup?ref=${me.referral_code}` : null,
+    earnsRewards,
     monthsPerReferral: REFERRER_MONTHS,
     welcomeMonths: WELCOME_MONTHS,
     proUntil: me?.pro_until ?? null,

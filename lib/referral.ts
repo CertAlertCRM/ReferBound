@@ -36,6 +36,17 @@ export async function maybeRewardReferrer(referredAccountId: string): Promise<bo
       .maybeSingle();
     if (!acct?.referred_by || acct.referred_by === acct.id) return false;
 
+    // Earned Pro months only mean something to a free account. Paying accounts
+    // — including anyone on a custom or founding rate — already hold their
+    // thank-you in the price they pay, so nothing accrues to them. Their
+    // referrals still land with the welcome month; that half is activation.
+    const { data: referrer } = await db()
+      .from("accounts")
+      .select("plan")
+      .eq("id", acct.referred_by)
+      .maybeSingle();
+    if (!referrer || referrer.plan !== "free") return false;
+
     // Already paid for this pairing?
     const { data: existing } = await db()
       .from("referral_rewards")

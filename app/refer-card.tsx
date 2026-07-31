@@ -11,6 +11,7 @@ type Refer = {
   managed: boolean;
   code: string | null;
   link: string | null;
+  earnsRewards: boolean;
   monthsPerReferral: number;
   welcomeMonths: number;
   proUntil: string | null;
@@ -44,15 +45,23 @@ export function ReferCard() {
           <h2 className="font-semibold flex items-center gap-2">
             <IconUsers size={16} className="text-brand" /> Refer an agent
           </h2>
-          <p className="text-sm text-ink-secondary mt-1">
-            Send another agent your link. They start with {d.welcomeMonths} month
-            {d.welcomeMonths === 1 ? "" : "s"} of Pro — and once they&apos;ve added a partner and
-            logged their first lead, you get{" "}
-            <span className="font-semibold text-ink">{d.monthsPerReferral} months of Pro, free</span>.
-            Unlimited partners the whole time.
-          </p>
+          {d.earnsRewards ? (
+            <p className="text-sm text-ink-secondary mt-1">
+              Send another agent your link. They start with {d.welcomeMonths} month
+              {d.welcomeMonths === 1 ? "" : "s"} of Pro — and once they&apos;ve added a partner and
+              logged their first lead, you get{" "}
+              <span className="font-semibold text-ink">{d.monthsPerReferral} months of Pro, free</span>.
+              Unlimited partners the whole time.
+            </p>
+          ) : (
+            <p className="text-sm text-ink-secondary mt-1">
+              Your link, ready to share. Any agent who uses it starts with {d.welcomeMonths} month
+              {d.welcomeMonths === 1 ? "" : "s"} of Pro, so they can set up every partner they work
+              with from day one instead of just one.
+            </p>
+          )}
         </div>
-        {d.proDaysLeft !== null && (
+        {d.earnsRewards && d.proDaysLeft !== null && (
           <span className="badge bg-emerald-50 text-emerald-700 shrink-0">
             Pro active · {d.proDaysLeft}d left
           </span>
@@ -84,7 +93,8 @@ export function ReferCard() {
       {d.invited.length > 0 && (
         <div className="pt-2 border-t border-slate-100">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1.5">
-            Agents you&apos;ve brought in · {d.monthsEarned} month{d.monthsEarned === 1 ? "" : "s"} earned
+            Agents you&apos;ve brought in
+            {d.earnsRewards && ` · ${d.monthsEarned} month${d.monthsEarned === 1 ? "" : "s"} earned`}
           </p>
           <ul className="space-y-1">
             {d.invited.map((a, i) => (
@@ -92,7 +102,7 @@ export function ReferCard() {
                 <span className="font-medium text-ink">{a.name}</span>
                 {a.rewarded ? (
                   <span className="text-emerald-700 font-medium">
-                    +{d.monthsPerReferral} months earned ✓
+                    {d.earnsRewards ? `+${d.monthsPerReferral} months earned ✓` : "up and running ✓"}
                   </span>
                 ) : (
                   <span className="text-ink-muted">
