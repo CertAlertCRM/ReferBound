@@ -203,7 +203,7 @@ export default function PartnersPage() {
   }
 
   async function txToNumber(pid: string) {
-    const num = await prompt("Mobile number to text the portal link to:");
+    const num = await prompt({ title: "Text the portal link", body: "Which mobile number should it go to?", placeholder: "(804) 555-1234", confirmLabel: "Send it" });
     if (!num) return;
     sendTx(pid, { phone: num });
   }

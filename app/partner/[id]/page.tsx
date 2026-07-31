@@ -313,7 +313,7 @@ export default function PartnerWorkspacePage() {
 
   // One-off: text the link to a number the agent types in (no saved contact).
   async function textLinkToNumber() {
-    const num = await prompt("Mobile number to text the portal link to:");
+    const num = await prompt({ title: "Text the portal link", body: "Which mobile number should it go to?", placeholder: "(804) 555-1234", confirmLabel: "Send it" });
     if (!num) return;
     setTextBusy("adhoc");
     const res = await fetch(`/api/partners/${id}/text-link`, {

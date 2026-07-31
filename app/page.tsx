@@ -170,10 +170,12 @@ export default function Dashboard() {
   // partner (that conversation deserves a personal touch); it just moves to
   // the Not written section and the portal shows it honestly.
   async function markLost(r: Referral) {
-    const reason = await prompt(
-      `Mark ${r.client_name} as “Not written”? No email goes to your partner.\n\nOptional reason (shows in your records):`,
-      ""
-    );
+    const reason = await prompt({
+      title: `Mark ${r.client_name} as “Not written”?`,
+      body: "No email goes to your partner — that conversation deserves a personal touch.",
+      placeholder: "Optional reason (shows in your records)",
+      confirmLabel: "Mark not written",
+    });
     if (reason === null) return;
     setBusyId(r.id);
     await fetch(`/api/referrals/${r.id}`, {
