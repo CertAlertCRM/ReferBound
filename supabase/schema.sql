@@ -189,6 +189,11 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- Source-file retention + backfill tracking (see migration_29)
+alter table agent_profile add column if not exists doc_retention_days integer not null default 0;
+alter table documents add column if not exists purged_at timestamptz;
+alter table referrals add column if not exists backfilled boolean not null default false;
+
 -- Referral Radar — partner prospects & pipeline (see migration_28)
 create table if not exists partner_prospects (
   id uuid primary key default gen_random_uuid(),

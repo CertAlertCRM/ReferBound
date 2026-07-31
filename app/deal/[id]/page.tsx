@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { STATUSES, STATUS_LABELS, DOC_KINDS } from "@/lib/config";
+import { STATUSES, STATUS_LABELS, DOC_KINDS, SENSITIVE_DOC_KINDS } from "@/lib/config";
 import { StatusBadge, StatusProgress, TopNav } from "../../components";
 import {
   IconMail,
@@ -21,7 +21,7 @@ import {
   IconAlert,
 } from "../../icons";
 
-type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string };
+type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string; purged_at?: string | null };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
 type Msg = { id: string; sender: string; body: string; created_at: string };
 type Referral = {
@@ -171,6 +171,20 @@ export default function DealPage() {
     const res = await fetch(`/api/docs/${docId}`, { method: "DELETE" });
     if (res.ok) load();
     else alert((await res.json()).error ?? "Couldn't delete");
+  }
+
+  // Keep the extracted details, delete the file that carried them. Real
+  // deletion, not a blur — a black box over a PDF leaves the text underneath.
+  async function purgeDoc(docId: string, label: string) {
+    if (
+      !confirm(
+        `Remove the source file for "${label}"?\n\nEverything already extracted (client details, dates, premium) stays on this deal. The original file — which may carry SSN, income, and asset information you don't need — is permanently deleted from storage.`
+      )
+    )
+      return;
+    const res = await fetch(`/api/docs/${docId}/purge`, { method: "POST" });
+    if (res.ok) load();
+    else alert((await res.json()).error ?? "Couldn't remove the file");
   }
 
   async function deleteMsg(messageId: string) {
@@ -515,17 +529,34 @@ export default function DealPage() {
                     )}
                   </span>
                   <span className="flex items-center gap-3 shrink-0">
-                    <button
-                      className="link disabled:opacity-50"
-                      onClick={() => extractDoc(d.id)}
-                      disabled={extracting !== null}
-                      title="AI reads this document and fills in any missing client or policy details"
-                    >
-                      <IconSparkles size={13} /> {extracting === d.id ? "Reading…" : "Extract"}
-                    </button>
-                    <a className="link" href={`/api/docs/${d.id}/download`} target="_blank">
-                      <IconDownload size={13} /> Download
-                    </a>
+                    {d.purged_at ? (
+                      <span className="text-[11px] text-ink-muted italic" title="Source file deleted for privacy — everything extracted from it is still on this deal">
+                        source file removed
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          className="link disabled:opacity-50"
+                          onClick={() => extractDoc(d.id)}
+                          disabled={extracting !== null}
+                          title="AI reads this document and fills in any missing client or policy details"
+                        >
+                          <IconSparkles size={13} /> {extracting === d.id ? "Reading…" : "Extract"}
+                        </button>
+                        <a className="link" href={`/api/docs/${d.id}/download`} target="_blank">
+                          <IconDownload size={13} /> Download
+                        </a>
+                        {SENSITIVE_DOC_KINDS.includes(d.kind) && (
+                          <button
+                            className="link !text-ink-muted hover:!text-brand"
+                            onClick={() => purgeDoc(d.id, d.file_name)}
+                            title="Delete the original file, keep everything extracted from it"
+                          >
+                            Keep details, drop file
+                          </button>
+                        )}
+                      </>
+                    )}
                     <button
                       className="text-ink-muted hover:text-red-600 transition-colors"
                       onClick={() => deleteDoc(d.id, d.file_name)}

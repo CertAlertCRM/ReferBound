@@ -6,6 +6,7 @@ import { formatPhoneInput } from "@/lib/format";
 import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX } from "../icons";
 import { THEMES } from "@/lib/themes";
 import { TEMPLATE_META, type NotifyTemplates } from "@/lib/voice";
+import { RETENTION_CHOICES } from "@/lib/config";
 
 type Team = {
   role: "owner" | "member";
@@ -28,9 +29,10 @@ type Profile = {
   google_review_url: string | null;
   sms_new_lead: boolean;
   show_scorecard: boolean;
+  doc_retention_days: number;
 };
 
-const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true };
+const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true, doc_retention_days: 0 };
 
 export default function ProfilePage() {
   const [form, setForm] = useState<Profile>(EMPTY);
@@ -82,6 +84,7 @@ export default function ProfilePage() {
             google_review_url: profile.google_review_url ?? "",
             sms_new_lead: Boolean(profile.sms_new_lead),
             show_scorecard: profile.show_scorecard !== false,
+            doc_retention_days: Number(profile.doc_retention_days ?? 0),
           };
           setForm(loaded);
           setBaseline(loaded);
@@ -382,7 +385,11 @@ export default function ProfilePage() {
     else alert((await res.json()).error ?? "Upload failed");
   }
 
-  const field = (key: Exclude<keyof Profile, "sms_new_lead" | "show_scorecard">, label: string, placeholder: string) => {
+  const field = (
+    key: Exclude<keyof Profile, "sms_new_lead" | "show_scorecard" | "doc_retention_days">,
+    label: string,
+    placeholder: string
+  ) => {
     const isPhone = key === "phone";
     const isEmail = key === "email";
     const isOffice = key === "office";
@@ -594,6 +601,26 @@ export default function ProfilePage() {
                     you business.
                   </span>
                 </span>
+              </label>
+              <label className="block">
+                <span className="section-label">Loan application files</span>
+                <span className="text-xs text-ink-muted block">
+                  A loan application carries far more personal information than you need to quote.
+                  ReferBound only ever stores the details it extracts — name, address, dates,
+                  premium — never SSNs, income, or assets. This controls how long the original
+                  file itself sticks around; the extracted details always stay on the referral.
+                </span>
+                <select
+                  className="input mt-1.5"
+                  value={String(form.doc_retention_days)}
+                  onChange={(e) => setForm({ ...form, doc_retention_days: Number(e.target.value) })}
+                >
+                  {RETENTION_CHOICES.map((c) => (
+                    <option key={c.days} value={c.days}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <input

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DOC_KINDS, PARTNER_DOC_KINDS } from "@/lib/config";
+import { DOC_KINDS_PARTNER, PARTNER_DOC_KINDS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { IconZap, IconUpload, IconX, IconMail } from "../../icons";
 
@@ -207,7 +207,7 @@ export function PartnerSubmitForm({
                     }
                   >
                     {PARTNER_DOC_KINDS.map((k) => (
-                      <option key={k} value={k}>{DOC_KINDS[k]}</option>
+                      <option key={k} value={k}>{DOC_KINDS_PARTNER[k]}</option>
                     ))}
                   </select>
                 )}

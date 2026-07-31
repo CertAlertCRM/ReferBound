@@ -58,10 +58,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const agentName = prof?.display_name || "Your insurance agent";
 
   const url = `${appUrl()}/p/${partner.short_code ?? partner.token}`;
+  const hi = `Hi${firstName ? ` ${firstName}` : ""}`;
+  // Two asks: introduce the portal, or invite them to load their active files
+  // so the board reflects everything in flight from day one.
+  const backfill = String(body?.purpose ?? "") === "backfill";
+  const message = backfill
+    ? `${hi} — ${agentName} here. Whenever you get a minute, add the files you have working right now to your portal so we're both looking at the same board: ${url} — takes about a minute each. Reply STOP to opt out.`
+    : `${hi} — ${agentName} here. Your live referral portal for ${partner.name} is ready: ${url} — see every client you've sent and grab insurance docs anytime. Reply STOP to opt out.`;
+
   const { sent, error } = await sendSms({
-    kind: "portal_link",
+    kind: backfill ? "portal_backfill" : "portal_link",
     to: phone,
-    body: `Hi${firstName ? ` ${firstName}` : ""} — ${agentName} here. Your live referral portal for ${partner.name} is ready: ${url} — see every client you've sent and grab insurance docs anytime. Reply STOP to opt out.`,
+    body: message,
   });
   if (!sent) return NextResponse.json({ error: error ?? "text failed" }, { status: 502 });
 

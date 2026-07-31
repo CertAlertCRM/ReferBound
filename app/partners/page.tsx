@@ -182,7 +182,7 @@ export default function PartnersPage() {
     setTxContacts(all.filter((c: any) => c.phone));
   }
 
-  async function sendTx(pid: string, payload: { contactId?: string; phone?: string }) {
+  async function sendTx(pid: string, payload: { contactId?: string; phone?: string; purpose?: string }) {
     setTxFor(null);
     setTxBusy(pid);
     const res = await fetch(`/api/partners/${pid}/text-link`, {
@@ -573,14 +573,27 @@ export default function PartnersPage() {
                           ) : (
                             <>
                               {txContacts.map((c) => (
-                                <button
-                                  key={c.id}
-                                  className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 transition-colors"
-                                  onClick={() => sendTx(p.id, { contactId: c.id })}
-                                >
-                                  <span className="font-medium">{c.name}</span>
-                                  <span className="text-ink-muted"> · {c.phone}</span>
-                                </button>
+                                <div key={c.id} className="rounded-lg hover:bg-brand-light/40 transition-colors px-2 py-1.5">
+                                  <p className="text-xs">
+                                    <span className="font-medium">{c.name}</span>
+                                    <span className="text-ink-muted"> · {c.phone}</span>
+                                  </p>
+                                  <div className="flex gap-3 mt-0.5">
+                                    <button
+                                      className="link !text-[11px]"
+                                      onClick={() => sendTx(p.id, { contactId: c.id })}
+                                    >
+                                      Send portal link
+                                    </button>
+                                    <button
+                                      className="link !text-[11px]"
+                                      title="Asks them to add the files they have working right now"
+                                      onClick={() => sendTx(p.id, { contactId: c.id, purpose: "backfill" })}
+                                    >
+                                      Ask for active files
+                                    </button>
+                                  </div>
+                                </div>
                               ))}
                               {txContacts.length === 0 && (
                                 <p className="text-[11px] text-ink-muted px-2 py-1.5">

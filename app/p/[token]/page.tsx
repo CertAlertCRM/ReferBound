@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/lib/db";
 import { currentAccountId } from "@/lib/auth";
-import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
+import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS_PARTNER, SAFE_STATUSES } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil, timeAgo } from "@/lib/helpers";
 import { themeStyle } from "@/lib/themes";
 import { ShareCard } from "./share-card";
@@ -96,7 +96,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
   const { data: referrals, error: refError } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, created_at, updated_at, partner_contacts(name), documents(id, kind, file_name, uploaded_by)")
+    .select("id, client_name, closing_date, status, created_at, updated_at, backfilled, partner_contacts(name), documents(id, kind, file_name, uploaded_by, purged_at)")
     .eq("partner_id", partner.id)
     .order("created_at", { ascending: false });
 
@@ -169,6 +169,9 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   let onTime = 0;
   let onTimeTotal = 0;
   for (const r of refs) {
+    // Backfilled leads carry no honest clock — a deal entered today but quoted
+    // three weeks ago would report a fake three-week turnaround. Skip them.
+    if ((r as any).backfilled) continue;
     const t0 = firstEvent.get(`${r.id}:new`) ?? new Date(r.created_at).getTime();
     const tq = firstEvent.get(`${r.id}:quoted`);
     const tb = firstEvent.get(`${r.id}:bound`);
@@ -457,7 +460,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                         className="inline-flex items-center gap-1.5 rounded-lg bg-brand-light text-brand-700 hover:bg-brand-100 px-3 py-1.5 text-xs font-semibold transition-colors"
                       >
                         <IconDownload size={12} strokeWidth={2.5} />
-                        {DOC_KINDS[d.kind] ?? d.file_name}
+                        {DOC_KINDS_PARTNER[d.kind] ?? d.file_name}
                       </a>
                     ))}
                   </div>
@@ -466,7 +469,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 {partnerDocs.length > 0 && (
                   <p className="mt-2.5 text-[11px] text-ink-muted inline-flex items-center gap-1">
                     <IconPaperclip size={11} /> You sent:{" "}
-                    {partnerDocs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", ")}
+                    {partnerDocs.map((d: any) => DOC_KINDS_PARTNER[d.kind] ?? d.file_name).join(", ")}
                   </p>
                 )}
 

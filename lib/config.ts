@@ -48,8 +48,30 @@ export const DOC_KINDS: Record<string, string> = {
   other: "Other document",
 };
 
+// Partner-facing labels. Partners shouldn't need to know industry form
+// numbers — "loan application" is the same document in plain language.
+export const DOC_KINDS_PARTNER: Record<string, string> = {
+  ...DOC_KINDS,
+  loan_1003: "Loan application",
+  hoi_request: "Insurance info sheet",
+  mortgagee: "Mortgagee clause / lender info",
+};
+
 // Kinds shown in the partner's upload picker
 export const PARTNER_DOC_KINDS = ["loan_1003", "hoi_request", "mortgagee", "other"] as const;
+
+// Document kinds that routinely carry more personal information than an agent
+// needs to quote. The source file for these can be purged after extraction —
+// the details pulled off it stay on the referral. See lib/retention.
+export const SENSITIVE_DOC_KINDS = ["loan_1003"];
+
+// Source-file retention choices (days; 0 = keep indefinitely).
+export const RETENTION_CHOICES = [
+  { days: 0, label: "Keep source files" },
+  { days: 30, label: "Delete after 30 days" },
+  { days: 90, label: "Delete after 90 days" },
+  { days: 180, label: "Delete after 180 days" },
+];
 
 // Partner types — drives which submission flow their portal shows.
 export const PARTNER_TYPES: Record<string, string> = {

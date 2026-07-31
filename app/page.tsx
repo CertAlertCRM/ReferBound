@@ -6,6 +6,7 @@ import { STATUSES, STATUS_LABELS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
 import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck, IconUsers, IconZap, IconFile, IconX } from "./icons";
+import { BackfillButton } from "./backfill";
 import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
 
@@ -253,6 +254,14 @@ export default function Dashboard() {
             <button onClick={openAdd} className="btn-primary">
               <IconPlus size={15} /> Log lead
             </button>
+            {partners.length > 0 && (
+              <BackfillButton
+                partners={partners}
+                onDone={load}
+                className="btn-ghost !py-1.5 text-xs justify-center"
+                label={referrals.length === 0 ? "Build my book" : "Add several"}
+              />
+            )}
             {referrals.length > 0 && (
               <a
                 href="/api/export?scope=new"
