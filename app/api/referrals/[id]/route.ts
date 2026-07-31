@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { STATUSES } from "@/lib/config";
-import { sendEmail, statusUpdateEmail, docsReadyEmail } from "@/lib/email";
+import { sendEmail, statusUpdateEmail, docsReadyEmail, plainBodyEmail } from "@/lib/email";
+import { renderVoice, type NotifyTemplates } from "@/lib/voice";
 import { appUrl } from "@/lib/helpers";
 import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
@@ -100,17 +101,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const recipients: string[] = contact?.email
         ? [contact.email]
         : (referral.partners.emails ?? []);
+
+      // Personal touch: if the agent approved a "Your voice" template, the
+      // notification goes out in their words instead of stock wording.
+      const { data: voiceProf } = await db()
+        .from("agent_profile")
+        .select("notify_templates")
+        .eq("account_id", account.id)
+        .maybeSingle();
+      const voice = (voiceProf?.notify_templates ?? {}) as NotifyTemplates;
+      const docList = (referral.documents ?? []).map((d: any) => DOC_KINDS[d.kind] ?? d.file_name);
+      const vars = {
+        client: referral.client_name,
+        partner: referral.partners.name,
+        first: contact?.name ? String(contact.name).split(" ")[0] : "",
+        link: portalUrl,
+        docs: docList.join(", ") || "EOI",
+      };
+
       if (wantsEmail) {
         if (referral.status === "docs_delivered") {
-          const docList = (referral.documents ?? []).map(
-            (d: any) => DOC_KINDS[d.kind] ?? d.file_name
-          );
           await sendEmail({
             referralId: referral.id,
             kind: "docs_ready",
             to: recipients,
             subject: `${referral.client_name}: insurance documents ready`,
-            html: docsReadyEmail(referral.client_name, docList, portalUrl),
+            html: voice.email_docs
+              ? plainBodyEmail(renderVoice(voice.email_docs, vars))
+              : docsReadyEmail(referral.client_name, docList, portalUrl),
           });
         } else if (referral.status !== "lost") {
           await sendEmail({
@@ -118,7 +136,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             kind: "status_update",
             to: recipients,
             subject: `${referral.client_name}: insurance update`,
-            html: statusUpdateEmail(referral.client_name, referral.status, portalUrl),
+            html: voice.email_quoted
+              ? plainBodyEmail(renderVoice(voice.email_quoted, vars))
+              : statusUpdateEmail(referral.client_name, referral.status, portalUrl),
           });
         }
       }
@@ -128,12 +148,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // Opt-in text to the contact who sent this lead, at the two moments
       // LOs actually care about: quote's out, and docs are ready.
       if (wantsSms) {
+        const smsTemplate =
+          referral.status === "docs_delivered" ? voice.sms_docs : voice.sms_quoted;
         await sendSms({
           referralId: referral.id,
           kind: `status_${referral.status}`,
           to: contact.phone,
-          body:
-            referral.status === "docs_delivered"
+          body: smsTemplate
+            ? renderVoice(smsTemplate, vars)
+            : referral.status === "docs_delivered"
               ? `ReferBound: ${referral.client_name} is bound — insurance docs are ready on your portal: ${portalUrl}`
               : `ReferBound: ${referral.client_name} has been quoted. Live status: ${portalUrl}`,
         });

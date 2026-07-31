@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { SAFE_STATUSES } from "@/lib/config";
-import { sendEmail, monthlySummaryEmail, thankYouEmail } from "@/lib/email";
+import { sendEmail, monthlySummaryEmail, thankYouEmail, plainBodyEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
+import { renderVoice, type NotifyTemplates } from "@/lib/voice";
 
 // Monthly partner summary — runs on the 1st (see vercel.json) and reports on
 // the PREVIOUS calendar month. Guarded by CRON_SECRET; safe to trigger
@@ -27,12 +28,17 @@ export async function GET(req: NextRequest) {
     timeZone: "UTC",
   });
 
-  // Per-account agent names (from each account's profile).
+  // Per-account agent names + "Your voice" templates (from each profile).
   const { data: profiles } = await db()
     .from("agent_profile")
-    .select("account_id, display_name");
+    .select("account_id, display_name, notify_templates");
   const nameByAccount = new Map(
     (profiles ?? []).filter((p) => p.account_id).map((p) => [p.account_id, p.display_name])
+  );
+  const voiceByAccount = new Map(
+    (profiles ?? [])
+      .filter((p) => p.account_id)
+      .map((p) => [p.account_id, (p.notify_templates ?? {}) as NotifyTemplates])
   );
 
   const { data: partners, error: pErr } = await db()
@@ -112,6 +118,14 @@ export async function GET(req: NextRequest) {
 
     const agentName =
       nameByAccount.get((partner as any).account_id) || "Your agent";
+    const voice = voiceByAccount.get((partner as any).account_id);
+    const intro = voice?.email_recap_intro
+      ? renderVoice(voice.email_recap_intro, {
+          partner: partner.name,
+          month: monthLabel,
+          agent: agentName,
+        })
+      : null;
 
     await sendEmail({
       kind: "monthly_summary",
@@ -122,7 +136,8 @@ export async function GET(req: NextRequest) {
         agentName,
         monthLabel,
         { referred: referredThisMonth, bound: boundThisMonth, inProgress, allTimeBound },
-        `${appUrl()}/p/${partner.token}`
+        `${appUrl()}/p/${partner.token}`,
+        intro
       ),
     });
     sent++;
@@ -161,11 +176,20 @@ export async function GET(req: NextRequest) {
       .limit(1);
     if (existing && existing.length > 0) continue;
 
+    const voice = voiceByAccount.get((partner as any).account_id);
     await sendEmail({
       kind: "thank_you",
       to: partner.emails,
       subject,
-      html: thankYouEmail(partner.name, agentName, periodLabel),
+      html: voice?.email_thankyou
+        ? plainBodyEmail(
+            renderVoice(voice.email_thankyou, {
+              partner: partner.name,
+              period: periodLabel,
+              agent: agentName,
+            })
+          )
+        : thankYouEmail(partner.name, agentName, periodLabel),
     });
     thanked++;
   }

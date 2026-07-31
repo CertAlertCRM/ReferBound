@@ -189,6 +189,10 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- Personalized notification voice (see migration_27)
+alter table agent_profile add column if not exists voice_notes text;
+alter table agent_profile add column if not exists notify_templates jsonb;
+
 -- Directed team invites to existing accounts (see migration_24)
 alter table team_invites add column if not exists invited_email text;
 create index if not exists idx_team_invites_email on team_invites(invited_email);

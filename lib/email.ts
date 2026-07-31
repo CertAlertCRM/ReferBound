@@ -233,10 +233,14 @@ export function monthlySummaryEmail(
   agentName: string,
   monthLabel: string,
   stats: { referred: number; bound: number; inProgress: number; allTimeBound: number },
-  portalUrl: string
+  portalUrl: string,
+  // "Your voice": the agent's own opening line replaces nothing — it sits
+  // above the stats so the numbers stay structured while the words stay theirs.
+  intro?: string | null
 ) {
   return wrap(`
     <h2 style="margin:0 0 12px">${monthLabel} — your referrals with ${esc(agentName)}</h2>
+    ${intro ? `<p style="font-size:15px">${esc(intro)}</p>` : ""}
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
       <tr>
         <td style="padding:12px;text-align:center;background:#eef4ff;border-radius:8px">

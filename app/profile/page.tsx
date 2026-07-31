@@ -5,6 +5,7 @@ import { TopNav } from "../components";
 import { formatPhoneInput } from "@/lib/format";
 import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX } from "../icons";
 import { THEMES } from "@/lib/themes";
+import { TEMPLATE_META, type NotifyTemplates } from "@/lib/voice";
 
 type Team = {
   role: "owner" | "member";
@@ -54,6 +55,15 @@ export default function ProfilePage() {
 
   const [theme, setTheme] = useState("default");
   const [themeSaving, setThemeSaving] = useState(false);
+  // "Your voice" — personalized notification wording
+  const [voiceNotes, setVoiceNotes] = useState("");
+  const [voiceTemplates, setVoiceTemplates] = useState<NotifyTemplates | null>(null);
+  const [voiceStock, setVoiceStock] = useState<NotifyTemplates>({});
+  const [voiceActive, setVoiceActive] = useState(false); // saved templates exist
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceLearning, setVoiceLearning] = useState(false);
+  const [voiceSaving, setVoiceSaving] = useState(false);
+  const [voiceMsg, setVoiceMsg] = useState("");
 
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const webhookDirty = webhook.trim() !== webhookBaseline.trim();
@@ -89,7 +99,68 @@ export default function ProfilePage() {
       }
     });
     loadTeam();
+    fetch("/api/voice").then(async (r) => {
+      if (!r.ok) return;
+      const d = await r.json();
+      setVoiceStock(d.stock ?? {});
+      if (d.templates) {
+        setVoiceTemplates(d.templates);
+        setVoiceNotes(d.voiceNotes ?? "");
+        setVoiceActive(true);
+      }
+    });
   }, []);
+
+  async function learnVoice() {
+    setVoiceLearning(true);
+    setVoiceMsg("");
+    const r = await fetch("/api/voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "learn" }),
+    });
+    setVoiceLearning(false);
+    if (r.ok) {
+      const d = await r.json();
+      setVoiceTemplates(d.templates);
+      setVoiceNotes(d.voiceNotes ?? "");
+      setVoiceOpen(true);
+      setVoiceMsg(
+        d.sampleCount > 0
+          ? `Drafted from ${d.sampleCount} of your real partner messages — edit anything, then save.`
+          : "No portal messages to learn from yet, so these start warm-by-default — make them yours and save."
+      );
+    } else setVoiceMsg((await r.json()).error ?? "Couldn't draft — try again.");
+  }
+
+  async function saveVoice() {
+    setVoiceSaving(true);
+    setVoiceMsg("");
+    const r = await fetch("/api/voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", voiceNotes, templates: voiceTemplates }),
+    });
+    setVoiceSaving(false);
+    if (r.ok) {
+      setVoiceActive(true);
+      setVoiceMsg("Saved — your notifications now go out in your voice.");
+    } else setVoiceMsg((await r.json()).error ?? "Couldn't save");
+  }
+
+  async function resetVoice() {
+    if (!confirm("Go back to ReferBound's stock wording for all notifications?")) return;
+    await fetch("/api/voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reset" }),
+    });
+    setVoiceTemplates(null);
+    setVoiceNotes("");
+    setVoiceActive(false);
+    setVoiceOpen(false);
+    setVoiceMsg("");
+  }
 
   async function loadTeam() {
     const r = await fetch("/api/team");
@@ -376,6 +447,76 @@ export default function ProfilePage() {
                   Any photo works — we center, crop, and resize it for you automatically.
                 </p>
               </div>
+            </section>
+
+            <section className="card p-6">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <h2 className="font-semibold">
+                    Your voice{" "}
+                    {voiceActive && <span className="badge bg-emerald-50 text-emerald-700 ml-1">active</span>}
+                  </h2>
+                  <p className="text-sm text-ink-secondary mt-1">
+                    The quote-ready and docs-ready emails and texts your partners get can sound
+                    like <em>you</em>, not like software. ReferBound reads your real messages to
+                    partners, drafts each notification in your voice, and you approve before
+                    anything changes.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <button type="button" className="btn-primary !py-2 text-xs" onClick={learnVoice} disabled={voiceLearning}>
+                  {voiceLearning ? "Reading your messages…" : voiceActive ? "Re-learn my voice" : "✨ Learn my voice"}
+                </button>
+                {(voiceTemplates || voiceActive) && (
+                  <button type="button" className="btn-ghost !py-2 text-xs" onClick={() => setVoiceOpen(!voiceOpen)}>
+                    {voiceOpen ? "Hide templates" : "View / edit templates"}
+                  </button>
+                )}
+                {voiceActive && (
+                  <button type="button" className="btn-ghost !py-2 text-xs" onClick={resetVoice}>
+                    Reset to stock
+                  </button>
+                )}
+              </div>
+              {voiceMsg && <p className="text-xs text-brand-800 mt-2">{voiceMsg}</p>}
+              {voiceOpen && voiceTemplates && (
+                <div className="mt-4 space-y-4">
+                  <label className="block">
+                    <span className="section-label">How you write (AI&apos;s read on your tone — edit freely)</span>
+                    <textarea
+                      className="input mt-1.5 !h-16 text-sm resize-y"
+                      value={voiceNotes}
+                      onChange={(e) => setVoiceNotes(e.target.value)}
+                      placeholder="e.g. Short and upbeat, first names, no jargon…"
+                    />
+                  </label>
+                  {(Object.keys(TEMPLATE_META) as (keyof NotifyTemplates)[]).map((key) => (
+                    <label key={key} className="block">
+                      <span className="section-label">{TEMPLATE_META[key].label}</span>
+                      <span className="text-[11px] text-ink-muted block">{TEMPLATE_META[key].hint}</span>
+                      <textarea
+                        className="input mt-1.5 !h-20 text-sm resize-y"
+                        value={voiceTemplates[key] ?? voiceStock[key] ?? ""}
+                        onChange={(e) => setVoiceTemplates({ ...voiceTemplates, [key]: e.target.value })}
+                      />
+                    </label>
+                  ))}
+                  <p className="text-[11px] text-ink-muted">
+                    Placeholders fill automatically: <code>{"{{client}}"}</code> client name ·{" "}
+                    <code>{"{{partner}}"}</code> partner company · <code>{"{{first}}"}</code>{" "}
+                    recipient&apos;s first name · <code>{"{{link}}"}</code> portal link ·{" "}
+                    <code>{"{{docs}}"}</code> document list (docs email) · <code>{"{{month}}"}</code>{" "}
+                    &amp; <code>{"{{agent}}"}</code> (recap) · <code>{"{{period}}"}</code>{" "}
+                    (thank-you). Deal notifications need <code>{"{{client}}"}</code> and{" "}
+                    <code>{"{{link}}"}</code>; texts keep &ldquo;Reply STOP to opt out&rdquo;; the
+                    thank-you stays metric-free.
+                  </p>
+                  <button type="button" className="btn-primary !py-2 text-xs" onClick={saveVoice} disabled={voiceSaving}>
+                    {voiceSaving ? "Saving…" : "Save my voice"}
+                  </button>
+                </div>
+              )}
             </section>
 
             <section className="card p-6">
