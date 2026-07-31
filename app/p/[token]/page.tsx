@@ -35,6 +35,11 @@ export async function generateMetadata({ params }: { params: { token: string } }
     .maybeSingle();
   return {
     title: partner ? `${partner.name} — Live Referral Portal` : "Referral Portal",
+    // Each portal is its own installable app: the per-portal manifest names it
+    // after the partnership and opens straight to this page — never the agent
+    // login. iOS Add-to-Home-Screen saves the current URL, so it works there too.
+    manifest: `/api/p/${slug}/manifest`,
+    appleWebApp: { capable: true, title: partner?.name ?? "Referrals", statusBarStyle: "default" as const },
   };
 }
 
@@ -67,17 +72,6 @@ function Progress({ status }: { status: string }) {
       ))}
     </div>
   );
-}
-
-// Each portal is its own installable app: the per-portal manifest names it
-// after the partnership and opens straight to this page — never the agent
-// login. iOS Add-to-Home-Screen saves the current URL, so it works there too.
-export function generateMetadata({ params }: { params: { token: string } }) {
-  const slug = params.token.replace(/[^a-zA-Z0-9]/g, "");
-  return {
-    manifest: `/api/p/${slug}/manifest`,
-    appleWebApp: { capable: true, title: "Referrals", statusBarStyle: "default" as const },
-  };
 }
 
 export default async function PartnerPortal({ params }: { params: { token: string } }) {
