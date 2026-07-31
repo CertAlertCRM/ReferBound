@@ -575,6 +575,7 @@ export default function ProfilePage() {
                     }
                   }}
                   className="flex gap-3 overflow-x-auto no-scrollbar pb-1 px-9"
+                >
                   {Object.entries(THEMES).map(([key, t]) => (
                     <button
                       key={key}
