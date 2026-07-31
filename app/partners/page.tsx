@@ -7,6 +7,7 @@ import { PARTNER_TYPES } from "@/lib/config";
 import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash, IconMessage } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
 import { ReferralRadar } from "../referral-radar";
+import { prepareLogo, sharpnessNote } from "@/lib/image";
 
 type Partner = {
   id: string;
@@ -235,15 +236,24 @@ export default function PartnersPage() {
     } else alert((await res.json()).error ?? "Failed to delete");
   }
 
+  const [logoNote, setLogoNote] = useState("");
+
   async function uploadLogo(p: Partner, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch(`/api/partners/${p.id}/logo`, { method: "POST", body: fd });
     e.target.value = "";
-    if (res.ok) load();
-    else alert((await res.json()).error ?? "Upload failed");
+    setLogoNote("");
+    // Sized for the portal's hero chip at retina density, transparency kept,
+    // never enlarged — see lib/image.
+    const prepared = await prepareLogo(file);
+    const fd = new FormData();
+    fd.append("file", prepared.file);
+    const res = await fetch(`/api/partners/${p.id}/logo`, { method: "POST", body: fd });
+    if (res.ok) {
+      load();
+      const note = sharpnessNote(prepared);
+      if (note) setLogoNote(note);
+    } else alert((await res.json()).error ?? "Upload failed");
   }
 
   function startEdit(p: Partner) {
@@ -282,6 +292,12 @@ export default function PartnersPage() {
             Each partner gets a private magic link — their live window into every referral they&apos;ve sent you.
           </p>
         </div>
+
+        {logoNote && (
+          <div className="card px-4 py-2.5 border-amber-300 bg-amber-100">
+            <p className="text-xs text-ink">{logoNote}</p>
+          </div>
+        )}
 
         <ReferralRadar onConvert={fromProspect} />
 
@@ -400,7 +416,12 @@ export default function PartnersPage() {
                           Add logo
                         </span>
                       )}
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        onChange={(e) => uploadLogo(p, e)}
+                      />
                     </label>
                     <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label className="block sm:col-span-2">
@@ -528,7 +549,12 @@ export default function PartnersPage() {
                           logo
                         </span>
                       )}
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadLogo(p, e)} />
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        onChange={(e) => uploadLogo(p, e)}
+                      />
                     </label>
                     <Link href={`/partner/${p.id}`} className="block group/name min-w-0">
                       <p className="font-semibold group-hover/name:text-brand transition-colors">

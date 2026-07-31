@@ -7,6 +7,7 @@ import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX, IconArrow
 import { THEMES } from "@/lib/themes";
 import { TEMPLATE_META, type NotifyTemplates } from "@/lib/voice";
 import { RETENTION_CHOICES } from "@/lib/config";
+import { prepareHeadshot } from "@/lib/image";
 
 type Team = {
   role: "owner" | "member";
@@ -350,46 +351,29 @@ export default function ProfilePage() {
     }
   }
 
-  // Any photo works: we center-crop to a square and shrink it right here in
-  // the browser, so huge phone photos and odd aspect ratios never error out.
-  async function toSquareJpeg(file: File): Promise<Blob | null> {
-    try {
-      let bmp: ImageBitmap;
-      try {
-        bmp = await createImageBitmap(file, { imageOrientation: "from-image" } as any);
-      } catch {
-        bmp = await createImageBitmap(file);
-      }
-      const side = Math.min(bmp.width, bmp.height);
-      const out = Math.min(side, 640);
-      const canvas = document.createElement("canvas");
-      canvas.width = out;
-      canvas.height = out;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return null;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
-      return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
-    } catch {
-      return null; // format the browser can't decode — upload the original instead
-    }
-  }
+  // Any photo works: centered, cropped square, and sized for retina before it
+  // ever leaves the browser. See lib/image for why it steps down in halves.
+  const [photoNote, setPhotoNote] = useState("");
 
   async function uploadHeadshot(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const processed = await toSquareJpeg(file);
+    setPhotoNote("");
+    const prepared = await prepareHeadshot(file);
     const fd = new FormData();
-    fd.append(
-      "file",
-      processed ? new File([processed], "headshot.jpg", { type: "image/jpeg" }) : file
-    );
+    fd.append("file", prepared.file);
     const res = await fetch("/api/profile/headshot", { method: "POST", body: fd });
     setUploading(false);
     e.target.value = "";
-    if (res.ok) setHeadshotUrl((await res.json()).headshotUrl);
-    else alert((await res.json()).error ?? "Upload failed");
+    if (res.ok) {
+      setHeadshotUrl((await res.json()).headshotUrl);
+      if (prepared.lowRes) {
+        setPhotoNote(
+          `Uploaded — though that photo is only ${prepared.sourceWidth}px wide, so it may look soft at full size. A larger one will look sharper on your partners' portals.`
+        );
+      }
+    } else alert((await res.json()).error ?? "Upload failed");
   }
 
   const field = (
@@ -458,8 +442,9 @@ export default function ProfilePage() {
                   />
                 </label>
                 <p className="text-xs text-ink-muted mt-2">
-                  Any photo works — we center, crop, and resize it for you automatically.
+                  Any photo works — we center, crop, and sharpen it for you automatically.
                 </p>
+                {photoNote && <p className="text-xs text-amber-700 mt-1 max-w-xs">{photoNote}</p>}
               </div>
             </section>
 

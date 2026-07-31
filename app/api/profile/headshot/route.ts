@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   const { error: upErr } = await db()
     .storage.from(DOCS_BUCKET)
-    .upload(path, buf, { contentType: file.type });
+    .upload(path, buf, { contentType: file.type, cacheControl: "31536000" });
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
   const { data: existing } = await db()

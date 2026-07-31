@@ -20,8 +20,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!file.type.startsWith("image/")) {
     return NextResponse.json({ error: "logo must be an image" }, { status: 400 });
   }
-  if (file.size > 2 * 1024 * 1024) {
-    return NextResponse.json({ error: "image too large (2MB max)" }, { status: 400 });
+  // The browser resizes before upload (lib/image), so anything arriving this
+  // large is a passthrough case — a vector file or a format we couldn't decode.
+  if (file.size > 8 * 1024 * 1024) {
+    return NextResponse.json({ error: "image too large (8MB max)" }, { status: 400 });
   }
 
   const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { error: upErr } = await db()
     .storage.from(DOCS_BUCKET)
-    .upload(path, buf, { contentType: file.type });
+    .upload(path, buf, { contentType: file.type, cacheControl: "31536000" });
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
   const { error } = await db().from("partners").update({ logo_path: path }).eq("id", params.id);

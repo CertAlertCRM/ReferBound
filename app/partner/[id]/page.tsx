@@ -19,6 +19,7 @@ import {
 } from "../../icons";
 import { PartnerInviteButton } from "../../partner-invite";
 import { LeadPrefillBox } from "../../lead-prefill";
+import { prepareLogo, sharpnessNote } from "@/lib/image";
 
 // The partner workspace: one partner, all their leads, bulk actions, and a
 // log-lead form already pointed at them. Reached by clicking a partner on the
@@ -231,15 +232,22 @@ export default function PartnerWorkspacePage() {
     } else alert((await res.json()).error ?? "Failed to save");
   }
 
+  const [logoNote, setLogoNote] = useState("");
+
   async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch(`/api/partners/${id}/logo`, { method: "POST", body: fd });
     e.target.value = "";
-    if (res.ok) load();
-    else alert((await res.json()).error ?? "Upload failed");
+    setLogoNote("");
+    const prepared = await prepareLogo(file);
+    const fd = new FormData();
+    fd.append("file", prepared.file);
+    const res = await fetch(`/api/partners/${id}/logo`, { method: "POST", body: fd });
+    if (res.ok) {
+      load();
+      const note = sharpnessNote(prepared);
+      if (note) setLogoNote(note);
+    } else alert((await res.json()).error ?? "Upload failed");
   }
 
   async function addContact() {
@@ -431,6 +439,12 @@ export default function PartnerWorkspacePage() {
           <div className="card p-10 text-center text-ink-muted">Loading…</div>
         ) : (
           <>
+            {logoNote && (
+              <div className="card px-4 py-2.5 border-amber-300 bg-amber-100">
+                <p className="text-xs text-ink">{logoNote}</p>
+              </div>
+            )}
+
             {/* Partner header — edits happen right here, in place */}
             <header className="card p-5 sm:p-6">
               {editing ? (
@@ -458,7 +472,12 @@ export default function PartnerWorkspacePage() {
                           Add logo
                         </span>
                       )}
-                      <input type="file" className="hidden" accept="image/*" onChange={uploadLogo} />
+                      <input
+                      type="file"
+                      className="hidden"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      onChange={uploadLogo}
+                    />
                     </label>
                     <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label className="block sm:col-span-2">
@@ -742,7 +761,12 @@ export default function PartnerWorkspacePage() {
                         logo
                       </span>
                     )}
-                    <input type="file" className="hidden" accept="image/*" onChange={uploadLogo} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      onChange={uploadLogo}
+                    />
                   </label>
                   <div className="min-w-0">
                     <h1 className="text-xl font-bold tracking-tight truncate">
