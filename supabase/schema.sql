@@ -183,6 +183,12 @@ alter table partner_contacts add column if not exists notify_channel text not nu
 -- Custom partner-type label for "Other" (see migration_23)
 alter table partners add column if not exists type_label text;
 
+-- Per-agent portal theme (see migration_25)
+alter table agent_profile add column if not exists brand_color text not null default 'default';
+
+-- Optional portal speed scorecard (see migration_26)
+alter table agent_profile add column if not exists show_scorecard boolean not null default true;
+
 -- Directed team invites to existing accounts (see migration_24)
 alter table team_invites add column if not exists invited_email text;
 create index if not exists idx_team_invites_email on team_invites(invited_email);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { getAccount } from "@/lib/account";
+import { THEMES } from "@/lib/themes";
 
 // Agent-only (protected by middleware): read/update the agent's profile.
 
@@ -43,6 +44,10 @@ export async function PUT(req: NextRequest) {
     if (f in body) row[f] = String(body[f] ?? "").trim() || null;
   }
   if ("sms_new_lead" in body) row.sms_new_lead = Boolean(body.sms_new_lead);
+  if ("show_scorecard" in body) row.show_scorecard = Boolean(body.show_scorecard);
+  if ("brand_color" in body && THEMES[String(body.brand_color)]) {
+    row.brand_color = String(body.brand_color);
+  }
 
   const { data, error } = await db().from("agent_profile").upsert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

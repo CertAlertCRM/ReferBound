@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { currentAccountId } from "@/lib/auth";
 import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil, timeAgo } from "@/lib/helpers";
+import { themeStyle } from "@/lib/themes";
 import { ShareCard } from "./share-card";
 import { HubCard } from "./hub-card";
 import { FeedbackWidget } from "../../feedback-widget";
@@ -181,14 +182,17 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const avgQuote = fmtHours(quoteHours);
   const avgBind = fmtHours(bindHours);
   const onTimeRate = onTimeTotal > 0 ? Math.round((onTime / onTimeTotal) * 100) : null;
-  const showSpeed = avgQuote !== null || avgBind !== null;
 
   // Prefer the agent's saved profile for partner-facing names; fall back to env config.
   const { data: prof } = await db()
     .from("agent_profile")
-    .select("display_name, agency_name, phone, email, headshot_path")
+    .select("display_name, agency_name, phone, email, headshot_path, brand_color, show_scorecard")
     .eq("account_id", (partner as any).account_id)
     .maybeSingle();
+  // Agent's choice: new/busy agents can keep speed stats off their portals
+  // until the numbers tell a story they want told.
+  const showSpeed =
+    (prof as any)?.show_scorecard !== false && (avgQuote !== null || avgBind !== null);
   // Per-account only — never fall back to env branding, which belongs to the
   // founding agency and must not leak onto other accounts' portals.
   const agentName = prof?.display_name || "your agent";
@@ -226,7 +230,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const closedRefs = refs.filter(isClosedRef);
 
   return (
-    <main className="pb-2">
+    <main className="pb-2" style={themeStyle((prof as any)?.brand_color)}>
       <AutoRefresh />
 
       {/* Full-bleed co-branded hero — this band owns the top of the viewport */}
@@ -236,7 +240,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(55% 90% at 85% 0%, rgba(96,138,250,0.45), transparent 65%), radial-gradient(45% 70% at 5% 100%, rgba(16,185,129,0.16), transparent 60%)",
+              "radial-gradient(55% 90% at 85% 0%, rgb(var(--brand-400) / 0.45), transparent 65%), radial-gradient(45% 70% at 5% 100%, rgba(16,185,129,0.16), transparent 60%)",
           }}
         />
         <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-16 sm:pb-20">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { STATUS_LABELS, STATUSES } from "@/lib/config";
+import { THEMES } from "@/lib/themes";
 import { IconAlert, IconMenu, IconX } from "./icons";
 import { FeedbackWidget } from "./feedback-widget";
 
@@ -85,6 +86,29 @@ export function TopNav({
     fetch("/api/admin/summary?ping=1").then((r) => setIsAdmin(r.ok)).catch(() => {});
     const m = document.cookie.match(/(?:^|;\s*)rb_support_view=([^;]+)/);
     setSupportView(m ? decodeURIComponent(m[1]) : null);
+
+    // Theme: apply the cached palette instantly (no flash), then confirm from
+    // the profile. Palettes live in lib/themes.ts.
+    const apply = (key: string | null) => {
+      const t = THEMES[key ?? ""];
+      const root = document.documentElement;
+      if (t) for (const [k, v] of Object.entries(t.vars)) root.style.setProperty(k, v);
+      else Object.keys(THEMES.default.vars).forEach((k) => root.style.removeProperty(k));
+    };
+    try {
+      apply(window.localStorage.getItem("rb_theme"));
+    } catch {}
+    fetch("/api/profile")
+      .then(async (r) => {
+        if (!r.ok) return;
+        const { profile } = await r.json();
+        const key = profile?.brand_color ?? "default";
+        apply(key);
+        try {
+          window.localStorage.setItem("rb_theme", key);
+        } catch {}
+      })
+      .catch(() => {});
   }, []);
 
   async function exitSupportView() {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { formatPhoneInput } from "@/lib/format";
 import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX } from "../icons";
+import { THEMES } from "@/lib/themes";
 
 type Team = {
   role: "owner" | "member";
@@ -25,9 +26,10 @@ type Profile = {
   email: string | null;
   google_review_url: string | null;
   sms_new_lead: boolean;
+  show_scorecard: boolean;
 };
 
-const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false };
+const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true };
 
 export default function ProfilePage() {
   const [form, setForm] = useState<Profile>(EMPTY);
@@ -50,6 +52,9 @@ export default function ProfilePage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  const [theme, setTheme] = useState("default");
+  const [themeSaving, setThemeSaving] = useState(false);
+
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const webhookDirty = webhook.trim() !== webhookBaseline.trim();
 
@@ -66,9 +71,11 @@ export default function ProfilePage() {
             email: profile.email ?? "",
             google_review_url: profile.google_review_url ?? "",
             sms_new_lead: Boolean(profile.sms_new_lead),
+            show_scorecard: profile.show_scorecard !== false,
           };
           setForm(loaded);
           setBaseline(loaded);
+          setTheme(profile.brand_color ?? "default");
         }
         setHeadshotUrl(headshotUrl);
       }
@@ -237,6 +244,31 @@ export default function ProfilePage() {
     }
   }
 
+  // Pick a theme: saves immediately and recolors the app on the spot. The
+  // same palette flows to every partner portal this account owns.
+  async function pickTheme(key: string) {
+    const prev = theme;
+    setTheme(key);
+    setThemeSaving(true);
+    const t = THEMES[key];
+    if (t) {
+      for (const [k, v] of Object.entries(t.vars)) document.documentElement.style.setProperty(k, v);
+      try {
+        window.localStorage.setItem("rb_theme", key);
+      } catch {}
+    }
+    const res = await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brand_color: key }),
+    });
+    setThemeSaving(false);
+    if (!res.ok) {
+      setTheme(prev);
+      alert("Couldn't save the color — try again");
+    }
+  }
+
   // Any photo works: we center-crop to a square and shrink it right here in
   // the browser, so huge phone photos and odd aspect ratios never error out.
   async function toSquareJpeg(file: File): Promise<Blob | null> {
@@ -279,7 +311,7 @@ export default function ProfilePage() {
     else alert((await res.json()).error ?? "Upload failed");
   }
 
-  const field = (key: Exclude<keyof Profile, "sms_new_lead">, label: string, placeholder: string) => {
+  const field = (key: Exclude<keyof Profile, "sms_new_lead" | "show_scorecard">, label: string, placeholder: string) => {
     const isPhone = key === "phone";
     const isEmail = key === "email";
     const isOffice = key === "office";
@@ -346,6 +378,42 @@ export default function ProfilePage() {
               </div>
             </section>
 
+            <section className="card p-6">
+              <h2 className="font-semibold">Portal colors</h2>
+              <p className="text-sm text-ink-secondary mt-1">
+                Your brand color across the app and every partner portal you share. Changes apply
+                the moment you pick — your partners see it on their next visit.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-4">
+                {Object.entries(THEMES).map(([key, t]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => pickTheme(key)}
+                    disabled={themeSaving}
+                    className="flex flex-col items-center gap-1.5 group"
+                    title={t.label}
+                  >
+                    <span
+                      className={`w-10 h-10 rounded-full border-2 transition-all group-hover:scale-110 ${
+                        theme === key ? "border-ink ring-2 ring-offset-2 ring-slate-400" : "border-white shadow-card"
+                      }`}
+                      style={{ backgroundColor: t.swatch }}
+                    >
+                      {theme === key && (
+                        <span className="w-full h-full flex items-center justify-center text-white">
+                          <IconCheck size={16} />
+                        </span>
+                      )}
+                    </span>
+                    <span className={`text-[11px] ${theme === key ? "font-semibold text-ink" : "text-ink-muted"}`}>
+                      {t.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <form onSubmit={save} className="card p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {field("display_name", "Your name", "David Falden")}
@@ -383,6 +451,22 @@ export default function ProfilePage() {
                   <span className="text-xs text-ink-muted">
                     Uses the phone number above. The one moment worth a buzz — a partner just sent
                     you business.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-brand"
+                  checked={form.show_scorecard}
+                  onChange={(e) => setForm({ ...form, show_scorecard: e.target.checked })}
+                />
+                <span>
+                  <span className="text-sm font-medium block">Show my speed scorecard on partner portals</span>
+                  <span className="text-xs text-ink-muted">
+                    The &ldquo;avg to quote · avg to bound · ready by closing&rdquo; strip partners
+                    see. Turn it off while you&apos;re new or slammed — turn it back on when the
+                    numbers make you look as good as you are.
                   </span>
                 </span>
               </label>

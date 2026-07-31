@@ -5,20 +5,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Brand colors read from CSS variables (RGB triplets, defaults in
+        // globals.css) so agents can theme their app + partner portals.
+        // Palettes live in lib/themes.ts.
         brand: {
-          50: "#eef4ff",
-          100: "#dbe6fe",
-          200: "#bfd3fe",
-          300: "#93b4fd",
-          400: "#608afa",
-          500: "#3b63f6",
-          600: "#2547eb",
-          700: "#1d36d8",
-          800: "#1e2faf",
-          900: "#1e2c8a",
-          DEFAULT: "#2547eb",
-          dark: "#1d36d8",
-          light: "#eef4ff",
+          50: "rgb(var(--brand-50) / <alpha-value>)",
+          100: "rgb(var(--brand-100) / <alpha-value>)",
+          200: "rgb(var(--brand-200) / <alpha-value>)",
+          300: "rgb(var(--brand-300) / <alpha-value>)",
+          400: "rgb(var(--brand-400) / <alpha-value>)",
+          500: "rgb(var(--brand-500) / <alpha-value>)",
+          600: "rgb(var(--brand-600) / <alpha-value>)",
+          700: "rgb(var(--brand-700) / <alpha-value>)",
+          800: "rgb(var(--brand-800) / <alpha-value>)",
+          900: "rgb(var(--brand-900) / <alpha-value>)",
+          DEFAULT: "rgb(var(--brand-600) / <alpha-value>)",
+          dark: "rgb(var(--brand-700) / <alpha-value>)",
+          light: "rgb(var(--brand-50) / <alpha-value>)",
         },
         ink: {
           // Contrast-safe greys: secondary reads as body text (slate-700),

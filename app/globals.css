@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Default theme (ReferBound Blue) as RGB triplets — overridden per account
+     by the theme loader (agent app) or the portal's inline style wrapper.
+     Full palettes live in lib/themes.ts. */
+  --brand-50: 238 244 255;
+  --brand-100: 219 230 254;
+  --brand-200: 191 211 254;
+  --brand-300: 147 180 253;
+  --brand-400: 96 138 250;
+  --brand-500: 59 99 246;
+  --brand-600: 37 71 235;
+  --brand-700: 29 54 216;
+  --brand-800: 30 47 175;
+  --brand-900: 30 44 138;
+}
+
 body {
   /* slate-200 background — decisively darker than the white cards, so every
      card reads as a raised surface even on washed-out office monitors. */
@@ -10,9 +26,9 @@ body {
      and a barely-there dot grid that only shows in the open space between
      cards. Fixed attachment so the ambience doesn't scroll away. */
   background-image:
-    radial-gradient(90% 42% at 50% 0%, rgba(37, 71, 235, 0.06), transparent 70%),
+    radial-gradient(90% 42% at 50% 0%, rgb(var(--brand-600) / 0.06), transparent 70%),
     radial-gradient(42% 34% at 92% 12%, rgba(16, 185, 129, 0.04), transparent 70%),
-    radial-gradient(46% 34% at 4% 92%, rgba(37, 71, 235, 0.04), transparent 70%),
+    radial-gradient(46% 34% at 4% 92%, rgb(var(--brand-600) / 0.04), transparent 70%),
     radial-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1.2px);
   background-size: 100% 100%, 100% 100%, 100% 100%, 24px 24px;
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
