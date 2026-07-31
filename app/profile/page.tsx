@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TopNav } from "../components";
 import { formatPhoneInput } from "@/lib/format";
-import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX } from "../icons";
+import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX, IconArrowLeft, IconArrowRight } from "../icons";
 import { THEMES } from "@/lib/themes";
 import { TEMPLATE_META, type NotifyTemplates } from "@/lib/voice";
 import { RETENTION_CHOICES } from "@/lib/config";
@@ -58,6 +58,11 @@ export default function ProfilePage() {
 
   const [theme, setTheme] = useState("default");
   const [themeSaving, setThemeSaving] = useState(false);
+  // Color strip: arrows for mouse users (a vertical wheel won't scroll a
+  // horizontal container), swipe for touch.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const nudgeStrip = (dir: 1 | -1) =>
+    stripRef.current?.scrollBy({ left: dir * 220, behavior: "smooth" });
   // "Your voice" — personalized notification wording
   const [voiceNotes, setVoiceNotes] = useState("");
   const [voiceTemplates, setVoiceTemplates] = useState<NotifyTemplates | null>(null);
@@ -537,14 +542,46 @@ export default function ProfilePage() {
               {/* One line, swipe/scroll for the rest — a paint strip, not a
                   grid that pushes the page around. */}
               <div className="relative mt-4">
-                <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1 pr-8">
+                <button
+                  type="button"
+                  aria-label="Previous colors"
+                  onClick={() => nudgeStrip(-1)}
+                  className="absolute left-0 top-4 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-300 shadow-card flex items-center justify-center text-ink-secondary hover:text-ink hover:border-slate-400 transition-colors"
+                >
+                  <IconArrowLeft size={13} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="More colors"
+                  onClick={() => nudgeStrip(1)}
+                  className="absolute right-0 top-4 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-300 shadow-card flex items-center justify-center text-ink-secondary hover:text-ink hover:border-slate-400 transition-colors"
+                >
+                  <IconArrowRight size={13} />
+                </button>
+                <div
+                  ref={stripRef}
+                  onWheel={(e) => {
+                    // Translate a vertical wheel into horizontal movement, but
+                    // only while there's somewhere to go — otherwise the page
+                    // should keep scrolling normally.
+                    const el = stripRef.current;
+                    if (!el || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                    const max = el.scrollWidth - el.clientWidth;
+                    if (max <= 0) return;
+                    const next = el.scrollLeft + e.deltaY;
+                    if (next > 0 && next < max) {
+                      e.preventDefault();
+                      el.scrollLeft = next;
+                    }
+                  }}
+                  className="flex gap-3 overflow-x-auto no-scrollbar pb-1 px-9"
                   {Object.entries(THEMES).map(([key, t]) => (
                     <button
                       key={key}
                       type="button"
                       onClick={() => pickTheme(key)}
                       disabled={themeSaving}
-                      className="flex flex-col items-center gap-1.5 group shrink-0 snap-start w-[62px]"
+                      className="flex flex-col items-center gap-1.5 group shrink-0 w-[62px]"
                       title={t.label}
                     >
                       <span
@@ -569,14 +606,18 @@ export default function ProfilePage() {
                     </button>
                   ))}
                 </div>
-                {/* Fade hints that the strip keeps going */}
+                {/* Fades under the arrows so the strip reads as continuing */}
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-white to-transparent"
+                  className="pointer-events-none absolute left-7 top-0 bottom-1 w-6 bg-gradient-to-r from-white to-transparent"
+                />
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute right-7 top-0 bottom-1 w-6 bg-gradient-to-l from-white to-transparent"
                 />
               </div>
               <p className="text-[11px] text-ink-muted mt-1">
-                {Object.keys(THEMES).length} colors — swipe or scroll for more.
+                {Object.keys(THEMES).length} colors — use the arrows, or swipe on your phone.
               </p>
             </section>
 
