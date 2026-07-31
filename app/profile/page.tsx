@@ -534,34 +534,50 @@ export default function ProfilePage() {
                 Your brand color across the app and every partner portal you share. Changes apply
                 the moment you pick — your partners see it on their next visit.
               </p>
-              <div className="flex flex-wrap gap-3 mt-4">
-                {Object.entries(THEMES).map(([key, t]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => pickTheme(key)}
-                    disabled={themeSaving}
-                    className="flex flex-col items-center gap-1.5 group"
-                    title={t.label}
-                  >
-                    <span
-                      className={`w-10 h-10 rounded-full border-2 transition-all group-hover:scale-110 ${
-                        theme === key ? "border-ink ring-2 ring-offset-2 ring-slate-400" : "border-white shadow-card"
-                      }`}
-                      style={{ backgroundColor: t.swatch }}
+              {/* One line, swipe/scroll for the rest — a paint strip, not a
+                  grid that pushes the page around. */}
+              <div className="relative mt-4">
+                <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1 pr-8">
+                  {Object.entries(THEMES).map(([key, t]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => pickTheme(key)}
+                      disabled={themeSaving}
+                      className="flex flex-col items-center gap-1.5 group shrink-0 snap-start w-[62px]"
+                      title={t.label}
                     >
-                      {theme === key && (
-                        <span className="w-full h-full flex items-center justify-center text-white">
-                          <IconCheck size={16} />
-                        </span>
-                      )}
-                    </span>
-                    <span className={`text-[11px] ${theme === key ? "font-semibold text-ink" : "text-ink-muted"}`}>
-                      {t.label}
-                    </span>
-                  </button>
-                ))}
+                      <span
+                        className={`w-11 h-11 rounded-full border-2 transition-all group-hover:scale-110 ${
+                          theme === key ? "border-ink ring-2 ring-offset-2 ring-slate-400" : "border-white shadow-card"
+                        }`}
+                        style={{ backgroundColor: t.swatch }}
+                      >
+                        {theme === key && (
+                          <span className="w-full h-full flex items-center justify-center text-white">
+                            <IconCheck size={16} />
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={`text-[11px] truncate max-w-full ${
+                          theme === key ? "font-semibold text-ink" : "text-ink-muted"
+                        }`}
+                      >
+                        {t.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {/* Fade hints that the strip keeps going */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-white to-transparent"
+                />
               </div>
+              <p className="text-[11px] text-ink-muted mt-1">
+                {Object.keys(THEMES).length} colors — swipe or scroll for more.
+              </p>
             </section>
 
             <form onSubmit={save} className="card p-6 space-y-4">

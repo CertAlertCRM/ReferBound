@@ -35,6 +35,16 @@ body {
   background-attachment: fixed, fixed, fixed, fixed;
 }
 
+/* Horizontal pickers (portal colors) scroll without a visible scrollbar —
+   the edge fade is the affordance instead. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Room for the fixed mobile bottom tab bar (set by TopNav on agent pages). */
 @media (max-width: 767px) {
   body.has-bottomnav {
