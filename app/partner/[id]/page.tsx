@@ -20,6 +20,8 @@ import {
 import { PartnerInviteButton } from "../../partner-invite";
 import { LeadPrefillBox } from "../../lead-prefill";
 import { prepareLogo, sharpnessNote } from "@/lib/image";
+import { useUI } from "../../ui";
+import { SkeletonPage } from "../../skeleton";
 
 // The partner workspace: one partner, all their leads, bulk actions, and a
 // log-lead form already pointed at them. Reached by clicking a partner on the
@@ -53,6 +55,7 @@ type Referral = {
 };
 
 export default function PartnerWorkspacePage() {
+  const { toast, confirm, prompt } = useUI();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [partner, setPartner] = useState<Partner | null>(null);
@@ -148,6 +151,7 @@ export default function PartnerWorkspacePage() {
   async function copyLink() {
     if (!partner) return;
     await navigator.clipboard.writeText(`${window.location.origin}${portalPath}`);
+    toast("Magic link copied");
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -174,18 +178,18 @@ export default function PartnerWorkspacePage() {
   }
 
   async function deleteOne(r: Referral) {
-    const ok = confirm(
+    const ok = await confirm(
       `Delete ${r.client_name}? Documents, messages, and history for this lead are permanently removed. This can't be undone.`
     );
     if (!ok) return;
     const res = await fetch(`/api/referrals/${r.id}`, { method: "DELETE" });
     if (res.ok) load();
-    else alert((await res.json()).error ?? "Failed to delete");
+    else toast((await res.json()).error ?? "Failed to delete", "error");
   }
 
   async function bulkDelete() {
     if (selected.size === 0) return;
-    const ok = confirm(
+    const ok = await confirm(
       `Remove ${selected.size} lead${selected.size === 1 ? "" : "s"}? Their documents, messages, and history are permanently deleted. This can't be undone.`
     );
     if (!ok) return;
@@ -229,7 +233,7 @@ export default function PartnerWorkspacePage() {
     if (res.ok) {
       setEditing(false);
       load();
-    } else alert((await res.json()).error ?? "Failed to save");
+    } else toast((await res.json()).error ?? "Failed to save", "error");
   }
 
   const [logoNote, setLogoNote] = useState("");
@@ -247,7 +251,7 @@ export default function PartnerWorkspacePage() {
       load();
       const note = sharpnessNote(prepared);
       if (note) setLogoNote(note);
-    } else alert((await res.json()).error ?? "Upload failed");
+    } else toast((await res.json()).error ?? "Upload failed", "error");
   }
 
   async function addContact() {
@@ -267,7 +271,7 @@ export default function PartnerWorkspacePage() {
       setCSms(false);
       const { contact } = await res.json();
       setContacts((c) => [...c, contact]);
-    } else alert((await res.json()).error ?? "Couldn't add contact");
+    } else toast((await res.json()).error ?? "Couldn't add contact", "error");
   }
 
   function openContactEdit(c: (typeof contacts)[number]) {
@@ -290,7 +294,7 @@ export default function PartnerWorkspacePage() {
       const { contact } = await res.json();
       setContacts((cs) => cs.map((x) => (x.id === contact.id ? contact : x)));
       setEcId(null);
-    } else alert((await res.json()).error ?? "Couldn't save");
+    } else toast((await res.json()).error ?? "Couldn't save", "error");
   }
 
   async function textPortalLink(cid: string) {
@@ -304,12 +308,12 @@ export default function PartnerWorkspacePage() {
     if (res.ok) {
       setTextSent(cid);
       setTimeout(() => setTextSent(null), 2500);
-    } else alert((await res.json()).error ?? "Couldn't send the text");
+    } else toast((await res.json()).error ?? "Couldn't send the text", "error");
   }
 
   // One-off: text the link to a number the agent types in (no saved contact).
   async function textLinkToNumber() {
-    const num = prompt("Mobile number to text the portal link to:");
+    const num = await prompt("Mobile number to text the portal link to:");
     if (!num) return;
     setTextBusy("adhoc");
     const res = await fetch(`/api/partners/${id}/text-link`, {
@@ -321,7 +325,7 @@ export default function PartnerWorkspacePage() {
     if (res.ok) {
       setTextSent("adhoc");
       setTimeout(() => setTextSent(null), 2500);
-    } else alert((await res.json()).error ?? "Couldn't send the text");
+    } else toast((await res.json()).error ?? "Couldn't send the text", "error");
   }
 
   async function removeContact(cid: string) {
@@ -331,7 +335,7 @@ export default function PartnerWorkspacePage() {
 
   async function rotateLink() {
     if (!partner) return;
-    const ok = confirm(
+    const ok = await confirm(
       `Rotate ${partner.name}'s magic link? Every link and QR code you've already shared stops working immediately — you'll need to send the new one. Use this if the link got out beyond the team.`
     );
     if (!ok) return;
@@ -339,15 +343,15 @@ export default function PartnerWorkspacePage() {
     if (res.ok) {
       const { short_code } = await res.json();
       await navigator.clipboard.writeText(`${window.location.origin}/p/${short_code}`).catch(() => {});
-      alert("Link rotated — the new link is on your clipboard. Old links are dead.");
+      toast("Link rotated — the new link is on your clipboard. Old links are dead.", "error");
       load();
-    } else alert((await res.json()).error ?? "Couldn't rotate the link");
+    } else toast((await res.json()).error ?? "Couldn't rotate the link", "error");
   }
 
   async function deletePartner() {
     if (!partner) return;
     const n = refs.length;
-    const ok = confirm(
+    const ok = await confirm(
       `Delete ${partner.name}? Their magic link stops working immediately and ${
         n === 0 ? "" : `their ${n} lead${n === 1 ? "" : "s"}, documents, and messages are `
       }permanently removed. This can't be undone.`
@@ -355,7 +359,7 @@ export default function PartnerWorkspacePage() {
     if (!ok) return;
     const res = await fetch(`/api/partners/${id}`, { method: "DELETE" });
     if (res.ok) router.push("/partners");
-    else alert((await res.json()).error ?? "Failed to delete");
+    else toast((await res.json()).error ?? "Failed to delete", "error");
   }
 
   async function addLead(e: React.FormEvent) {
@@ -368,7 +372,7 @@ export default function PartnerWorkspacePage() {
     });
     if (!res.ok) {
       setSaving(false);
-      alert((await res.json()).error ?? "Failed to save");
+      toast((await res.json()).error ?? "Failed to save", "error");
       return;
     }
     const { referral } = await res.json();
@@ -436,7 +440,7 @@ export default function PartnerWorkspacePage() {
         </Link>
 
         {!partner ? (
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <SkeletonPage tiles={4} rows={3} />
         ) : (
           <>
             {logoNote && (
@@ -842,7 +846,7 @@ export default function PartnerWorkspacePage() {
                 </div>
               </div>
               )}
-              <div className="grid grid-cols-4 gap-2.5 mt-4">
+              <div className="grid grid-cols-4 gap-2.5 mt-4 stagger">
                 {[
                   { v: String(stats.total), l: "Referred" },
                   { v: String(stats.active), l: "In progress" },
@@ -857,7 +861,7 @@ export default function PartnerWorkspacePage() {
                   },
                 ].map((s: any) => (
                   <div key={s.l} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-center sm:text-left">
-                    <p className="text-lg font-semibold tracking-tight">{s.v}</p>
+                    <p className="tabnum text-lg font-semibold tracking-tight">{s.v}</p>
                     <p className="text-[11px] text-ink-muted">{s.l}</p>
                     {s.hint && <p className="text-[10px] text-ink-muted">{s.hint}</p>}
                   </div>

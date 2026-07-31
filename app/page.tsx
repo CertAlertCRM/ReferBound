@@ -9,6 +9,7 @@ import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload,
 import { BackfillButton } from "./backfill";
 import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
+import { useUI } from "./ui";
 
 type Referral = {
   id: string;
@@ -64,6 +65,7 @@ function nextStatus(status: string): string | null {
 }
 
 export default function Dashboard() {
+  const { toast, confirm, prompt } = useUI();
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [feed, setFeed] = useState<ActivityItem[]>([]);
@@ -127,7 +129,7 @@ export default function Dashboard() {
     });
     if (!res.ok) {
       setSaving(false);
-      alert((await res.json()).error ?? "Failed to save");
+      toast((await res.json()).error ?? "Failed to save", "error");
       return;
     }
     const { referral } = await res.json();
@@ -149,7 +151,7 @@ export default function Dashboard() {
     const ns = nextStatus(r.status);
     if (!ns) return;
     if (ns === "docs_delivered" && (r.documents?.length ?? 0) === 0) {
-      const ok = confirm(
+      const ok = await confirm(
         "No documents are uploaded yet, but this sends the partner their one “bound + documents ready” email. Open the deal to upload the EOI/RCE first, or continue anyway?"
       );
       if (!ok) return;
@@ -168,7 +170,7 @@ export default function Dashboard() {
   // partner (that conversation deserves a personal touch); it just moves to
   // the Not written section and the portal shows it honestly.
   async function markLost(r: Referral) {
-    const reason = prompt(
+    const reason = await prompt(
       `Mark ${r.client_name} as “Not written”? No email goes to your partner.\n\nOptional reason (shows in your records):`,
       ""
     );
@@ -228,7 +230,7 @@ export default function Dashboard() {
 
         {/* Stat tiles */}
         <div className="flex items-start justify-between gap-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1 stagger">
             {[
               { v: String(inProgress), l: "In progress" },
               { v: String(groups.risk.length), l: "Closing soon", alert: groups.risk.length > 0 },
@@ -246,8 +248,8 @@ export default function Dashboard() {
                 hint: referrals.some((r) => r.backfilled) ? "live business only" : undefined,
               },
             ].map((t: any) => (
-              <div key={t.l} className={`card px-4 py-3 ${t.alert ? "border-red-200" : ""}`}>
-                <p className={`text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
+              <div key={t.l} className={`card card-hover px-4 py-3 ${t.alert ? "border-red-200" : ""}`}>
+                <p className={`tabnum text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
                   {t.v}
                 </p>
                 <p className="text-[11px] text-ink-muted mt-0.5">{t.l}</p>
@@ -675,7 +677,7 @@ function Section({
           return (
             <div
               key={r.id}
-              className={`card p-4 hover:shadow-lift transition-shadow ${highlight ? "border-red-200" : ""}`}
+              className={`card card-hover p-4 ${highlight ? "border-red-200" : ""}`}
             >
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">

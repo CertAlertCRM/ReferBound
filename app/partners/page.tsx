@@ -8,6 +8,7 @@ import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash, Ico
 import { PartnerInviteButton } from "../partner-invite";
 import { ReferralRadar } from "../referral-radar";
 import { prepareLogo, sharpnessNote } from "@/lib/image";
+import { useUI } from "../ui";
 
 type Partner = {
   id: string;
@@ -24,6 +25,7 @@ type Partner = {
 };
 
 export default function PartnersPage() {
+  const { toast, confirm, prompt } = useUI();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [name, setName] = useState("");
   const [emails, setEmails] = useState("");
@@ -148,7 +150,7 @@ export default function PartnersPage() {
     } else {
       const err = await res.json();
       if (err.upgrade) setUpgrade(name.trim() || "your second partner");
-      else alert(err.error ?? "Failed");
+      else toast(err.error ?? "Failed", "error");
     }
   }
 
@@ -156,6 +158,7 @@ export default function PartnersPage() {
     // Prefer the compact short link — same portal, way cleaner in a text.
     await navigator.clipboard.writeText(`${window.location.origin}/p/${p.short_code || p.token}`);
     setCopied(p.id);
+    toast("Magic link copied — paste it into a text or email");
     setTimeout(() => setCopied(null), 1500);
   }
 
@@ -194,12 +197,13 @@ export default function PartnersPage() {
     setTxBusy(null);
     if (res.ok) {
       setTxSent(pid);
+      toast(payload.purpose === "backfill" ? "Asked them to add their active files" : "Portal link sent");
       setTimeout(() => setTxSent(null), 2500);
-    } else alert((await res.json()).error ?? "Couldn't send the text");
+    } else toast((await res.json()).error ?? "Couldn't send the text", "error");
   }
 
-  function txToNumber(pid: string) {
-    const num = prompt("Mobile number to text the portal link to:");
+  async function txToNumber(pid: string) {
+    const num = await prompt("Mobile number to text the portal link to:");
     if (!num) return;
     sendTx(pid, { phone: num });
   }
@@ -217,13 +221,13 @@ export default function PartnersPage() {
     } else {
       const err = await res.json();
       if (err.upgrade) setUpgrade(`${p.name} (copy)`);
-      else alert(err.error ?? "Couldn't duplicate");
+      else toast(err.error ?? "Couldn't duplicate", "error");
     }
   }
 
   async function deletePartner(p: Partner) {
     const n = p.referrals?.[0]?.count ?? 0;
-    const ok = confirm(
+    const ok = await confirm(
       `Delete ${p.name}? Their magic link stops working immediately and ${
         n === 0 ? "" : `their ${n} referral${n === 1 ? "" : "s"}, documents, and messages are `
       }permanently removed. This can't be undone.`
@@ -233,7 +237,7 @@ export default function PartnersPage() {
     if (res.ok) {
       setEditingId(null);
       load();
-    } else alert((await res.json()).error ?? "Failed to delete");
+    } else toast((await res.json()).error ?? "Failed to delete", "error");
   }
 
   const [logoNote, setLogoNote] = useState("");
@@ -253,7 +257,7 @@ export default function PartnersPage() {
       load();
       const note = sharpnessNote(prepared);
       if (note) setLogoNote(note);
-    } else alert((await res.json()).error ?? "Upload failed");
+    } else toast((await res.json()).error ?? "Upload failed", "error");
   }
 
   function startEdit(p: Partner) {
@@ -279,7 +283,7 @@ export default function PartnersPage() {
     if (res.ok) {
       setEditingId(null);
       load();
-    } else alert((await res.json()).error ?? "Failed to save");
+    } else toast((await res.json()).error ?? "Failed to save", "error");
   }
 
   return (
@@ -383,7 +387,7 @@ export default function PartnersPage() {
 
         <div className="space-y-3">
           {partners.map((p) => (
-            <div key={p.id} className="card p-5">
+            <div key={p.id} className="card card-hover p-5">
               {editingId === p.id ? (
                 <form onSubmit={saveEdit} className="space-y-4">
                   <div className="flex items-center justify-between gap-3">

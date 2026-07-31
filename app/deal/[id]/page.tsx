@@ -21,6 +21,8 @@ import {
   IconAlert,
   IconCheck,
 } from "../../icons";
+import { useUI } from "../../ui";
+import { SkeletonPanels } from "../../skeleton";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string; purged_at?: string | null };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
@@ -45,6 +47,7 @@ type Referral = {
 };
 
 export default function DealPage() {
+  const { toast, confirm } = useUI();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [r, setR] = useState<Referral | null>(null);
@@ -99,7 +102,7 @@ export default function DealPage() {
       setCovName("");
       setCovNote("");
       load();
-    } else alert((await res.json()).error ?? "Couldn't save");
+    } else toast((await res.json()).error ?? "Couldn't save", "error");
   }
 
   useEffect(() => {
@@ -170,7 +173,7 @@ export default function DealPage() {
       setExtractResult(await res.json());
       load();
     } else {
-      alert((await res.json()).error ?? "Extraction failed");
+      toast((await res.json()).error ?? "Extraction failed", "error");
     }
   }
 
@@ -179,7 +182,7 @@ export default function DealPage() {
     const res = await fetch(`/api/referrals/${id}/draft-reply`, { method: "POST" });
     setDrafting(false);
     if (res.ok) setReply((await res.json()).draft ?? "");
-    else alert((await res.json()).error ?? "Couldn't draft — write it manually");
+    else toast((await res.json()).error ?? "Couldn't draft — write it manually", "error");
   }
 
   function askForMissing(missing: string[]) {
@@ -193,33 +196,36 @@ export default function DealPage() {
   // stops showing it immediately; emails already delivered can't be recalled.
   async function deleteDoc(docId: string, label: string) {
     if (
-      !confirm(
+      !await confirm(
         `Remove "${label}"? It disappears from ${r?.partners?.name ?? "the partner"}'s portal immediately. If an email about it already went out, that email can't be recalled.`
       )
     )
       return;
     const res = await fetch(`/api/docs/${docId}`, { method: "DELETE" });
     if (res.ok) load();
-    else alert((await res.json()).error ?? "Couldn't delete");
+    else toast((await res.json()).error ?? "Couldn't delete", "error");
   }
 
   // Keep the extracted details, delete the file that carried them. Real
   // deletion, not a blur — a black box over a PDF leaves the text underneath.
   async function purgeDoc(docId: string, label: string) {
     if (
-      !confirm(
+      !await confirm(
         `Remove the source file for "${label}"?\n\nEverything already extracted (client details, dates, premium) stays on this deal. The original file — which may carry SSN, income, and asset information you don't need — is permanently deleted from storage.`
       )
     )
       return;
     const res = await fetch(`/api/docs/${docId}/purge`, { method: "POST" });
-    if (res.ok) load();
-    else alert((await res.json()).error ?? "Couldn't remove the file");
+    if (res.ok) {
+      toast("Source file deleted — extracted details kept");
+      load();
+    }
+    else toast((await res.json()).error ?? "Couldn't remove the file", "error");
   }
 
   async function deleteMsg(messageId: string) {
     if (
-      !confirm(
+      !await confirm(
         "Remove this message from the thread? It disappears from the portal immediately. If it already went out by email, that email can't be recalled."
       )
     )
@@ -230,7 +236,7 @@ export default function DealPage() {
       body: JSON.stringify({ messageId }),
     });
     if (res.ok) load();
-    else alert((await res.json()).error ?? "Couldn't delete");
+    else toast((await res.json()).error ?? "Couldn't delete", "error");
   }
 
   async function sendReply(e: React.FormEvent) {
@@ -245,7 +251,7 @@ export default function DealPage() {
     if (res.ok) {
       setReply("");
       load();
-    } else alert((await res.json()).error ?? "Failed to send");
+    } else toast((await res.json()).error ?? "Failed to send", "error");
   }
   useEffect(() => {
     load();
@@ -264,7 +270,7 @@ export default function DealPage() {
       setTimeout(() => setTouchDone(null), 1500);
       load();
     } else {
-      alert((await res.json()).error ?? "Couldn't log that");
+      toast((await res.json()).error ?? "Couldn't log that", "error");
     }
   }
 
@@ -281,7 +287,7 @@ export default function DealPage() {
       load();
     } else {
       setReviewState("idle");
-      alert((await res.json()).error ?? "Couldn't send the review request");
+      toast((await res.json()).error ?? "Couldn't send the review request", "error");
     }
   }
 
@@ -304,7 +310,7 @@ export default function DealPage() {
 
   async function setStatus(status: string, extra: Record<string, unknown> = {}) {
     if (status === "docs_delivered" && r && r.documents.length === 0) {
-      const ok = confirm(
+      const ok = await confirm(
         "No documents are uploaded yet, but this sends the partner their one “bound + documents ready” email. Upload the EOI/RCE first, or continue anyway?"
       );
       if (!ok) return;
@@ -328,7 +334,7 @@ export default function DealPage() {
     if (res.ok) {
       setShowLost(false);
       load();
-    } else alert((await res.json()).error ?? "Failed");
+    } else toast((await res.json()).error ?? "Failed", "error");
   }
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -345,11 +351,11 @@ export default function DealPage() {
     setUploading(false);
     e.target.value = "";
     if (res.ok) load();
-    else alert((await res.json()).error ?? "Upload failed");
+    else toast((await res.json()).error ?? "Upload failed", "error");
   }
 
   async function del() {
-    if (!confirm("Delete this referral? This cannot be undone.")) return;
+    if (!await confirm("Delete this referral? This cannot be undone.")) return;
     await fetch(`/api/referrals/${id}`, { method: "DELETE" });
     router.push("/");
   }
@@ -359,7 +365,7 @@ export default function DealPage() {
       <>
         <TopNav active="referrals" />
         <main className="max-w-2xl mx-auto p-6">
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <SkeletonPanels count={4} />
         </main>
       </>
     );

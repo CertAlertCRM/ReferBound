@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { STATUS_LABELS } from "@/lib/config";
 import { TopNav } from "../components";
+import { SkeletonPage } from "../skeleton";
 
 type Stats = {
   scope: "live" | "history" | "all";
@@ -45,7 +46,7 @@ export default function StatsPage() {
       <>
         <TopNav active="stats" />
         <main className="max-w-2xl mx-auto p-6">
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <SkeletonPage tiles={3} rows={2} />
         </main>
       </>
     );
@@ -126,10 +127,10 @@ export default function StatsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 stagger">
           {tiles.map((t) => (
-            <div key={t.label} className="card p-4">
-              <p className="text-[26px] leading-8 font-semibold tracking-tight">{t.value}</p>
+            <div key={t.label} className="card card-hover p-4">
+              <p className="tabnum text-[26px] leading-8 font-semibold tracking-tight">{t.value}</p>
               <p className="text-xs text-ink-secondary mt-1">{t.label}</p>
               {t.hint && <p className="text-[11px] text-ink-muted mt-1">{t.hint}</p>}
             </div>

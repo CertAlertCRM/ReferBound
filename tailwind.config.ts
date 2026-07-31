@@ -35,8 +35,12 @@ const config: Config = {
         sans: ["var(--font-inter)", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 3px 0 rgb(15 23 42 / 0.10), 0 4px 14px -2px rgb(15 23 42 / 0.12)",
-        lift: "0 8px 22px -3px rgb(15 23 42 / 0.18), 0 4px 10px -2px rgb(15 23 42 / 0.10)",
+        // Layered shadows: a tight contact shadow, a mid diffusion, and a wide
+        // ambient. One flat shadow reads as a sticker; three read as depth.
+        card: "0 1px 2px 0 rgb(15 23 42 / 0.06), 0 2px 6px -1px rgb(15 23 42 / 0.09), 0 8px 20px -6px rgb(15 23 42 / 0.10)",
+        lift: "0 1px 2px 0 rgb(15 23 42 / 0.07), 0 6px 14px -3px rgb(15 23 42 / 0.14), 0 18px 36px -10px rgb(15 23 42 / 0.18)",
+        btn: "0 1px 2px 0 rgb(15 23 42 / 0.12), 0 2px 6px -1px rgb(15 23 42 / 0.14), inset 0 1px 0 0 rgb(255 255 255 / 0.16)",
+        xl: "0 10px 24px -6px rgb(15 23 42 / 0.18), 0 28px 60px -16px rgb(15 23 42 / 0.28)",
       },
     },
   },

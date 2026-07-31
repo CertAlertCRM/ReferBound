@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { IconPlus, IconX, IconArrowRight, IconSparkles } from "./icons";
 import { PARTNER_TYPES } from "@/lib/config";
+import { useUI } from "./ui";
 
 // Referral Radar — the mirror, not a megaphone. It shows agents where their
 // referrals actually come from and who they've already worked with but never
@@ -38,6 +39,7 @@ type Radar = {
 };
 
 export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void }) {
+  const { toast } = useUI();
   const [d, setD] = useState<Radar | null>(null);
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -101,7 +103,7 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
       await fetch(`/api/radar?id=${encodeURIComponent(p.id)}`, { method: "DELETE" });
       load();
     } else {
-      alert((await res.json()).error ?? "Couldn't add — they may need an email address first.");
+      toast((await res.json()).error ?? "Couldn't add — they may need an email address first.", "error");
     }
   }
 

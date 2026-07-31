@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { TopNav } from "../components";
+import { useUI } from "../ui";
+import { SkeletonPage } from "../skeleton";
 
 const PLAN_LABELS: Record<string, string> = { free: "Free", pro: "Pro", agency: "Agency" };
 
@@ -45,6 +47,7 @@ type Summary = {
 };
 
 export default function AdminPage() {
+  const { toast } = useUI();
   const [data, setData] = useState<Summary | null>(null);
   const [denied, setDenied] = useState(false);
   const [cost, setCost] = useState<string>("");
@@ -74,7 +77,7 @@ export default function AdminPage() {
       body: JSON.stringify({ email }),
     });
     if (res.ok) window.location.href = "/";
-    else alert((await res.json()).error ?? "Couldn't open support view");
+    else toast((await res.json()).error ?? "Couldn't open support view", "error");
   }
 
   if (denied) {
@@ -94,7 +97,7 @@ export default function AdminPage() {
       <>
         <TopNav />
         <main className="max-w-2xl mx-auto p-6">
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <SkeletonPage tiles={4} rows={3} />
         </main>
       </>
     );
@@ -140,8 +143,8 @@ export default function AdminPage() {
               good: net > 0,
             },
           ].map((x: any) => (
-            <div key={x.l} className="card px-4 py-3.5">
-              <p className={`text-xl font-semibold tracking-tight ${x.good ? "text-emerald-600" : ""}`}>{x.v}</p>
+            <div key={x.l} className="card card-hover px-4 py-3.5">
+              <p className={`tabnum text-xl font-semibold tracking-tight ${x.good ? "text-emerald-600" : ""}`}>{x.v}</p>
               <p className="text-[11px] text-ink-muted mt-0.5">{x.l}</p>
               {x.hint && <p className="text-[11px] text-ink-muted mt-0.5">{x.hint}</p>}
             </div>
@@ -205,8 +208,8 @@ export default function AdminPage() {
               hint: t.feedback30d ? `${t.feedback30d} feedback notes` : undefined,
             },
           ].map((x: any) => (
-            <div key={x.l} className="card px-4 py-3.5">
-              <p className="text-sm font-semibold tracking-tight">{x.v}</p>
+            <div key={x.l} className="card card-hover px-4 py-3.5">
+              <p className="tabnum text-sm font-semibold tracking-tight">{x.v}</p>
               <p className="text-[11px] text-ink-muted mt-0.5">{x.l}</p>
               {x.hint && <p className="text-[11px] text-brand mt-0.5">{x.hint}</p>}
             </div>

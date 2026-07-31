@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconMessage } from "../../icons";
+import { useUI } from "../../ui";
 
 type Msg = { id: string; sender: string; body: string; created_at: string };
 
@@ -19,6 +20,7 @@ export function ReferralMessages({
   agentName: string;
   partnerName: string;
 }) {
+  const { toast } = useUI();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,7 +39,7 @@ export function ReferralMessages({
       setBody("");
       router.refresh();
     } else {
-      alert((await res.json()).error ?? "Couldn't send — try again");
+      toast((await res.json()).error ?? "Couldn't send — try again", "error");
     }
   }
 

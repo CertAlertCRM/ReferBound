@@ -18,10 +18,34 @@
   --brand-900: 30 44 138;
 }
 
+/* Typography: optical sizing and real kerning on, tabular figures wherever
+   numbers sit in columns. The single cheapest thing that makes a dashboard
+   look engineered rather than assembled. */
+h1, h2, h3, .tracking-tight {
+  font-optical-sizing: auto;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  letter-spacing: -0.018em;
+}
+h1 {
+  letter-spacing: -0.028em;
+}
+/* Stat values, money, counts, dates in tables — fixed-width digits so nothing
+   jitters as values change. */
+.tabnum,
+th, td,
+.badge {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: rgb(var(--brand-500) / 0.22);
+}
+
 body {
   /* slate-200 background — decisively darker than the white cards, so every
      card reads as a raised surface even on washed-out office monitors. */
   @apply bg-slate-200 text-ink antialiased font-sans;
+  text-rendering: optimizeLegibility;
   /* Composed whitespace: a brand wash from the top, two soft corner glows,
      and a barely-there dot grid that only shows in the open space between
      cards. Fixed attachment so the ambience doesn't scroll away. */
@@ -58,21 +82,31 @@ body {
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
+  /* Buttons get a top highlight and a press that actually depresses — the
+     difference between a colored rectangle and something that feels physical. */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-white hover:bg-brand-dark shadow-card hover:shadow-lift active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-white hover:bg-brand-dark shadow-btn hover:shadow-lift hover:-translate-y-px active:translate-y-0 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white border border-slate-300 text-ink-secondary hover:border-slate-400 hover:text-ink shadow-card active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed bg-white border border-slate-300 text-ink-secondary hover:border-slate-400 hover:text-ink hover:-translate-y-px shadow-card hover:shadow-lift active:translate-y-0 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-offset-2;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700 shadow-btn hover:shadow-lift hover:-translate-y-px active:translate-y-0 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand-300 transition-shadow;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm placeholder:text-ink-muted focus:outline-none focus:ring-[3px] focus:ring-brand/20 focus:border-brand-400 transition-all duration-150;
   }
   .card {
-    /* Solid border + real shadow — cards must read as cards, never melt into
-       the ambient background. */
+    /* Solid border + layered shadow + a hairline top highlight. The highlight
+       is what makes a white card read as a raised surface rather than a hole. */
     @apply bg-white rounded-2xl border border-slate-200 shadow-card;
+    background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.9), transparent 6px);
+  }
+  /* Cards that respond to the pointer — lists, tiles, anything clickable. */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-lift hover:-translate-y-0.5 hover:border-slate-300;
   }
   .badge {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none;
@@ -92,6 +126,81 @@ body {
   }
   .meta-item {
     @apply inline-flex items-center gap-1.5;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+   Fast and quiet: 150–260ms, ease-out, small distances. Motion here confirms
+   an action happened; it is never decoration. Anyone who asks their OS for
+   less motion gets none of it. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-check {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.animate-fade-in { animation: fade-in 160ms ease-out both; }
+.animate-rise-in { animation: rise-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-dialog-in { animation: dialog-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-toast-in { animation: toast-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-pop-check { animation: pop-check 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Content that arrives together should arrive in sequence, barely. */
+.stagger > * { animation: rise-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+/* Loading skeletons shaped like the content they stand in for. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(226 232 240);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .btn-primary:hover,
+  .btn-ghost:hover,
+  .card-hover:hover {
+    transform: none !important;
   }
 }
 

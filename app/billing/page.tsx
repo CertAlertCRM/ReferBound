@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TopNav } from "../components";
 import { IconCheck, IconExternal, IconUsers } from "../icons";
 import { ReferCard } from "../refer-card";
+import { SkeletonPanels } from "../skeleton";
 
 type Billing = {
   plan: string;
@@ -54,7 +55,7 @@ export default function BillingPage() {
       <>
         <TopNav active="billing" />
         <main className="max-w-3xl mx-auto p-6">
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <SkeletonPanels count={3} />
         </main>
       </>
     );

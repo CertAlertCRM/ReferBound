@@ -2,8 +2,16 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { APP_CONFIG } from "@/lib/config";
+import { UIProvider } from "./ui";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Variable Inter with optical sizing — the display cut at large sizes is
+// noticeably tighter and more confident than the static text cut.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+  axes: ["opsz"],
+});
 
 export const metadata: Metadata = {
   title: `${APP_CONFIG.productName} — Live referral tracking`,
@@ -29,7 +37,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body>{children}</body>
+      <body>
+        <UIProvider>{children}</UIProvider>
+      </body>
     </html>
   );
 }

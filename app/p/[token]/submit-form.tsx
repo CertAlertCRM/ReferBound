@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DOC_KINDS_PARTNER, PARTNER_DOC_KINDS } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { IconZap, IconUpload, IconX, IconMail } from "../../icons";
+import { useUI } from "../../ui";
 
 type PendingFile = { file: File; kind: string };
 
@@ -30,6 +31,7 @@ export function PartnerSubmitForm({
   partnerType?: string;
   contacts?: { id: string; name: string; role: string | null }[];
 }) {
+  const { toast } = useUI();
   const isLender = partnerType === "lender";
   const [open, setOpen] = useState(false);
   // Who on the team is sending this? Remembered per device.
@@ -124,7 +126,7 @@ export function PartnerSubmitForm({
     if (!res.ok) {
       setBusy(false);
       setProgress("");
-      alert((await res.json()).error ?? "Something went wrong");
+      toast((await res.json()).error ?? "Something went wrong", "error");
       return;
     }
     const { referral_id } = await res.json();
@@ -137,7 +139,7 @@ export function PartnerSubmitForm({
       fd.append("referral_id", referral_id);
       const up = await fetch(`/api/p/${token}/upload`, { method: "POST", body: fd });
       if (!up.ok) {
-        alert(`"${files[i].file.name}" failed to upload — you can try it again from this page later.`);
+        toast(`"${files[i].file.name}" failed to upload — you can try it again from this page later.`, "error");
       }
     }
 

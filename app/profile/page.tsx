@@ -8,6 +8,8 @@ import { THEMES } from "@/lib/themes";
 import { TEMPLATE_META, type NotifyTemplates } from "@/lib/voice";
 import { RETENTION_CHOICES } from "@/lib/config";
 import { prepareHeadshot } from "@/lib/image";
+import { useUI } from "../ui";
+import { SkeletonPanels } from "../skeleton";
 
 type Team = {
   role: "owner" | "member";
@@ -37,6 +39,7 @@ type Profile = {
 const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true, doc_retention_days: 0, renewal_watch: true };
 
 export default function ProfilePage() {
+  const { toast, confirm } = useUI();
   const [form, setForm] = useState<Profile>(EMPTY);
   const [baseline, setBaseline] = useState<Profile>(EMPTY);
   const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
@@ -160,7 +163,7 @@ export default function ProfilePage() {
   }
 
   async function resetVoice() {
-    if (!confirm("Go back to ReferBound's stock wording for all notifications?")) return;
+    if (!await confirm("Go back to ReferBound's stock wording for all notifications?")) return;
     await fetch("/api/voice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -186,13 +189,14 @@ export default function ProfilePage() {
       const { inviteUrl } = await r.json();
       setTeam((t) => (t ? { ...t, inviteUrl } : t));
     } else {
-      alert((await r.json()).error ?? "Couldn't create the invite link");
+      toast((await r.json()).error ?? "Couldn't create the invite link", "error");
     }
   }
 
   async function copyInvite() {
     if (!team?.inviteUrl) return;
     await navigator.clipboard.writeText(team.inviteUrl);
+    toast("Invite link copied");
     setInviteCopied(true);
     setTimeout(() => setInviteCopied(false), 1500);
   }
@@ -219,7 +223,7 @@ export default function ProfilePage() {
       setAddDone(email);
       setTimeout(() => setAddDone(""), 3000);
       loadTeam();
-    } else alert((await r.json()).error ?? "Couldn't send the invite");
+    } else toast((await r.json()).error ?? "Couldn't send the invite", "error");
   }
 
   async function cancelPending(code: string) {
@@ -230,7 +234,7 @@ export default function ProfilePage() {
   async function respondToInvite(code: string, accept: boolean) {
     if (
       accept &&
-      !confirm(
+      !await confirm(
         "Join this agency? Your partners and referrals move into the agency's shared book, and you'll share the agency profile. Your seat is covered by their plan — if you're paying for Pro yourself, cancel your own subscription from the Billing page after joining."
       )
     )
@@ -245,19 +249,19 @@ export default function ProfilePage() {
     if (r.ok) {
       const d = await r.json();
       if (d.joined && d.hadPaidPlan) {
-        alert("You're on the team! One housekeeping item: you were on a paid plan — open Billing → 'Open billing portal' to cancel your own subscription, since the agency covers you now.");
+        toast("You're on the team! One housekeeping item: you were on a paid plan — open Billing → 'Open billing portal' to cancel your own subscription, since the agency covers you now.", "error");
       }
       window.location.reload();
-    } else alert((await r.json()).error ?? "Couldn't respond to the invite");
+    } else toast((await r.json()).error ?? "Couldn't respond to the invite", "error");
   }
 
   async function removeMember(id: string, email: string) {
-    if (!confirm(`Remove ${email} from your team? They keep their login but lose access to the agency's shared partners and referrals.`)) return;
+    if (!await confirm(`Remove ${email} from your team? They keep their login but lose access to the agency's shared partners and referrals.`)) return;
     setRemoveBusy(id);
     const r = await fetch(`/api/team?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     setRemoveBusy(null);
     if (r.ok) loadTeam();
-    else alert((await r.json()).error ?? "Couldn't remove that member");
+    else toast((await r.json()).error ?? "Couldn't remove that member", "error");
   }
 
   async function saveWebhook(e: React.FormEvent) {
@@ -273,7 +277,7 @@ export default function ProfilePage() {
       setWebhookBaseline(webhook.trim());
       setTestState("idle");
     } else {
-      alert((await res.json()).error ?? "Failed to save");
+      toast((await res.json()).error ?? "Failed to save", "error");
     }
   }
 
@@ -320,9 +324,10 @@ export default function ProfilePage() {
     });
     setSaving(false);
     if (res.ok) {
+      toast("Profile saved");
       setBaseline({ ...form });
     } else {
-      alert((await res.json()).error ?? "Failed to save");
+      toast((await res.json()).error ?? "Failed to save", "error");
     }
   }
 
@@ -347,7 +352,7 @@ export default function ProfilePage() {
     setThemeSaving(false);
     if (!res.ok) {
       setTheme(prev);
-      alert("Couldn't save the color — try again");
+      toast("Couldn't save the color — try again", "error");
     }
   }
 
@@ -373,7 +378,7 @@ export default function ProfilePage() {
           `Uploaded — though that photo is only ${prepared.sourceWidth}px wide, so it may look soft at full size. A larger one will look sharper on your partners' portals.`
         );
       }
-    } else alert((await res.json()).error ?? "Upload failed");
+    } else toast((await res.json()).error ?? "Upload failed", "error");
   }
 
   const field = (
@@ -414,7 +419,7 @@ export default function ProfilePage() {
         </div>
 
         {loading ? (
-          <div className="card p-10 text-center text-ink-muted">Loading…</div>
+          <SkeletonPanels count={4} />
         ) : (
           <>
             <section className="card p-6 flex items-center gap-5">
