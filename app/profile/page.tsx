@@ -30,9 +30,10 @@ type Profile = {
   sms_new_lead: boolean;
   show_scorecard: boolean;
   doc_retention_days: number;
+  renewal_watch: boolean;
 };
 
-const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true, doc_retention_days: 0 };
+const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true, doc_retention_days: 0, renewal_watch: true };
 
 export default function ProfilePage() {
   const [form, setForm] = useState<Profile>(EMPTY);
@@ -85,6 +86,7 @@ export default function ProfilePage() {
             sms_new_lead: Boolean(profile.sms_new_lead),
             show_scorecard: profile.show_scorecard !== false,
             doc_retention_days: Number(profile.doc_retention_days ?? 0),
+            renewal_watch: profile.renewal_watch !== false,
           };
           setForm(loaded);
           setBaseline(loaded);
@@ -386,7 +388,7 @@ export default function ProfilePage() {
   }
 
   const field = (
-    key: Exclude<keyof Profile, "sms_new_lead" | "show_scorecard" | "doc_retention_days">,
+    key: Exclude<keyof Profile, "sms_new_lead" | "show_scorecard" | "doc_retention_days" | "renewal_watch">,
     label: string,
     placeholder: string
   ) => {
@@ -599,6 +601,21 @@ export default function ProfilePage() {
                   <span className="text-xs text-ink-muted">
                     Uses the phone number above. The one moment worth a buzz — a partner just sent
                     you business.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-brand"
+                  checked={form.renewal_watch}
+                  onChange={(e) => setForm({ ...form, renewal_watch: e.target.checked })}
+                />
+                <span>
+                  <span className="text-sm font-medium block">Warn me about renewals 30 days out</span>
+                  <span className="text-xs text-ink-muted">
+                    A weekly note when a bound policy is expiring, so the lender gets updated proof
+                    of coverage before a servicer force-places it.
                   </span>
                 </span>
               </label>

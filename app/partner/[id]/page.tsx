@@ -61,6 +61,15 @@ export default function PartnerWorkspacePage() {
   const [editType, setEditType] = useState("lender");
   const [editTypeLabel, setEditTypeLabel] = useState("");
   const [txOpen, setTxOpen] = useState(false);
+  // Lender requirements — collapsed by default so the edit panel stays calm.
+  const [reqOpen, setReqOpen] = useState(false);
+  const [req, setReq] = useState({
+    mortgagee_clause: "",
+    max_wind_deductible: "",
+    min_liability: "",
+    flood_required: false,
+    notes: "",
+  });
   const [editRecap, setEditRecap] = useState(true);
   const [editCadence, setEditCadence] = useState("off");
   const [editSaving, setEditSaving] = useState(false);
@@ -193,6 +202,15 @@ export default function PartnerWorkspacePage() {
     setEditEmails(partner.emails.join(", "));
     setEditType(partner.partner_type ?? "lender");
     setEditTypeLabel(partner.type_label ?? "");
+    const rq = (partner as any).requirements ?? {};
+    setReq({
+      mortgagee_clause: rq.mortgagee_clause ?? "",
+      max_wind_deductible: rq.max_wind_deductible ?? "",
+      min_liability: rq.min_liability ?? "",
+      flood_required: Boolean(rq.flood_required),
+      notes: rq.notes ?? "",
+    });
+    setReqOpen(false);
     setEditRecap(partner.monthly_summary !== false);
     setEditCadence(partner.thankyou_cadence ?? "off");
     setEditing(true);
@@ -204,7 +222,7 @@ export default function PartnerWorkspacePage() {
     const res = await fetch(`/api/partners/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, type_label: editTypeLabel, monthly_summary: editRecap, thankyou_cadence: editCadence }),
+      body: JSON.stringify({ name: editName, emails: editEmails, partner_type: editType, type_label: editTypeLabel, monthly_summary: editRecap, thankyou_cadence: editCadence, requirements: req }),
     });
     setEditSaving(false);
     if (res.ok) {
@@ -371,9 +389,12 @@ export default function PartnerWorkspacePage() {
 
   const stats = useMemo(() => {
     const bound = refs.filter((r) => ["bound", "docs_delivered"].includes(r.status));
-    const premium = bound.reduce((a, r) => a + (r.premium ?? 0), 0);
+    // Counts reflect the whole relationship; premium splits live from imported
+    // so the ROI figure is never inflated by history you loaded in.
+    const premium = bound.filter((r) => !(r as any).backfilled).reduce((a, r) => a + (r.premium ?? 0), 0);
+    const historyPremium = bound.filter((r) => (r as any).backfilled).reduce((a, r) => a + (r.premium ?? 0), 0);
     const active = refs.filter((r) => !["bound", "docs_delivered", "lost"].includes(r.status));
-    return { total: refs.length, active: active.length, bound: bound.length, premium };
+    return { total: refs.length, active: active.length, bound: bound.length, premium, historyPremium };
   }, [refs]);
 
   const sorted = useMemo(
@@ -495,6 +516,71 @@ export default function PartnerWorkspacePage() {
                       </select>
                     </label>
                   </div>
+                  {/* What this lender requires — collapsed; fills itself into
+                      every future pre-delivery check once entered. */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
+                      onClick={() => setReqOpen(!reqOpen)}
+                    >
+                      <span>
+                        <span className="text-sm font-semibold">Their requirements</span>
+                        {(req.mortgagee_clause || req.max_wind_deductible || req.min_liability || req.flood_required) && (
+                          <span className="badge bg-emerald-50 text-emerald-700 ml-2">on file</span>
+                        )}
+                        <span className="text-xs text-ink-muted block">
+                          Optional. Enter once — every EOI you send them gets checked against it.
+                        </span>
+                      </span>
+                      <span className="link !text-xs shrink-0">{reqOpen ? "Hide" : "Open"}</span>
+                    </button>
+                    {reqOpen && (
+                      <div className="px-4 pb-4 space-y-2">
+                        <label className="block">
+                          <span className="text-xs text-ink-secondary">
+                            Exact mortgagee clause (paste it exactly as they give it)
+                          </span>
+                          <textarea
+                            className="input mt-1 !h-16 text-sm resize-y"
+                            placeholder={"Cowart Home Loans ISAOA/ATIMA\nPO Box 12, Richmond VA 23220"}
+                            value={req.mortgagee_clause}
+                            onChange={(e) => setReq({ ...req, mortgagee_clause: e.target.value })}
+                          />
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            className="input !py-2 text-sm"
+                            placeholder="Max wind/hail deductible (e.g. 2%)"
+                            value={req.max_wind_deductible}
+                            onChange={(e) => setReq({ ...req, max_wind_deductible: e.target.value })}
+                          />
+                          <input
+                            className="input !py-2 text-sm"
+                            placeholder="Min liability (e.g. $300k)"
+                            value={req.min_liability}
+                            onChange={(e) => setReq({ ...req, min_liability: e.target.value })}
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer text-xs text-ink-secondary">
+                          <input
+                            type="checkbox"
+                            className="accent-brand"
+                            checked={req.flood_required}
+                            onChange={(e) => setReq({ ...req, flood_required: e.target.checked })}
+                          />
+                          Requires flood coverage when the property is in a flood zone
+                        </label>
+                        <input
+                          className="input !py-2 text-sm"
+                          placeholder="Anything else they always ask for"
+                          value={req.notes}
+                          onChange={(e) => setReq({ ...req, notes: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   {/* Team contacts — who's who at this partner */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
                     <p className="text-sm font-semibold">Team contacts</p>
@@ -737,11 +823,19 @@ export default function PartnerWorkspacePage() {
                   { v: String(stats.total), l: "Referred" },
                   { v: String(stats.active), l: "In progress" },
                   { v: String(stats.bound), l: "Bound" },
-                  { v: stats.premium > 0 ? `$${Math.round(stats.premium).toLocaleString()}` : "$0", l: "Premium" },
-                ].map((s) => (
+                  {
+                    v: stats.premium > 0 ? `$${Math.round(stats.premium).toLocaleString()}` : "$0",
+                    l: "Premium",
+                    hint:
+                      stats.historyPremium > 0
+                        ? `+$${Math.round(stats.historyPremium).toLocaleString()} imported`
+                        : undefined,
+                  },
+                ].map((s: any) => (
                   <div key={s.l} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-center sm:text-left">
                     <p className="text-lg font-semibold tracking-tight">{s.v}</p>
                     <p className="text-[11px] text-ink-muted">{s.l}</p>
+                    {s.hint && <p className="text-[10px] text-ink-muted">{s.hint}</p>}
                   </div>
                 ))}
               </div>

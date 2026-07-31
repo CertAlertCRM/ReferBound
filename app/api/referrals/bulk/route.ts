@@ -57,6 +57,9 @@ export async function POST(req: NextRequest) {
     const premiumNum = Number(String(r.premium ?? "").replace(/[^0-9.]/g, ""));
 
     inserts.push({
+      // Echoed back so the client can attach the source document that produced
+      // this row to the referral it became.
+      ref: String(r.ref ?? ""),
       account_id: account.id,
       partner_id,
       client_name,
@@ -76,6 +79,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ created: 0, skipped }, { status: 200 });
   }
 
+  // `ref` is a client-side correlation key, not a column.
+  const refs = inserts.map((r) => String(r.ref ?? ""));
+  for (const r of inserts) delete r.ref;
+
   const { data, error } = await db().from("referrals").insert(inserts).select("id, client_name, status");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -87,5 +94,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ created: data?.length ?? 0, skipped });
+  return NextResponse.json({
+    created: data?.length ?? 0,
+    skipped,
+    rows: (data ?? []).map((r, i) => ({ id: r.id, ref: refs[i] ?? "" })),
+  });
 }

@@ -5,6 +5,9 @@ import { STATUS_LABELS } from "@/lib/config";
 import { TopNav } from "../components";
 
 type Stats = {
+  scope: "live" | "history" | "all";
+  liveCount: number;
+  historyCount: number;
   total: number;
   byStatus: Record<string, number>;
   premiumTotal: number;
@@ -29,10 +32,13 @@ type Stats = {
 
 export default function StatsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  // Live business vs imported history — never mixed by default, because
+  // backfilled deals have no honest clock and would flatter every average.
+  const [scope, setScope] = useState<"live" | "history" | "all">("live");
 
   useEffect(() => {
-    fetch("/api/stats").then(async (r) => r.ok && setStats(await r.json()));
-  }, []);
+    fetch(`/api/stats?scope=${scope}`).then(async (r) => r.ok && setStats(await r.json()));
+  }, [scope]);
 
   if (!stats) {
     return (
@@ -92,6 +98,33 @@ export default function StatsPage() {
           <h1 className="text-xl font-bold tracking-tight">Pilot metrics</h1>
           <p className="text-sm text-ink-secondary mt-1">The numbers that answer whether this is working.</p>
         </div>
+
+        {stats.historyCount > 0 && (
+          <div className="card p-3 flex items-center gap-2 flex-wrap">
+            {[
+              { k: "live" as const, l: "Live business", n: stats.liveCount },
+              { k: "history" as const, l: "Imported history", n: stats.historyCount },
+              { k: "all" as const, l: "Everything", n: stats.liveCount + stats.historyCount },
+            ].map((s) => (
+              <button
+                key={s.k}
+                onClick={() => setScope(s.k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  scope === s.k ? "bg-brand text-white" : "text-ink-secondary hover:bg-slate-100"
+                }`}
+              >
+                {s.l} <span className={scope === s.k ? "text-white/70" : "text-ink-muted"}>{s.n}</span>
+              </button>
+            ))}
+            <p className="text-[11px] text-ink-muted ml-auto max-w-xs">
+              {scope === "live"
+                ? "Deals worked through ReferBound — the only ones with a real clock behind the averages."
+                : scope === "history"
+                  ? "Deals you imported to build your book. Real business, but the timings are historical."
+                  : "Combined. Time-based averages are less meaningful here."}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {tiles.map((t) => (

@@ -15,6 +15,11 @@ type Row = {
   closing_date: string;
   client_phone: string;
   premium: string;
+  property_address?: string;
+  // Set when the row came from an uploaded document, so the file can be
+  // attached to the referral once it exists.
+  ref?: string;
+  docKind?: string;
 };
 
 const BLANK: Row = { client_name: "", partner: "", status: "new", closing_date: "", client_phone: "", premium: "" };
@@ -31,7 +36,10 @@ export function BackfillButton({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"type" | "paste" | "file">("type");
+  const [tab, setTab] = useState<"type" | "paste" | "file" | "docs">("type");
+  // Files from the EOI/dec upload path, keyed by row ref.
+  const [pending, setPending] = useState<Record<string, File>>({});
+  const [docBusy, setDocBusy] = useState<{ done: number; total: number } | null>(null);
   const [rows, setRows] = useState<Row[]>([{ ...BLANK }, { ...BLANK }, { ...BLANK }]);
   const [paste, setPaste] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,6 +53,73 @@ export function BackfillButton({
     setPaste("");
     setResult(null);
     setError("");
+    setPending({});
+    setDocBusy(null);
+  }
+
+  // Past EOIs / dec pages → closed deals. Processed one at a time so a folder
+  // of twenty files never trips a serverless timeout, with visible progress.
+  async function readDocs(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (!files.length) return;
+    setError("");
+    setDocBusy({ done: 0, total: files.length });
+    const found: Row[] = [];
+    const keep: Record<string, File> = {};
+    const failed: string[] = [];
+
+    for (const [i, file] of files.entries()) {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/parse-doc", { method: "POST", body: fd });
+      setDocBusy({ done: i + 1, total: files.length });
+      if (!res.ok) {
+        failed.push(file.name);
+        continue;
+      }
+      const { row } = await res.json();
+      if (!row?.client_name) {
+        failed.push(file.name);
+        continue;
+      }
+      const ref = `${Date.now()}-${i}`;
+      keep[ref] = file;
+      // Match the mortgagee to a partner the agent actually has, when it's
+      // clearly the same company; otherwise leave it for them to pick.
+      const guess =
+        partners.find((p) => p.name.toLowerCase() === String(row.partner ?? "").toLowerCase())?.name ??
+        partners.find(
+          (p) =>
+            row.partner &&
+            (p.name.toLowerCase().includes(String(row.partner).toLowerCase().slice(0, 8)) ||
+              String(row.partner).toLowerCase().includes(p.name.toLowerCase().slice(0, 8)))
+        )?.name ??
+        defaultPartner;
+      found.push({
+        client_name: row.client_name,
+        partner: guess,
+        // Honest default: the policy exists, so it's bound. The agent can move
+        // it to "EOI & docs delivered" if the partner already has the papers.
+        status: "bound",
+        closing_date: row.closing_date ?? "",
+        client_phone: row.client_phone ?? "",
+        premium: row.premium ?? "",
+        property_address: row.property_address ?? "",
+        ref,
+        docKind: row.doc_kind ?? "eoi",
+      });
+    }
+
+    setDocBusy(null);
+    setPending((p) => ({ ...p, ...keep }));
+    if (!found.length) {
+      setError("Couldn't read a client name from any of those. PDFs and photos of EOIs work best.");
+      return;
+    }
+    if (failed.length) setError(`Skipped ${failed.length}: ${failed.slice(0, 3).join(", ")}`);
+    setRows((rs) => [...rs.filter((r) => r.client_name.trim()), ...found, { ...BLANK, partner: defaultPartner }]);
+    setTab("type");
   }
 
   function setRow(i: number, patch: Partial<Row>) {
@@ -147,7 +222,22 @@ export function BackfillButton({
       setError((await res.json()).error ?? "Couldn't save");
       return;
     }
-    setResult(await res.json());
+    const out = await res.json();
+
+    // Attach each source document to the referral it became, so the partner
+    // can download the EOI for their own records.
+    for (const created of out.rows ?? []) {
+      const file = created.ref ? pending[created.ref] : null;
+      if (!file) continue;
+      const row = payload.find((r) => r.ref === created.ref);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", row?.docKind ?? "eoi");
+      await fetch(`/api/referrals/${created.id}/docs`, { method: "POST", body: fd }).catch(() => {});
+    }
+
+    setResult(out);
+    setPending({});
     onDone();
   }
 
@@ -213,6 +303,7 @@ export function BackfillButton({
                   {[
                     { k: "type" as const, l: "Type them" },
                     { k: "paste" as const, l: "Paste a list" },
+                    { k: "docs" as const, l: "Upload past EOIs" },
                     { k: "file" as const, l: "Import a file" },
                   ].map((t) => (
                     <button
@@ -243,6 +334,34 @@ export function BackfillButton({
                     <button className="btn-primary !py-2 text-xs" onClick={runPaste} disabled={busy || !paste.trim()}>
                       <IconSparkles size={12} /> {busy ? "Reading…" : "Turn into leads"}
                     </button>
+                  </div>
+                )}
+
+                {tab === "docs" && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-ink-secondary">
+                      Select the EOIs or declarations pages from deals you&apos;ve already written
+                      — as many as you like. AI reads the named insured, property, carrier,
+                      premium, and the mortgagee clause, and matches each one back to the partner
+                      who sent it. They come in as <span className="font-medium text-ink">Bound</span>,
+                      and the file is attached so your partner can download their copy.
+                    </p>
+                    <label className="btn-ghost cursor-pointer inline-flex">
+                      {docBusy ? `Reading ${docBusy.done} of ${docBusy.total}…` : "Choose EOI files"}
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        accept=".pdf,.png,.jpg,.jpeg"
+                        onChange={readDocs}
+                        disabled={!!docBusy}
+                      />
+                    </label>
+                    <p className="text-[11px] text-ink-muted">
+                      This is how a brand-new portal opens with a year of history on it instead of
+                      an empty page. Nothing is emailed or texted to your partner for backfilled
+                      deals — the board just fills in.
+                    </p>
                   </div>
                 )}
 
@@ -277,12 +396,22 @@ export function BackfillButton({
                         {rows.map((r, i) => (
                           <tr key={i}>
                             <td className="pr-1.5 py-0.5">
-                              <input
-                                className="input !py-1.5 text-sm"
-                                placeholder="Client name"
-                                value={r.client_name}
-                                onChange={(e) => setRow(i, { client_name: e.target.value })}
-                              />
+                              <div className="relative">
+                                <input
+                                  className="input !py-1.5 text-sm"
+                                  placeholder="Client name"
+                                  value={r.client_name}
+                                  onChange={(e) => setRow(i, { client_name: e.target.value })}
+                                />
+                                {r.ref && (
+                                  <span
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-brand-700 font-semibold"
+                                    title="From an uploaded document — it'll be attached to this deal"
+                                  >
+                                    📎
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="pr-1.5 py-0.5">
                               <select

@@ -20,6 +20,7 @@ type Summary = {
     mrr: number;
     partners: number;
     referrals: number;
+    backfilled: number;
     fromPortal: number;
     bound: number;
     premiumTracked: number;
@@ -185,7 +186,11 @@ export default function AdminPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { v: String(t.partners), l: "Partners on portals" },
-            { v: `${t.referrals} · ${t.fromPortal} via portal`, l: "Referrals" },
+            {
+              v: `${t.referrals} · ${t.fromPortal} via portal`,
+              l: "Referrals (live)",
+              hint: t.backfilled ? `${t.backfilled} imported history, excluded` : undefined,
+            },
             { v: `${t.bound} bound · $${t.premiumTracked.toLocaleString()}`, l: "Premium tracked" },
             {
               v: `${t.emailsSent30d} ✓ · ${t.emailsFailed30d} ✗`,

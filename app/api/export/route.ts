@@ -20,6 +20,7 @@ const COLUMNS: [string, (r: any) => unknown][] = [
   ["Lost reason", (r) => r.lost_reason],
   ["Referral partner", (r) => r.partners?.name],
   ["Partner type", (r) => r.partners?.partner_type],
+  ["Imported history", (r) => (r.backfilled ? "yes" : "no")],
   ["Source", (r) => (r.source === "partner" ? "Partner portal" : "Agent")],
   ["Annual premium", (r) => r.premium],
   ["Lines written", (r) => r.policy_lines],

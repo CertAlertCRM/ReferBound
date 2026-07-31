@@ -73,6 +73,33 @@ export default function DealPage() {
   const [touchBusy, setTouchBusy] = useState<string | null>(null);
   const [touchDone, setTouchDone] = useState<string | null>(null);
   const [teamContacts, setTeamContacts] = useState<{ id: string; name: string; role: string | null }[]>([]);
+  // Pre-delivery cross-check
+  const [check, setCheck] = useState<any | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState("");
+  const [gate, setGate] = useState<any | null>(null);
+  const checkPassed = Boolean(check && check.findings?.length === 0);
+  // Coverage record — only visible once used, or behind a one-line link.
+  const [covOpen, setCovOpen] = useState(false);
+  const [covName, setCovName] = useState("");
+  const [covOutcome, setCovOutcome] = useState("declined");
+  const [covNote, setCovNote] = useState("");
+  const [covEntries, setCovEntries] = useState<any[]>([]);
+
+  async function addCoverage() {
+    if (!covName.trim()) return;
+    const res = await fetch(`/api/referrals/${id}/coverage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coverage: covName, outcome: covOutcome, note: covNote }),
+    });
+    if (res.ok) {
+      setCovEntries((await res.json()).entries ?? []);
+      setCovName("");
+      setCovNote("");
+      load();
+    } else alert((await res.json()).error ?? "Couldn't save");
+  }
 
   useEffect(() => {
     const pid = (r as any)?.partner_id;
@@ -109,6 +136,8 @@ export default function DealPage() {
         setPremium(p);
         setLines(l);
         setDealBaseline({ premium: p, lines: l });
+        if ((found as any).doc_check) setCheck((found as any).doc_check);
+        setCovEntries(Array.isArray((found as any).coverage_notes) ? (found as any).coverage_notes : []);
       }
     }
     if (actRes.ok) setActivity((await actRes.json()).activity ?? []);
@@ -255,12 +284,38 @@ export default function DealPage() {
     }
   }
 
+  // Cross-check the EOI/RCE against what the lender sent. Runs on demand, and
+  // automatically as a gate before the "documents ready" email goes out.
+  async function runCheck(silent = false): Promise<any | null> {
+    setChecking(true);
+    const res = await fetch(`/api/referrals/${id}/verify`, { method: "POST" });
+    setChecking(false);
+    if (!res.ok) {
+      const e = await res.json();
+      if (!silent) setCheckError(e.error ?? "Couldn't run the check");
+      return null;
+    }
+    setCheckError("");
+    const result = await res.json();
+    setCheck(result);
+    return result;
+  }
+
   async function setStatus(status: string, extra: Record<string, unknown> = {}) {
     if (status === "docs_delivered" && r && r.documents.length === 0) {
       const ok = confirm(
         "No documents are uploaded yet, but this sends the partner their one “bound + documents ready” email. Upload the EOI/RCE first, or continue anyway?"
       );
       if (!ok) return;
+    }
+    // The gate: never let a wrong mortgagee clause or a missing co-borrower
+    // reach the lender. Runs once; the agent can still choose to send.
+    if (status === "docs_delivered" && r && r.documents.length > 0 && !checkPassed) {
+      const result = check ?? (await runCheck(true));
+      if (result && result.findings?.length > 0) {
+        setGate(result);
+        return;
+      }
     }
     setBusy(true);
     const res = await fetch(`/api/referrals/${id}`, {
@@ -512,7 +567,153 @@ export default function DealPage() {
               </button>
             ))}
           </div>
+
+          {/* Coverage record — one line until it's used. The timestamped proof
+              that a recommendation was made, which is what an E&O carrier asks
+              for and almost nobody keeps. */}
+          {covEntries.length > 0 && (
+            <ul className="pt-2 border-t border-slate-100 space-y-1">
+              {covEntries.map((c: any, i: number) => (
+                <li key={i} className="text-xs text-ink-secondary">
+                  <span className="font-medium text-ink">{c.coverage}</span> —{" "}
+                  {c.outcome === "declined" ? (
+                    <span className="text-amber-700 font-medium">declined by client</span>
+                  ) : c.outcome === "accepted" ? (
+                    <span className="text-emerald-700 font-medium">accepted</span>
+                  ) : (
+                    "recommended"
+                  )}
+                  {c.note ? ` · ${c.note}` : ""}
+                  <span className="text-ink-muted">
+                    {" · "}
+                    {new Date(c.at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {covOpen ? (
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input
+                  className="input !py-2 text-sm"
+                  placeholder="Coverage (e.g. Flood)"
+                  value={covName}
+                  onChange={(e) => setCovName(e.target.value)}
+                />
+                <select className="input !py-2 text-sm" value={covOutcome} onChange={(e) => setCovOutcome(e.target.value)}>
+                  <option value="declined">Client declined</option>
+                  <option value="accepted">Client accepted</option>
+                  <option value="pending">Recommended — awaiting</option>
+                </select>
+                <input
+                  className="input !py-2 text-sm"
+                  placeholder="Note (optional)"
+                  value={covNote}
+                  onChange={(e) => setCovNote(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={addCoverage}>
+                  Record it
+                </button>
+                <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={() => setCovOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="link !text-xs" onClick={() => setCovOpen(true)}>
+              + Record a coverage recommendation or declination
+            </button>
+          )}
         </section>
+
+        {/* Pre-delivery cross-check — the last set of eyes before the lender
+            sees the policy. Only shown once there's something to check. */}
+        {r.documents.length > 0 && (
+          <section
+            className={`card p-5 space-y-3 ${
+              check?.blockers > 0
+                ? "border-red-300"
+                : check && check.findings?.length === 0
+                  ? "border-emerald-300"
+                  : ""
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <IconSparkles size={15} className="text-brand" /> Pre-delivery check
+                </h2>
+                <p className="text-xs text-ink-secondary mt-0.5">
+                  Reads your EOI and RCE against the loan application, insurance request, and
+                  mortgagee clause your partner sent — names, co-borrower, property address,
+                  mortgagee wording, loan number, effective date, and Coverage A vs replacement
+                  cost.
+                </p>
+              </div>
+              <button
+                className="btn-ghost !py-1.5 text-xs shrink-0"
+                onClick={() => runCheck()}
+                disabled={checking}
+              >
+                {checking ? "Reading documents…" : check ? "Re-check" : "Check the docs"}
+              </button>
+            </div>
+
+            {checkError && <p className="text-xs text-amber-700">{checkError}</p>}
+
+            {check && (
+              <div className="space-y-2">
+                {check.findings.length === 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+                    <p className="text-sm font-semibold text-emerald-800 inline-flex items-center gap-2">
+                      <IconCheck size={15} /> Everything matches
+                    </p>
+                    <p className="text-xs text-ink-secondary mt-1">
+                      Checked {check.checked.join(", ") || "the available fields"} against{" "}
+                      {check.comparedAgainst.join(", ")}.
+                      {check.unchecked?.length > 0 && (
+                        <> Couldn&apos;t compare: {check.unchecked.join(", ")}.</>
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  check.findings.map((f: any, i: number) => (
+                    <div
+                      key={i}
+                      className={`rounded-xl border px-4 py-3 ${
+                        f.severity === "blocker"
+                          ? "border-red-200 bg-red-50/60"
+                          : "border-amber-200 bg-amber-50/60"
+                      }`}
+                    >
+                      <p
+                        className={`text-sm font-semibold ${
+                          f.severity === "blocker" ? "text-red-700" : "text-amber-800"
+                        }`}
+                      >
+                        {f.severity === "blocker" ? "⛔" : "⚠️"} {f.issue}
+                      </p>
+                      {(f.on_agent_doc || f.on_lender_doc) && (
+                        <p className="text-[11px] text-ink-secondary mt-1">
+                          Your document: <span className="font-medium text-ink">{f.on_agent_doc ?? "—"}</span>
+                          {" · "}Lender&apos;s: <span className="font-medium text-ink">{f.on_lender_doc ?? "—"}</span>
+                        </p>
+                      )}
+                      {f.fix && <p className="text-xs text-ink-secondary mt-1.5">→ {f.fix}</p>}
+                    </div>
+                  ))
+                )}
+                <p className="text-[11px] text-ink-muted">
+                  Checked {new Date(check.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  . Re-check after you re-issue anything — a second look costs nothing.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Documents */}
         <section className="card p-6 space-y-3.5">
@@ -785,7 +986,67 @@ export default function DealPage() {
           <button onClick={del} className="link-muted hover:!text-red-600">
             <IconTrash size={13} /> Delete referral
           </button>
+          <a href={`/deal/${id}/file`} className="link !text-xs" target="_blank" rel="noopener">
+            Print the full deal file
+          </a>
         </div>
+
+        {/* The gate. Triggered by marking docs delivered when the check found
+            something — the one moment where catching it still costs nothing. */}
+        {gate && (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+            <div className="card p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-red-700">
+                Hold on — before this goes to your partner
+              </p>
+              <h3 className="text-lg font-bold tracking-tight mt-1">
+                {gate.blockers > 0
+                  ? `${gate.blockers} thing${gate.blockers === 1 ? "" : "s"} the lender will bounce`
+                  : `${gate.warnings} thing${gate.warnings === 1 ? "" : "s"} worth a look`}
+              </h3>
+              <p className="text-sm text-ink-secondary mt-1.5">
+                Marking this delivered emails {r.partners?.name ?? "your partner"} that the
+                documents are ready. Fixing it now is a re-upload; fixing it later is a phone call
+                during someone&apos;s closing week.
+              </p>
+              <div className="space-y-2 mt-4">
+                {gate.findings.map((f: any, i: number) => (
+                  <div
+                    key={i}
+                    className={`rounded-xl border px-4 py-3 ${
+                      f.severity === "blocker" ? "border-red-200 bg-red-50/60" : "border-amber-200 bg-amber-50/60"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-ink">
+                      {f.severity === "blocker" ? "⛔" : "⚠️"} {f.issue}
+                    </p>
+                    {f.fix && <p className="text-xs text-ink-secondary mt-1">→ {f.fix}</p>}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-5 flex-wrap">
+                <button className="btn-primary !py-2 text-xs" onClick={() => setGate(null)}>
+                  Let me fix it
+                </button>
+                <button
+                  className="btn-ghost !py-2 text-xs"
+                  onClick={async () => {
+                    const g = gate;
+                    setGate(null);
+                    setCheck({ ...g, overridden: true, findings: [] });
+                    await setStatus("docs_delivered");
+                  }}
+                >
+                  I checked — send anyway
+                </button>
+              </div>
+              <p className="text-[11px] text-ink-muted mt-3">
+                AI reads documents well but not perfectly. If it flagged something that&apos;s
+                actually fine, send anyway — you know the file.
+              </p>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );

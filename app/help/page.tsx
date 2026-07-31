@@ -73,6 +73,53 @@ export default function HelpPage() {
           </p>
         </Section>
 
+        <Section title="The pre-delivery check">
+          <p>
+            Once you&apos;ve uploaded the EOI (and RCE), the deal page offers a{" "}
+            <strong className="text-ink">pre-delivery check</strong>. It reads your documents
+            against whatever your partner sent — the loan application, insurance request, or
+            mortgagee clause — and compares the things that cause real closing problems: named
+            insured and co-borrower, property address, mortgagee wording, loan number, effective
+            date versus closing, and Coverage A against the replacement cost.
+          </p>
+          <p>
+            It runs automatically when you mark <em>EOI &amp; docs delivered</em>, and if it finds
+            something it stops the email until you decide. A missing co-borrower or a wrong
+            mortgagee clause costs a re-upload now and a phone call during someone&apos;s closing
+            week later. It stays quiet about formatting differences — &ldquo;St&rdquo; versus
+            &ldquo;Street&rdquo; is not a problem, and a checker that cries wolf gets ignored. You
+            can always send anyway; you know the file better than it does.
+          </p>
+        </Section>
+
+        <Section title="Things that quietly protect you">
+          <p>
+            <strong className="text-ink">Renewal watch.</strong> Once a week, if a bound policy is
+            expiring within 30 days, you get a note — because a renewal the lender never receives
+            proof of is how force-placed coverage happens. Turn it off in your profile if you
+            don&apos;t service renewals here.
+          </p>
+          <p>
+            <strong className="text-ink">Their requirements, on file.</strong> In a partner&apos;s
+            Edit panel there&apos;s an optional &ldquo;Their requirements&rdquo; section — the
+            exact mortgagee clause, deductible caps, flood rule. Enter it once and every EOI you
+            ever send that partner gets checked against it, even on deals where they never sent
+            you a document.
+          </p>
+          <p>
+            <strong className="text-ink">Coverage records.</strong> Under Log a touch you can
+            record that you recommended a coverage and the client declined it. That timestamped
+            line is the single most useful thing to have if a claim ever gets ugly, and it takes
+            five seconds.
+          </p>
+          <p>
+            <strong className="text-ink">The deal file.</strong> At the bottom of any deal,
+            &ldquo;Print the full deal file&rdquo; produces one page with every status change,
+            message, email, document, and check — timestamped. Save it as a PDF and it goes
+            straight to your E&amp;O carrier or your attorney.
+          </p>
+        </Section>
+
         <Section title="What your partner sees">
           <p>
             Their portal shows every client they&apos;ve sent you: live status bars, closing-date

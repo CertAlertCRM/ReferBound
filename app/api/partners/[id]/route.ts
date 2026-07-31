@@ -34,6 +34,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("monthly_summary" in body) {
     patch.monthly_summary = Boolean(body.monthly_summary);
   }
+  // What this lender requires — entered once, checked against every EOI.
+  if ("requirements" in body) {
+    const r = body.requirements ?? {};
+    const clean = {
+      mortgagee_clause: String(r.mortgagee_clause ?? "").trim().slice(0, 500) || null,
+      max_wind_deductible: String(r.max_wind_deductible ?? "").trim().slice(0, 60) || null,
+      min_liability: String(r.min_liability ?? "").trim().slice(0, 60) || null,
+      flood_required: Boolean(r.flood_required),
+      notes: String(r.notes ?? "").trim().slice(0, 500) || null,
+    };
+    const empty =
+      !clean.mortgagee_clause && !clean.max_wind_deductible && !clean.min_liability && !clean.flood_required && !clean.notes;
+    patch.requirements = empty ? null : clean;
+  }
   if ("thankyou_cadence" in body) {
     const cadence = String(body.thankyou_cadence ?? "off");
     if (!["off", "monthly", "quarterly"].includes(cadence)) {

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     await Promise.all([
       s.from("accounts").select("id, email, plan, billing_interval, created_at, team_owner_id, stripe_subscription_id"),
       s.from("partners").select("id, account_id, partner_type"),
-      s.from("referrals").select("id, account_id, status, premium, created_at, source"),
+      s.from("referrals").select("id, account_id, status, premium, created_at, source, backfilled"),
       s.from("email_log").select("kind, sent, created_at"),
     ]);
 
@@ -95,7 +95,10 @@ export async function GET(req: NextRequest) {
   const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
   const recentEmails = ems.filter((e) => e.created_at >= since30);
 
-  const premiumTracked = refs
+  // Imported history is real business but wasn't produced through the product —
+  // it never counts toward the founder view of what ReferBound generated.
+  const liveRefs = refs.filter((r) => !r.backfilled);
+  const premiumTracked = liveRefs
     .filter((r) => ["bound", "docs_delivered"].includes(r.status) && typeof r.premium === "number")
     .reduce((a, r) => a + (r.premium as number), 0);
 
@@ -110,9 +113,10 @@ export async function GET(req: NextRequest) {
       founderAnnual,
       mrr,
       partners: parts.length,
-      referrals: refs.length,
-      fromPortal: refs.filter((r) => r.source === "partner").length,
-      bound: refs.filter((r) => ["bound", "docs_delivered"].includes(r.status)).length,
+      referrals: liveRefs.length,
+      backfilled: refs.length - liveRefs.length,
+      fromPortal: liveRefs.filter((r) => r.source === "partner").length,
+      bound: liveRefs.filter((r) => ["bound", "docs_delivered"].includes(r.status)).length,
       premiumTracked: Math.round(premiumTracked),
       emailsSent30d: recentEmails.filter((e) => e.sent).length,
       emailsFailed30d: recentEmails.filter((e) => !e.sent).length,

@@ -20,6 +20,7 @@ type Referral = {
   created_at: string;
   updated_at: string | null;
   premium: number | null;
+  backfilled?: boolean;
   client_dob: string | null;
   property_address: string | null;
   partners: { name: string } | null;
@@ -233,20 +234,24 @@ export default function Dashboard() {
               { v: String(groups.risk.length), l: "Closing soon", alert: groups.risk.length > 0 },
               { v: String(groups.done.length), l: "Bound" },
               {
+                // Live business only — imported history has its own ledger on
+                // the Stats page, so this number never flatters itself.
                 v: (() => {
                   const p = referrals
-                    .filter((r) => ["bound", "docs_delivered"].includes(r.status))
+                    .filter((r) => ["bound", "docs_delivered"].includes(r.status) && !r.backfilled)
                     .reduce((a, r) => a + (r.premium ?? 0), 0);
                   return p > 0 ? `$${Math.round(p).toLocaleString()}` : "$0";
                 })(),
                 l: "Premium sourced",
+                hint: referrals.some((r) => r.backfilled) ? "live business only" : undefined,
               },
-            ].map((t) => (
+            ].map((t: any) => (
               <div key={t.l} className={`card px-4 py-3 ${t.alert ? "border-red-200" : ""}`}>
                 <p className={`text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
                   {t.v}
                 </p>
                 <p className="text-[11px] text-ink-muted mt-0.5">{t.l}</p>
+                {t.hint && <p className="text-[10px] text-ink-muted">{t.hint}</p>}
               </div>
             ))}
           </div>

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccount } from "@/lib/account";
 
@@ -6,16 +6,33 @@ export const dynamic = "force-dynamic";
 
 const SAFE = new Set(["bound", "docs_delivered"]);
 
-export async function GET() {
+// ROI is reported on LIVE business by default — deals actually worked through
+// ReferBound. Imported history (backfilled leads) is real business but carries
+// no honest clock and would inflate every rate and average here, so it's kept
+// on its own ledger: ?scope=live (default) | history | all.
+
+export async function GET(req: NextRequest) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const s = db();
 
+  const scopeParam = req.nextUrl.searchParams.get("scope");
+  const scope: "live" | "history" | "all" =
+    scopeParam === "history" || scopeParam === "all" ? scopeParam : "live";
+
   const { data: referrals } = await s
     .from("referrals")
-    .select("id, status, source, log_seconds, created_at, premium, partner_id, partners(name)")
+    .select("id, status, source, log_seconds, created_at, premium, partner_id, backfilled, partners(name)")
     .eq("account_id", account.id);
-  const refs = referrals ?? [];
+  const allRefs = referrals ?? [];
+  const liveCount = allRefs.filter((r) => !(r as any).backfilled).length;
+  const historyCount = allRefs.length - liveCount;
+  const refs =
+    scope === "all"
+      ? allRefs
+      : scope === "history"
+        ? allRefs.filter((r) => (r as any).backfilled)
+        : allRefs.filter((r) => !(r as any).backfilled);
   const refIds = refs.map((r) => r.id);
 
   // Events and emails scoped to THIS account's referrals.
@@ -127,6 +144,9 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    scope,
+    liveCount,
+    historyCount,
     total: refs.length,
     byStatus,
     premiumTotal,

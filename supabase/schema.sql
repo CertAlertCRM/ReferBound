@@ -189,6 +189,15 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- E&O prevention suite (see migration_31)
+alter table partners add column if not exists requirements jsonb;
+alter table referrals add column if not exists coverage_notes jsonb;
+alter table referrals add column if not exists renewal_notified_at timestamptz;
+alter table agent_profile add column if not exists renewal_watch boolean not null default true;
+
+-- Pre-delivery document cross-check (see migration_30)
+alter table referrals add column if not exists doc_check jsonb;
+
 -- Source-file retention + backfill tracking (see migration_29)
 alter table agent_profile add column if not exists doc_retention_days integer not null default 0;
 alter table documents add column if not exists purged_at timestamptz;
