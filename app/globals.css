@@ -45,10 +45,14 @@ body {
   display: none;
 }
 
-/* Room for the fixed mobile bottom tab bar (set by TopNav on agent pages). */
+/* Room for the fixed mobile bottom tab bar (set by TopNav on agent pages),
+   and lift the feedback pill clear of it so it never covers a tab. */
 @media (max-width: 767px) {
   body.has-bottomnav {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    padding-bottom: calc(74px + env(safe-area-inset-bottom));
+  }
+  body.has-bottomnav .feedback-float {
+    bottom: calc(76px + env(safe-area-inset-bottom));
   }
 }
 

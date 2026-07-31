@@ -262,11 +262,11 @@ export function TopNav({
           <Link
             key={t.key}
             href={t.href}
-            className={`flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[10px] font-semibold transition-colors ${
+            className={`flex flex-col items-center gap-1 pt-3 pb-2.5 text-[11px] font-semibold transition-colors ${
               active === t.key ? "text-brand-700" : "text-ink-muted hover:text-ink"
             }`}
           >
-            <t.Icon size={19} />
+            <t.Icon size={22} />
             {t.label}
           </Link>
         ))}

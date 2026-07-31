@@ -35,7 +35,9 @@ export function FeedbackWidget({ source, context }: { source: "agent" | "partner
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2 print:hidden">
+    // `feedback-float` lets globals.css lift this above the mobile tab bar on
+    // agent pages (body.has-bottomnav). Portals have no tab bar and stay put.
+    <div className="feedback-float fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2 print:hidden">
       {open && (
         <div className="card p-4 w-72 shadow-lift">
           {state === "sent" ? (
