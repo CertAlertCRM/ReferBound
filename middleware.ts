@@ -27,9 +27,7 @@ const PUBLIC_PREFIXES = [
   "/icon.svg",
   // PWA assets — must load before sign-in for install prompts to work.
   "/manifest.webmanifest",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/icon-512-maskable.png",
+  "/icon-", // all PWA icon sizes (48–512 + maskable)
   "/apple-touch-icon.png",
 ];
 

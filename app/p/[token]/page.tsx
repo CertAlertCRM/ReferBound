@@ -69,6 +69,17 @@ function Progress({ status }: { status: string }) {
   );
 }
 
+// Each portal is its own installable app: the per-portal manifest names it
+// after the partnership and opens straight to this page — never the agent
+// login. iOS Add-to-Home-Screen saves the current URL, so it works there too.
+export function generateMetadata({ params }: { params: { token: string } }) {
+  const slug = params.token.replace(/[^a-zA-Z0-9]/g, "");
+  return {
+    manifest: `/api/p/${slug}/manifest`,
+    appleWebApp: { capable: true, title: "Referrals", statusBarStyle: "default" as const },
+  };
+}
+
 export default async function PartnerPortal({ params }: { params: { token: string } }) {
   noStore(); // opt this render out of every Next.js cache layer — always live data
   // Accept both the original long token and the compact short code — old
@@ -506,6 +517,11 @@ export default async function PartnerPortal({ params }: { params: { token: strin
       <FeedbackWidget source="partner" context={`portal: ${partner.name}`} />
 
       <footer className="text-center text-xs text-ink-muted pt-4 pb-8">
+        <span className="block mb-2">
+          📱 Keep this portal one tap away — on iPhone: Safari → Share → Add to Home Screen; on
+          Android or desktop Chrome/Edge: the Install option in the address bar. It opens straight
+          here, like an app.
+        </span>
         <a href="/" className="hover:underline">
           Powered by <span className="font-semibold text-ink-secondary">Refer<span className="text-brand">Bound</span></span>
         </a>
