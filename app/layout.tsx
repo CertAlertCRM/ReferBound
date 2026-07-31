@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   title: `${APP_CONFIG.productName} — Live referral tracking`,
   description: "Real-time referral tracking between insurance agents and their partners.",
   icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
