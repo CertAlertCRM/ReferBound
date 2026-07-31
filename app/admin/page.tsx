@@ -17,6 +17,7 @@ type Summary = {
     paying: number;
     viaStripe: number;
     founderAnnual: number;
+    discounted: number;
     viaReferral: number;
     onEarnedPro: number;
     mrr: number;
@@ -121,7 +122,7 @@ export default function AdminPage() {
             {
               v: `$${t.mrr.toLocaleString()}`,
               l: "MRR",
-              hint: `${t.paying} paying · ${t.viaStripe} via Stripe${t.founderAnnual ? ` · ${t.founderAnnual} founding annual` : ""}`,
+              hint: `${t.paying} paying · ${t.viaStripe} via Stripe${t.founderAnnual ? ` · ${t.founderAnnual} founding annual` : ""}${t.discounted ? ` · ${t.discounted} discounted` : ""}`,
             },
             {
               v: String(t.accounts),

@@ -5,10 +5,18 @@ import { getAccount, PLAN_LABELS } from "@/lib/account";
 // Agent-only: current plan + the Stripe Payment Link URLs with this account's
 // id and email attached, so the webhook can activate the right account.
 
-function withParams(link: string | undefined, accountId: string, email: string): string | null {
+// The plan key rides along in client_reference_id ("<accountId>_agency") so the
+// webhook never has to guess the plan from the price — which is what makes
+// discounted and custom-priced links safe.
+function withParams(
+  link: string | undefined,
+  accountId: string,
+  email: string,
+  planKey: "pro" | "agency" | "founder"
+): string | null {
   if (!link) return null;
   const sep = link.includes("?") ? "&" : "?";
-  return `${link}${sep}client_reference_id=${encodeURIComponent(accountId)}&prefilled_email=${encodeURIComponent(email)}`;
+  return `${link}${sep}client_reference_id=${encodeURIComponent(`${accountId}_${planKey}`)}&prefilled_email=${encodeURIComponent(email)}`;
 }
 
 export async function GET() {
@@ -47,9 +55,9 @@ export async function GET() {
     ownerEmail: null,
     billingInterval: row?.billing_interval ?? "monthly",
     links: {
-      pro: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_PRO, account.id, account.email),
-      agency: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_AGENCY, account.id, account.email),
-      founder: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_FOUNDER, account.id, account.email),
+      pro: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_PRO, account.id, account.email, "pro"),
+      agency: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_AGENCY, account.id, account.email, "agency"),
+      founder: withParams(process.env.NEXT_PUBLIC_STRIPE_LINK_FOUNDER, account.id, account.email, "founder"),
       portal: process.env.NEXT_PUBLIC_STRIPE_PORTAL_LINK ?? null,
     },
   });

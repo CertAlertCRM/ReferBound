@@ -40,22 +40,34 @@ export async function POST(req: NextRequest) {
   const obj = event?.data?.object ?? {};
 
   if (event.type === "checkout.session.completed") {
-    const accountId = obj.client_reference_id;
+    // client_reference_id carries "<accountId>" or "<accountId>_<planKey>".
+    // The suffix is what makes discounts safe: a friend paying $50 for Agency
+    // must not be read as Pro just because the amount isn't $99. Amount is
+    // only a fallback for links created before this existed.
+    const ref = String(obj.client_reference_id ?? "");
+    const [accountId, planKey] = ref.split("_");
+    const cents = obj.amount_total ?? 0;
+
     if (accountId) {
-      // Plan by amount (cents). Exact prices, not thresholds — a threshold
-      // would misread the $199/yr Founder Annual (19900¢) as Agency:
-      //   $20/mo  (2000)  → pro, monthly
-      //   $99/mo  (9900)  → agency, monthly
-      //   $199/yr (19900) → pro, annual (founding rate — Pro features)
-      // If a price ever changes in Stripe, update this map in the same commit.
-      const cents = obj.amount_total ?? 0;
-      const plan = cents === 9900 ? "agency" : "pro";
-      const billing_interval = cents >= 19900 ? "annual" : "monthly";
+      const BY_KEY: Record<string, { plan: string; interval: string }> = {
+        pro: { plan: "pro", interval: "monthly" },
+        agency: { plan: "agency", interval: "monthly" },
+        founder: { plan: "pro", interval: "annual" },
+      };
+      const resolved =
+        BY_KEY[planKey] ??
+        ({
+          plan: cents === 9900 ? "agency" : "pro",
+          interval: cents >= 19900 ? "annual" : "monthly",
+        } as const);
+
       await db()
         .from("accounts")
         .update({
-          plan,
-          billing_interval,
+          plan: resolved.plan,
+          billing_interval: resolved.interval,
+          // What they actually pay, discount included — MRR reads this.
+          plan_amount_cents: cents > 0 ? cents : null,
           stripe_customer_id: obj.customer ?? null,
           stripe_subscription_id: obj.subscription ?? null,
           subscription_status: "active",
@@ -71,6 +83,7 @@ export async function POST(req: NextRequest) {
       if (status === "canceled" || status === "unpaid") {
         patch.plan = "free";
         patch.billing_interval = "monthly";
+        patch.plan_amount_cents = null;
       }
       await db().from("accounts").update(patch).eq("stripe_customer_id", obj.customer);
     }
@@ -80,7 +93,13 @@ export async function POST(req: NextRequest) {
     if (obj.customer) {
       await db()
         .from("accounts")
-        .update({ plan: "free", billing_interval: "monthly", subscription_status: "canceled", stripe_subscription_id: null })
+        .update({
+          plan: "free",
+          billing_interval: "monthly",
+          plan_amount_cents: null,
+          subscription_status: "canceled",
+          stripe_subscription_id: null,
+        })
         .eq("stripe_customer_id", obj.customer);
     }
   }

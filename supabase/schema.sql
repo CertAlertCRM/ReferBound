@@ -189,6 +189,9 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- Actual charged amount, for real MRR (see migration_33)
+alter table accounts add column if not exists plan_amount_cents integer;
+
 -- Agent referral program (see migration_32)
 alter table accounts add column if not exists referral_code text unique
   default substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const s = db();
   const [{ data: accounts }, { data: partners }, { data: referrals }, { data: emails }] =
     await Promise.all([
-      s.from("accounts").select("id, email, plan, billing_interval, created_at, team_owner_id, stripe_subscription_id, referred_by, pro_until"),
+      s.from("accounts").select("id, email, plan, billing_interval, plan_amount_cents, created_at, team_owner_id, stripe_subscription_id, referred_by, pro_until"),
       s.from("partners").select("id, account_id, partner_type"),
       s.from("referrals").select("id, account_id, status, premium, created_at, source, backfilled"),
       s.from("email_log").select("kind, sent, created_at"),
@@ -44,14 +44,23 @@ export async function GET(req: NextRequest) {
   for (const a of owners) byPlan[a.plan] = (byPlan[a.plan] ?? 0) + 1;
   const paying = owners.filter((a) => (PLAN_PRICE[a.plan] ?? 0) > 0);
   const founderAnnual = paying.filter((a) => a.billing_interval === "annual").length;
-  // Annual accounts contribute their monthly equivalent ($199/12) to MRR.
-  const mrr = Math.round(
-    paying.reduce(
-      (sum, a) =>
-        sum + (a.billing_interval === "annual" ? FOUNDER_ANNUAL_PRICE / 12 : PLAN_PRICE[a.plan] ?? 0),
-      0
-    )
-  );
+  // Real money, not list price: use what Stripe actually charged when we have
+  // it, so discounted plans and annual terms report honestly. List price is
+  // the fallback for accounts set by hand before this existed.
+  const monthlyValue = (a: any): number => {
+    const cents = a.plan_amount_cents;
+    if (typeof cents === "number" && cents > 0) {
+      return a.billing_interval === "annual" ? cents / 100 / 12 : cents / 100;
+    }
+    return a.billing_interval === "annual" ? FOUNDER_ANNUAL_PRICE / 12 : PLAN_PRICE[a.plan] ?? 0;
+  };
+  const mrr = Math.round(paying.reduce((sum, a) => sum + monthlyValue(a), 0));
+  const discounted = paying.filter(
+    (a) =>
+      typeof a.plan_amount_cents === "number" &&
+      a.billing_interval !== "annual" &&
+      a.plan_amount_cents / 100 < (PLAN_PRICE[a.plan] ?? 0)
+  ).length;
   const viaStripe = paying.filter((a) => a.stripe_subscription_id).length;
 
   // Signups per day, last 14 days (UTC).
@@ -111,6 +120,7 @@ export async function GET(req: NextRequest) {
       paying: paying.length,
       viaStripe,
       founderAnnual,
+      discounted,
       // How much of the base came from agents referring agents — the number
       // that tells you whether this thing spreads on its own yet.
       viaReferral: accts.filter((a) => a.referred_by).length,
