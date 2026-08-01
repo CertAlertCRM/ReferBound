@@ -6,6 +6,8 @@ import {
   extractFromEmail,
   createReferralFromInbound,
   sendAcknowledgment,
+  findForwardedSender,
+  findForwardedName,
   INBOX_DOMAIN,
 } from "@/lib/inbound";
 import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
@@ -102,7 +104,27 @@ export async function POST(req: NextRequest) {
   if (!body && providerId) body = await fetchBody(providerId);
   body = body.slice(0, 40000);
 
-  const match = await matchSender(account.id, fromEmail);
+  // Who actually sent this referral. On a forward that's not the envelope
+  // sender — it's whoever's From: line sits inside the body. Without this,
+  // every forwarded email fails to match a partner and lands in review, which
+  // is the exact opposite of what forwarding is for.
+  let match = await matchSender(account.id, fromEmail);
+  let forwardedFrom: string | null = null;
+
+  if (match.kind === "none") {
+    const original = findForwardedSender(body);
+    if (original && original !== fromEmail) {
+      const viaForward = await matchSender(account.id, original);
+      if (viaForward.kind !== "none") {
+        match = viaForward;
+        forwardedFrom = original;
+      }
+    }
+  }
+
+  // Whoever we end up answering: the loan officer who wrote it, not the agent
+  // who passed it along.
+  const replyTo = forwardedFrom ?? fromEmail;
 
   const { data: prof } = await db()
     .from("agent_profile")
@@ -114,7 +136,8 @@ export async function POST(req: NextRequest) {
     account_id: account.id,
     provider_id: providerId,
     from_email: fromEmail || "unknown",
-    from_name: fromName || null,
+    from_name: (forwardedFrom ? findForwardedName(body) : null) ?? fromName ?? null,
+    forwarded_from: forwardedFrom,
     subject,
     body,
     partner_id: match.partnerId,
@@ -162,7 +185,7 @@ export async function POST(req: NextRequest) {
   row.referral_id = referral.id;
 
   // Acknowledge — but only to a sender we actually recognize.
-  if (prof?.inbox_autoack !== false && fromEmail && match.kind !== "none") {
+  if (prof?.inbox_autoack !== false && replyTo && match.kind !== "none") {
     const { data: partner } = await db()
       .from("partners")
       .select("token")
@@ -171,7 +194,7 @@ export async function POST(req: NextRequest) {
     if (partner?.token) {
       const sent = await sendAcknowledgment({
         accountId: account.id,
-        to: fromEmail,
+        to: replyTo,
         referralId: referral.id,
         clientName: String(extracted.client_name),
         partnerName: match.partnerName ?? "",

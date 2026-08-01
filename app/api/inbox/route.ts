@@ -30,7 +30,7 @@ export async function GET() {
 
   const { data, error } = await db()
     .from("inbound_emails")
-    .select("id, from_email, from_name, subject, body, match_kind, extracted, status, referral_id, error, created_at, partners(id, name)")
+    .select("id, from_email, from_name, forwarded_from, subject, body, match_kind, extracted, status, referral_id, error, created_at, partners(id, name)")
     .eq("account_id", account.id)
     .order("created_at", { ascending: false })
     .limit(60);
@@ -88,13 +88,16 @@ export async function POST(req: NextRequest) {
 
   // If the sender turns out to be someone on this partner's team, tie the lead
   // to them so their notifications route correctly from here on.
+  // On a forward, the person to tie this to is whoever wrote the original —
+  // not the agent who passed it along.
+  const senderEmail = row.forwarded_from ?? row.from_email;
   let contactId: string | null = row.contact_id ?? null;
-  if (!contactId && row.from_email) {
+  if (!contactId && senderEmail) {
     const { data: c } = await db()
       .from("partner_contacts")
       .select("id")
       .eq("partner_id", partner.id)
-      .eq("email", String(row.from_email).toLowerCase())
+      .eq("email", String(senderEmail).toLowerCase())
       .maybeSingle();
     contactId = c?.id ?? null;
   }
@@ -120,10 +123,10 @@ export async function POST(req: NextRequest) {
 
   // Acknowledgment is opt-in per accept here, since the agent may already have
   // replied by hand before getting to the queue.
-  if (body?.acknowledge && row.from_email) {
+  if (body?.acknowledge && senderEmail) {
     const sent = await sendAcknowledgment({
       accountId: account.id,
-      to: row.from_email,
+      to: senderEmail,
       referralId: referral.id,
       clientName: String(extracted.client_name),
       partnerName: partner.name,

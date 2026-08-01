@@ -19,6 +19,7 @@ type Row = {
   id: string;
   from_email: string;
   from_name: string | null;
+  forwarded_from?: string | null;
   subject: string | null;
   body: string | null;
   match_kind: string | null;
@@ -180,7 +181,10 @@ export default function InboxPage() {
                         </p>
                         <p className="text-xs text-ink-muted mt-0.5">
                           from {r.from_name ? `${r.from_name} · ` : ""}
-                          {r.from_email}
+                          {r.forwarded_from ?? r.from_email}
+                          {r.forwarded_from && (
+                            <span className="text-ink-muted"> · forwarded by you</span>
+                          )}
                         </p>
                       </div>
                       <span className="shrink-0 flex items-center gap-1.5">
@@ -249,8 +253,8 @@ export default function InboxPage() {
                           onChange={(ev) => setAck(ev.target.checked)}
                         />
                         <span>
-                          Reply to {r.from_email} that you&apos;ve got it and you&apos;re working on the
-                          quote
+                          Reply to {r.forwarded_from ?? r.from_email} that you&apos;ve got it and
+                          you&apos;re working on the quote
                           <span className="block text-ink-muted">
                             Uncheck if you already answered them yourself.
                           </span>
@@ -300,7 +304,8 @@ export default function InboxPage() {
                       {r.extracted?.client_name || r.subject || "(no subject)"}
                     </p>
                     <p className="text-[11px] text-ink-muted">
-                      {r.from_email} · {r.status === "created" ? "logged as a lead" : "dismissed"}
+                      {r.forwarded_from ?? r.from_email} ·{" "}
+                      {r.status === "created" ? "logged as a lead" : "dismissed"}
                     </p>
                   </div>
                   {r.referral_id && (

@@ -155,6 +155,72 @@ export async function matchSender(accountId: string, fromEmail: string): Promise
   return none;
 }
 
+// ── Forwards ────────────────────────────────────────────────────────────────
+//
+// The whole product assumes an agent forwards the intro email their loan
+// officer sent them. On a forward, the envelope sender is the AGENT — so
+// matching on it finds nobody, and the lead that should have logged itself
+// sits in a review queue instead.
+//
+// The original sender is still there, in the header block every mail client
+// writes into the body. Gmail writes "---------- Forwarded message ---------",
+// Apple Mail writes "Begin forwarded message:", Outlook writes
+// "-----Original Message-----" or just a bare "From:" block. All of them put a
+// From: line first.
+
+const FORWARD_MARKERS = [
+  /-{2,}\s*forwarded message\s*-{2,}/i,
+  /begin forwarded message:/i,
+  /-{2,}\s*original message\s*-{2,}/i,
+];
+
+const FROM_LINE = /^[ \t>]*from:[ \t]*(.+)$/im;
+const EMAIL_IN = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+
+// The address of whoever actually wrote the message being forwarded. Returns
+// null when this doesn't look like a forward at all.
+export function findForwardedSender(body: string): string | null {
+  if (!body) return null;
+
+  // Start from the earliest forward marker when there is one — a long thread
+  // can contain many From: lines, and the one that matters is the first after
+  // the marker. Without a marker (Outlook mobile does this), take the first
+  // From: line in the body.
+  let from = 0;
+  for (const re of FORWARD_MARKERS) {
+    const m = body.match(re);
+    if (m?.index !== undefined && (from === 0 || m.index < from)) from = m.index;
+  }
+
+  const region = body.slice(from, from + 4000);
+  const line = region.match(FROM_LINE);
+  if (!line) return null;
+
+  const email = line[1].match(EMAIL_IN)?.[0]?.toLowerCase() ?? null;
+  if (!email) return null;
+  // Never resolve to our own intake address — that's the forward's destination,
+  // not its author.
+  if (email.endsWith(`@${INBOX_DOMAIN}`)) return null;
+  return email;
+}
+
+// The display name on that same From: line, when there is one.
+export function findForwardedName(body: string): string | null {
+  if (!body) return null;
+  let from = 0;
+  for (const re of FORWARD_MARKERS) {
+    const m = body.match(re);
+    if (m?.index !== undefined && (from === 0 || m.index < from)) from = m.index;
+  }
+  const line = body.slice(from, from + 4000).match(FROM_LINE);
+  if (!line) return null;
+  const name = line[1]
+    .replace(/<[^>]*>/g, "")
+    .replace(/["']/g, "")
+    .trim();
+  return name && !EMAIL_IN.test(name) ? name.slice(0, 120) : null;
+}
+
 // ── Extraction ──────────────────────────────────────────────────────────────
 
 const SYSTEM = `You read an email that a mortgage loan officer, processor, or
@@ -169,6 +235,9 @@ Rules:
 - Extract ONLY what is explicitly present. Never guess or infer. Use null when
   a field is absent — a wrong value is far worse than a missing one.
 - The CLIENT is the borrower/buyer being introduced, never the sender.
+- The message is often a FORWARD. If you see a forwarded header block, the
+  person who matters is the ORIGINAL author in that block, not whoever
+  forwarded it — report them as sender_name / sender_company.
 - Dates in ISO format (YYYY-MM-DD).
 - is_referral is false for anything that is not introducing a client for a
   quote: status questions, document requests, marketing, newsletters,

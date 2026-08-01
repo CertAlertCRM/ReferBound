@@ -297,6 +297,9 @@ create unique index if not exists idx_inbound_provider on inbound_emails(provide
 -- emails: client names, phones, addresses, whatever the loan officer typed.
 alter table inbound_emails enable row level security;
 
+-- Forwarded referrals (see migration_42)
+alter table inbound_emails add column if not exists forwarded_from text;
+
 -- Contacts who receive documents automatically (see migration_35)
 alter table partner_contacts add column if not exists doc_recipient boolean not null default false;
 create index if not exists idx_partner_contacts_doc_recipient
