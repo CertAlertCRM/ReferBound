@@ -81,6 +81,8 @@ export function TopNav({
 }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Desktop overflow menu — Billing, Help, Admin, Sign out.
+  const [moreOpen, setMoreOpen] = useState(false);
   // Support view marker — set by /api/admin/impersonate, shown as an amber bar
   // so there's never ambiguity about whose account is on screen.
   const [supportView, setSupportView] = useState<string | null>(null);
@@ -149,6 +151,11 @@ export function TopNav({
     };
   }, [active]);
 
+  useEffect(() => {
+    setMoreOpen(false);
+    setMenuOpen(false);
+  }, [active]);
+
   // Reserve room for the fixed bottom tab bar on small screens.
   useEffect(() => {
     document.body.classList.add("has-bottomnav");
@@ -165,17 +172,27 @@ export function TopNav({
     window.location.href = "/login";
   }
 
-  const links: { href: string; key: string; label: string }[] = [
+  // The bar holds the pages an agent moves between during a working day.
+  // Everything you visit occasionally lives behind the menu — adding Closing
+  // and Intake made the difference between a nav bar and a wall of words.
+  const primary: { href: string; key: string; label: string }[] = [
     { href: "/", key: "referrals", label: "Referrals" },
     { href: "/partners", key: "partners", label: "Partners" },
     { href: "/closing", key: "closing", label: "Closing" },
     { href: "/inbox", key: "inbox", label: "Intake" },
     { href: "/stats", key: "stats", label: "Stats" },
     { href: "/profile", key: "profile", label: "Profile" },
+  ];
+
+  const overflow: { href: string; key: string; label: string }[] = [
     { href: "/billing", key: "billing", label: "Billing" },
     { href: "/help", key: "help", label: "Help" },
     ...(isAdmin ? [{ href: "/admin", key: "admin", label: "Admin" }] : []),
   ];
+
+  // The mobile sheet still lists everything — there's no crowding problem in a
+  // vertical list, and hiding things behind two taps would be worse.
+  const links = [...primary, ...overflow];
 
   const tab = (href: string, key: string, label: string) => (
     <Link
@@ -207,14 +224,53 @@ export function TopNav({
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          {links.map((l) => tab(l.href, l.key, l.label))}
-          <button
-            onClick={signOut}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors"
-            title="Sign out"
-          >
-            Sign out
-          </button>
+          {primary.map((l) => tab(l.href, l.key, l.label))}
+
+          <div className="relative">
+            <button
+              onClick={() => setMoreOpen(!moreOpen)}
+              className={`px-2.5 py-1.5 rounded-lg transition-colors ${
+                moreOpen || overflow.some((l) => l.key === active)
+                  ? "bg-brand-light text-brand-700"
+                  : "text-ink-secondary hover:text-ink hover:bg-slate-100"
+              }`}
+              aria-label={moreOpen ? "Close menu" : "More"}
+              aria-expanded={moreOpen}
+            >
+              <IconMenu size={18} />
+            </button>
+
+            {moreOpen && (
+              <>
+                {/* Click anywhere to dismiss — cheaper and more reliable than
+                    listening for outside clicks on the document. */}
+                <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-20 w-44 rounded-xl border border-slate-200 bg-white shadow-lift py-1.5 animate-dialog-in">
+                  {overflow.map((l) => (
+                    <Link
+                      key={l.key}
+                      href={l.href}
+                      onClick={() => setMoreOpen(false)}
+                      className={`block px-3.5 py-2 text-sm font-medium transition-colors ${
+                        active === l.key
+                          ? "text-brand-700 bg-brand-light/60"
+                          : "text-ink-secondary hover:text-ink hover:bg-slate-50"
+                      }`}
+                    >
+                      {l.label}
+                    </Link>
+                  ))}
+                  <div className="border-t border-slate-100 my-1.5" />
+                  <button
+                    onClick={signOut}
+                    className="block w-full text-left px-3.5 py-2 text-sm font-medium text-ink-muted hover:text-ink hover:bg-slate-50 transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </nav>
 
         {/* Mobile: hamburger — every destination reachable without side-scrolling */}
