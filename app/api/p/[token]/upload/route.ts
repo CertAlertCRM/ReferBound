@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
-import { DOC_KINDS } from "@/lib/config";
+import { DOC_KINDS, shouldPersistDoc } from "@/lib/config";
+import { extractFromAttachment, applyExtractedToReferral } from "@/lib/inbound-docs";
+import { autoMatchClause } from "@/lib/clauses";
 import { logActivity } from "@/lib/activity";
 
 // Public (token-guarded): partner uploads a document (1003, HOI request,
@@ -38,6 +40,29 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");
   const path = `${referral.id}/${Date.now()}-partner-${kind}-${safeName}`;
   const buf = Buffer.from(await file.arrayBuffer());
+
+  // Same rule wherever a loan application enters: read it, use it, don't keep
+  // it. The processor who sent it still has it; the agent never needed a copy.
+  if (!shouldPersistDoc(kind)) {
+    const fields = await extractFromAttachment(buf, safeName).catch(() => null);
+    const filled = await applyExtractedToReferral(referral.id, fields);
+    if (fields) {
+      await autoMatchClause(referral.id, {
+        loanType: fields.loan_type ?? null,
+        investor: fields.investor ?? null,
+        text: fields.loan_number ?? null,
+      });
+    }
+    await logActivity(
+      referral.id,
+      "document_uploaded",
+      `${partner.name} sent ${safeName} — read and discarded; loan applications aren't stored.${
+        filled.length > 0 ? ` Filled in ${filled.join(", ")}.` : ""
+      }`,
+      "partner"
+    );
+    return NextResponse.json({ ok: true, discarded: true, filled });
+  }
 
   const { error: upErr } = await db()
     .storage.from(DOCS_BUCKET)

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
-import { DOC_KINDS } from "@/lib/config";
+import { DOC_KINDS, shouldPersistDoc } from "@/lib/config";
+import { extractFromAttachment, applyExtractedToReferral } from "@/lib/inbound-docs";
+import { autoMatchClause } from "@/lib/clauses";
 import { logActivity } from "@/lib/activity";
 import { getAccount, ownedReferral } from "@/lib/account";
 
@@ -22,6 +24,31 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");
   const path = `${params.id}/${Date.now()}-${kind}-${safeName}`;
   const buf = Buffer.from(await file.arrayBuffer());
+
+  // A loan application is read here and never written down. It carries the
+  // borrower's SSN, income, and assets — none of which is needed to quote —
+  // so the file goes no further than this request. What it says lands on the
+  // referral; the original stays wherever the agent already has it.
+  if (!shouldPersistDoc(kind)) {
+    const fields = await extractFromAttachment(buf, safeName).catch(() => null);
+    const filled = await applyExtractedToReferral(params.id, fields);
+    if (fields) {
+      await autoMatchClause(params.id, {
+        loanType: fields.loan_type ?? null,
+        investor: fields.investor ?? null,
+        text: fields.loan_number ?? null,
+      });
+    }
+    await logActivity(
+      params.id,
+      "document_uploaded",
+      `Read ${safeName} and discarded it — loan applications aren't stored.${
+        filled.length > 0 ? ` Filled in ${filled.join(", ")}.` : ""
+      }`,
+      "agent"
+    );
+    return NextResponse.json({ document: null, discarded: true, filled });
+  }
 
   const { error: upErr } = await db()
     .storage.from(DOCS_BUCKET)

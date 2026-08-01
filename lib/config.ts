@@ -127,6 +127,19 @@ export const PARTNER_DOC_KINDS = ["loan_1003", "hoi_request", "mortgagee", "othe
 // the details pulled off it stay on the referral. See lib/retention.
 export const SENSITIVE_DOC_KINDS = ["loan_1003"];
 
+// Documents that are read and then thrown away, never written to storage.
+//
+// A loan application carries the borrower's SSN, income, and assets. None of it
+// is needed to quote, and the safest copy of a document like that is the one
+// that was never kept. What it told us — names, address, closing date, loan
+// number — lands on the referral; the file itself does not survive the request
+// that read it. The agent still has the original in the inbox it arrived in.
+export const NEVER_STORE_KINDS = ["loan_1003"];
+
+export function shouldPersistDoc(kind: string): boolean {
+  return !NEVER_STORE_KINDS.includes(kind);
+}
+
 // Source-file retention choices (days; 0 = keep indefinitely).
 export const RETENTION_CHOICES = [
   { days: 0, label: "Keep source files" },

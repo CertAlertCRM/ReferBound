@@ -3,6 +3,8 @@ import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
 import { autoMatchClause } from "@/lib/clauses";
 import { recordProspectFromDoc } from "@/lib/radar";
+import { shouldPersistDoc } from "@/lib/config";
+import { logActivity } from "@/lib/activity";
 
 // Attachments on a forwarded referral.
 //
@@ -21,12 +23,47 @@ import { recordProspectFromDoc } from "@/lib/radar";
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_FILES = 5;
 
+// Outlook signatures arrive as a pile of inline images — logos, social icons,
+// award badges. A single forward brought seven. They are referenced by
+// content_id from inside the HTML body, never sent as documents, and feeding
+// them to an extractor is both expensive and a good way to hallucinate a
+// client named "Equal Housing Lender".
+export function isRealAttachment(a: any): boolean {
+  const disposition = String(a?.content_disposition ?? a?.disposition ?? "").toLowerCase();
+  if (disposition === "inline") return false;
+  if (a?.content_id) return false;
+  return true;
+}
+
+// Microsoft Purview / Outlook message encryption wraps the whole message in
+// this. The body doesn't arrive empty — it doesn't arrive at all, and the only
+// "attachment" is the sealed envelope. It's bound to the recipient's identity
+// in Microsoft's directory and cannot be opened by us, so the honest move is to
+// recognize it and say so rather than produce nothing and stay quiet.
+export function isSealedMessage(attachments: any[]): boolean {
+  return (attachments ?? []).some((a) => {
+    const name = String(a?.filename ?? "").toLowerCase();
+    const type = String(a?.content_type ?? "").toLowerCase();
+    return name.endsWith(".rpmsg") || type.includes("rpmsg") || type.includes("pkcs7-mime");
+  });
+}
+
+// A PDF that needs a password to open. Detected from the file itself rather
+// than trusted from a filename — /Encrypt in the trailer is the marker.
+export function isLockedPdf(buffer: Buffer): boolean {
+  if (buffer.subarray(0, 5).toString("latin1") !== "%PDF-") return false;
+  return buffer.subarray(0, Math.min(buffer.length, 4_000_000)).includes(Buffer.from("/Encrypt"));
+}
+
 export type InboundAttachment = {
   filename: string;
   contentType: string | null;
   bytes: number;
-  storagePath: string;
+  // Null when the document was read and discarded rather than kept.
+  storagePath: string | null;
   kind: string;
+  locked?: boolean;
+  discarded?: boolean;
 };
 
 // Guess what a document is from its name. The AI reads the contents either
@@ -75,7 +112,7 @@ export async function fetchInboundAttachments(
     }
   }
 
-  for (const a of list.slice(0, MAX_FILES)) {
+  for (const a of list.filter(isRealAttachment).slice(0, MAX_FILES)) {
     const filename = String(a?.filename ?? a?.name ?? "attachment");
     const contentType = a?.content_type ?? a?.contentType ?? null;
     // Only formats the extractor can actually read. A .docx attachment is
@@ -107,6 +144,23 @@ export async function storeInboundAttachments(
 ): Promise<InboundAttachment[]> {
   const stored: InboundAttachment[] = [];
   for (const f of files) {
+    const kind = guessDocKind(f.filename);
+
+    // A loan application is read in memory and never written down. Everything
+    // it tells us is already on the referral by the time this returns.
+    if (!shouldPersistDoc(kind)) {
+      stored.push({
+        filename: f.filename,
+        contentType: f.contentType,
+        bytes: f.buffer.length,
+        storagePath: null,
+        kind,
+        locked: isLockedPdf(f.buffer),
+        discarded: true,
+      });
+      continue;
+    }
+
     const safe = f.filename.replace(/[^\w.\-]/g, "_").slice(0, 120);
     const path = `inbound/${accountId}/${inboundId}/${Date.now()}-${safe}`;
     const { error } = await db()
@@ -118,7 +172,8 @@ export async function storeInboundAttachments(
       contentType: f.contentType,
       bytes: f.buffer.length,
       storagePath: path,
-      kind: guessDocKind(f.filename),
+      kind,
+      locked: isLockedPdf(f.buffer),
     });
   }
   return stored;
@@ -163,15 +218,23 @@ export async function extractFromAttachment(
   buffer: Buffer,
   fileName: string
 ): Promise<Record<string, any> | null> {
-  const media = mediaTypeFor(fileName);
-  if (!media) return null;
+  // Text arrives this way from an unlocked PDF, where the decoder gives us the
+  // words rather than the page.
+  const asText = /\.txt$/i.test(fileName);
+  const media = asText ? null : mediaTypeFor(fileName);
+  if (!media && !asText) return null;
+  // Reading a locked PDF costs an API call to be told nothing. Skip it; the
+  // agent unlocks it on the deal and extraction runs then.
+  if (!asText && isLockedPdf(buffer)) return null;
   try {
     const raw = await askClaude({
       system: DOC_SYSTEM,
       content: [
-        media === "application/pdf"
-          ? { type: "document", source: { type: "base64", media_type: media, data: buffer.toString("base64") } }
-          : { type: "image", source: { type: "base64", media_type: media, data: buffer.toString("base64") } },
+        asText
+          ? { type: "text", text: buffer.toString("utf8").slice(0, 40000) }
+          : media === "application/pdf"
+            ? { type: "document", source: { type: "base64", media_type: media!, data: buffer.toString("base64") } }
+            : { type: "image", source: { type: "base64", media_type: media!, data: buffer.toString("base64") } },
       ],
       maxTokens: 1000,
     });
@@ -197,6 +260,45 @@ export function mergeExtracted(fromBody: any, fromDoc: any): any {
   return merged;
 }
 
+// Fill in whatever the referral is still missing. Never overwrites something
+// already there — a document is a source, not an authority over the agent.
+export async function applyExtractedToReferral(
+  referralId: string,
+  fields: any
+): Promise<string[]> {
+  if (!fields) return [];
+  const { data: r } = await db()
+    .from("referrals")
+    .select("client_name, coborrower_name, client_phone, client_email, property_address, closing_date, notes")
+    .eq("id", referralId)
+    .maybeSingle();
+  if (!r) return [];
+
+  const patch: Record<string, unknown> = {};
+  const filled: string[] = [];
+  const map: [string, any][] = [
+    ["coborrower_name", fields.coborrower_name],
+    ["client_phone", normalizePhone(fields.client_phone)],
+    ["client_email", normalizeEmail(fields.client_email)],
+    ["property_address", fields.property_address],
+    ["closing_date", /^\d{4}-\d{2}-\d{2}$/.test(String(fields.closing_date ?? "")) ? fields.closing_date : null],
+  ];
+  for (const [k, v] of map) {
+    if (v && !(r as any)[k]) {
+      patch[k] = v;
+      filled.push(k.replace(/_/g, " "));
+    }
+  }
+  if (fields.loan_number && !String(r.notes ?? "").includes(String(fields.loan_number))) {
+    patch.notes = [r.notes, `Loan #${fields.loan_number}`].filter(Boolean).join(" · ").slice(0, 1000);
+    filled.push("loan number");
+  }
+  if (Object.keys(patch).length > 0) {
+    await db().from("referrals").update(patch).eq("id", referralId);
+  }
+  return filled;
+}
+
 // ── Attaching them to a referral ────────────────────────────────────────────
 
 export async function attachStoredToReferral(
@@ -204,11 +306,26 @@ export async function attachStoredToReferral(
   stored: InboundAttachment[]
 ): Promise<void> {
   if (stored.length === 0) return;
+  const keep = stored.filter((s) => s.storagePath && !s.discarded);
+  const dropped = stored.filter((s) => s.discarded);
+
+  // Say plainly on the timeline that a document arrived, was read, and wasn't
+  // kept — otherwise "where's the 1003?" has no answer anywhere in the product.
+  for (const d of dropped) {
+    await logActivity(
+      referralId,
+      "document_uploaded",
+      `Read ${d.filename} and discarded it — loan applications aren't stored. The details it carried are on this referral; the original is in your inbox.`,
+      "system"
+    ).catch(() => {});
+  }
+
+  if (keep.length === 0) return;
   try {
     await db()
       .from("documents")
       .insert(
-        stored.map((s) => ({
+        keep.map((s) => ({
           referral_id: referralId,
           kind: s.kind,
           file_name: s.filename,

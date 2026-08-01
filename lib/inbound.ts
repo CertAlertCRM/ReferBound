@@ -238,6 +238,12 @@ Rules:
 - The message is often a FORWARD. If you see a forwarded header block, the
   person who matters is the ORIGINAL author in that block, not whoever
   forwarded it — report them as sender_name / sender_company.
+- THE SUBJECT LINE COUNTS. Lender subjects are frequently structured and carry
+  the whole referral, e.g. "The Cowart Team | HOI Request | Jane A Smith |
+  418 Maple Ave". Extract the client and property address from it. If the
+  subject alone identifies a client, is_referral is true even when the body is
+  empty or unavailable — say confidence "medium" in that case, or "low" if the
+  subject is vague.
 - Dates in ISO format (YYYY-MM-DD).
 - is_referral is false for anything that is not introducing a client for a
   quote: status questions, document requests, marketing, newsletters,
@@ -274,8 +280,14 @@ export type Extracted = {
   sender_company?: string | null;
 };
 
+export function cleanSubject(subject: string): string {
+  return String(subject ?? "")
+    .replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, "")
+    .trim();
+}
+
 export async function extractFromEmail(subject: string, body: string): Promise<Extracted> {
-  const text = `Subject: ${subject}\n\n${body}`.slice(0, 20000);
+  const text = `Subject: ${cleanSubject(subject)}\n\n${body}`.slice(0, 20000);
   const raw = await askClaude({
     system: SYSTEM,
     content: [{ type: "text", text }],

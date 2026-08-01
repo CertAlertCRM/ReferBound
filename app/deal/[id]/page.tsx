@@ -86,6 +86,12 @@ export default function DealPage() {
   const [lostNote, setLostNote] = useState<string | null>(null);
   const [lostBusy, setLostBusy] = useState(false);
   const [lostSent, setLostSent] = useState(false);
+  // Password-protected loan applications: lenders send the file and the
+  // password in separate emails, so the agent supplies it once here.
+  const [unlockFor, setUnlockFor] = useState<string | null>(null);
+  const [unlockPw, setUnlockPw] = useState("");
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const [unlockErr, setUnlockErr] = useState("");
   const [reviewState, setReviewState] = useState<"idle" | "sending" | "sent" | "already">("idle");
   const [touchBusy, setTouchBusy] = useState<string | null>(null);
   const [touchDone, setTouchDone] = useState<string | null>(null);
@@ -285,6 +291,23 @@ export default function DealPage() {
     } else {
       toast((await res.json()).error ?? "Couldn't log that", "error");
     }
+  }
+
+  async function unlockDoc(docId: string) {
+    setUnlockBusy(true);
+    setUnlockErr("");
+    const res = await fetch(`/api/referrals/${id}/unlock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: docId, password: unlockPw }),
+    });
+    setUnlockBusy(false);
+    if (res.ok) {
+      setUnlockFor(null);
+      setUnlockPw("");
+      toast("Unlocked and read");
+      load();
+    } else setUnlockErr((await res.json()).error ?? "Couldn't unlock that");
   }
 
   async function requestReview() {
@@ -896,6 +919,32 @@ export default function DealPage() {
                       <IconTrash size={13} />
                     </button>
                   </span>
+                  {unlockFor === d.id && (
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <p className="text-[11px] text-ink-secondary">
+                        Lenders send protected files and the password separately. Paste it here — it
+                        opens this document and is never stored.
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          className="input !py-2 text-sm !w-auto flex-1 min-w-[180px]"
+                          type="password"
+                          placeholder="Password from the lender"
+                          value={unlockPw}
+                          onChange={(e) => setUnlockPw(e.target.value)}
+                          autoFocus
+                        />
+                        <button
+                          className="btn-primary !py-2 !px-3 text-xs shrink-0"
+                          disabled={unlockBusy || !unlockPw}
+                          onClick={() => unlockDoc(d.id)}
+                        >
+                          {unlockBusy ? "Opening…" : "Unlock & read"}
+                        </button>
+                      </div>
+                      {unlockErr && <p className="text-xs text-red-600">{unlockErr}</p>}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
