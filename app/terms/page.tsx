@@ -81,8 +81,11 @@ export default function TermsPage() {
         <Section n={5} title="Emails and text messages (SMS)">
           <p>
             The service sends transactional emails on your behalf to your partners and, when you
-            request it, to your clients (for example, review requests). You&apos;re responsible
-            for having a business relationship with the recipients. Partners can ask you — or us —
+            choose to send them, to your clients — a quote, a check-in, a welcome with proof of
+            insurance, or a review request. Client-facing messages are never sent automatically;
+            each one requires an action by you. You&apos;re responsible for having a business
+            relationship with the recipients and for the content of any message you send or
+            edit. Partners can ask you — or us —
             to stop non-essential emails at any time.
           </p>
           <p>
@@ -107,15 +110,31 @@ export default function TermsPage() {
 
         <Section n={6} title="Plans and billing">
           <p>
-            The Free plan includes one partner. Paid plans (Pro, Agency) bill monthly through
-            Stripe and renew automatically until canceled. You can cancel anytime via the billing
+            The Free plan includes one lender partner plus up to two non-lender referral partners.
+            Paid plans (Pro, Agency) bill monthly or annually through Stripe, depending on the
+            plan you choose, and renew automatically until canceled. You can cancel anytime via the billing
             portal; access continues through the paid period. Prices may change with at least 30
             days&apos; notice. Fees are non-refundable except where required by law or where we
             choose to issue a refund.
           </p>
         </Section>
 
-        <Section n={7} title="Your data">
+        <Section n={7} title="Forwarding address">
+          <p>
+            Each account may be issued a private email address for forwarding referrals. You are
+            responsible for what you forward to it and for confirming you have the right to share
+            that material with a service provider. Mail from senders we cannot match to one of
+            your existing partners is held for your review rather than acted on automatically.
+          </p>
+          <p>
+            Loan applications reaching the service by any route are read once and discarded, not
+            stored. We keep only the details required to quote. The original remains wherever you
+            already hold it, and you should not rely on ReferBound as a system of record for
+            lender documents.
+          </p>
+        </Section>
+
+        <Section n={8} title="Your data">
           <p>
             Your data is yours. You can export your referrals as a CSV at any time and delete
             your account from the Profile page, which permanently removes your partners,
@@ -127,7 +146,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={8} title="AI features">
+        <Section n={9} title="AI features">
           <p>
             Some features use artificial intelligence (document extraction, drafted emails and
             replies). AI output can be wrong — always review extracted data and drafts before
@@ -135,7 +154,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={9} title="Service availability and changes">
+        <Section n={10} title="Service availability and changes">
           <p>
             We work hard to keep ReferBound available and improving, but it&apos;s provided
             &ldquo;as is&rdquo; and &ldquo;as available,&rdquo; without warranties of any kind.
@@ -144,7 +163,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={10} title="Limitation of liability">
+        <Section n={11} title="Limitation of liability">
           <p>
             To the maximum extent permitted by law, Cert Alert CRM LLC is not liable for
             indirect, incidental, special, or consequential damages, or for lost profits, lost
@@ -154,7 +173,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={11} title="Termination">
+        <Section n={12} title="Termination">
           <p>
             You can stop using the service or delete your account at any time. We may suspend or
             terminate accounts that violate these terms, with notice where practical. Sections
@@ -163,7 +182,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={12} title="Governing law and disputes">
+        <Section n={13} title="Governing law and disputes">
           <p>
             These terms are governed by the laws of the Commonwealth of Virginia, without regard
             to conflict-of-law rules. Disputes will be resolved in the state or federal courts
@@ -171,7 +190,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={13} title="Changes to these terms">
+        <Section n={14} title="Changes to these terms">
           <p>
             We may update these terms as the service evolves. If a change is material, we&apos;ll
             notify account holders by email or in the app before it takes effect. Continued use
@@ -179,7 +198,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n={14} title="Contact">
+        <Section n={15} title="Contact">
           <p>
             Questions about these terms: <span className="text-ink font-medium">hello@stonebind.com</span>.
             ReferBound™ is a trade name of Cert Alert CRM LLC.
@@ -190,6 +209,10 @@ export default function TermsPage() {
       <footer className="text-center text-xs text-ink-muted py-8">
         <Link href="/" className="link !text-xs">
           ← Back to ReferBound
+        </Link>{" "}
+        ·{" "}
+        <Link href="/security" className="link !text-xs">
+          Security
         </Link>{" "}
         ·{" "}
         <Link href="/privacy" className="link !text-xs">

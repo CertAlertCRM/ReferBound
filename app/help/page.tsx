@@ -113,6 +113,14 @@ export default function HelpPage() {
             five seconds.
           </p>
           <p>
+            <strong className="text-ink">Loan applications are never stored.</strong> A 1003
+            carries the borrower&apos;s SSN, income, and assets — none of which is needed to
+            quote. However one reaches us, forwarded or uploaded, it&apos;s read once and
+            discarded. What it said lands on the referral: names, both dates of birth, the
+            address, the closing date, the loan number. The original stays wherever you already
+            have it. The timeline records that it arrived and what it filled in.
+          </p>
+          <p>
             <strong className="text-ink">The deal file.</strong> At the bottom of any deal,
             &ldquo;Print the full deal file&rdquo; produces one page with every status change,
             message, email, document, and check — timestamped. Save it as a PDF and it goes
@@ -188,6 +196,125 @@ export default function HelpPage() {
             Add to Home Screen. <strong className="text-ink">Android:</strong> Chrome shows an
             Install button in the address bar. On your phone, swipe left or right to move between
             pages, or use the tab bar at the bottom.
+          </p>
+        </Section>
+
+        <Section title="Email intake — forward instead of typing">
+          <p>
+            Most referrals arrive as an email, not a portal submission. Under{" "}
+            <strong className="text-ink">Intake</strong> you&apos;ll find a forwarding address that
+            belongs only to you. Forward the loan officer&apos;s introduction to it and it becomes
+            a lead: the sender matched to the right partner, the client details pulled out, and a
+            short &ldquo;got it, I&apos;m on the quote&rdquo; reply sent back in your words.
+          </p>
+          <p>
+            It reads the subject line as well as the body — lender subjects are often structured
+            enough to carry the client and the address on their own — and it reads attachments, so
+            a three-word email with a loan application attached still produces a full lead.
+          </p>
+          <p>
+            Anything from a sender we don&apos;t recognize waits in Intake for you rather than
+            becoming a lead on its own, and nothing is ever auto-replied to a stranger. You can
+            turn off the automatic logging or the automatic reply in your profile.
+          </p>
+          <p>
+            Two things it can&apos;t read, so you know rather than wonder. A message your mail
+            system encrypted (Outlook&apos;s &ldquo;Encrypt&rdquo; button produces a{" "}
+            <code className="text-[12px]">.rpmsg</code> file) is sealed to your identity and
+            can&apos;t be opened by us — we take what the subject line gives and say so. And a
+            password-protected PDF needs the password; open the document on the deal, choose
+            Unlock, and paste the one the lender sent separately.
+          </p>
+        </Section>
+
+        <Section title="Your client's three emails">
+          <p>
+            Every deal has two audiences. On the deal page, under{" "}
+            <strong className="text-ink">The client</strong>, are the three messages you&apos;d
+            otherwise type by hand: the quote, a check-in, and the welcome.
+          </p>
+          <p>
+            <strong className="text-ink">Send quote</strong> emails the client with the loan
+            officer copied on the same thread — the way you already send it — and marks the deal
+            Quoted, so that&apos;s one action instead of three. If a quote has been sitting three
+            days with no answer, a check-in button appears. Once the policy is bound,{" "}
+            <strong className="text-ink">Send welcome</strong> gives the client their own copy of
+            the proof of insurance, separate from the lender&apos;s.
+          </p>
+          <p>
+            <strong className="text-ink">Nothing customer-facing ever sends on its own.</strong>{" "}
+            Every one of these is a button you press. A mistake to a partner is awkward; a mistake
+            to a customer is your reputation.
+          </p>
+        </Section>
+
+        <Section title="Closing week">
+          <p>
+            <strong className="text-ink">Closing</strong> in the nav shows every file with a
+            closing date in the next 7, 14, or 30 days, grouped by day, with exactly what&apos;s
+            still open on each: not bound, no EOI, documents not delivered, check not run,
+            blockers unresolved. Red is a real problem, amber is worth a look, and a file with
+            nothing open is marked Ready.
+          </p>
+          <p>
+            Your partners can correct a date from their own portal. When a closing moves you get
+            an email — and a text if it moved <em>up</em>, because that&apos;s a file that just
+            became urgent without anyone touching it. The board shows &ldquo;moved from&rdquo; so
+            you can see the change rather than just a different number.
+          </p>
+        </Section>
+
+        <Section title="Realtors are worth more than one client">
+          <p>
+            When you add a partner as a Realtor, their referrals run a shorter track — got it,
+            working it, covered — because a realtor doesn&apos;t need the EOI pipeline. What they
+            do have is the loan officer on the other side of the deal, and they&apos;re the only
+            person who knows all three of you.
+          </p>
+          <p>
+            Their portal asks who&apos;s handling the loan (the honest reason: so you can send
+            documents straight to the lender instead of routing them through the realtor), and the
+            deal grows a panel with two drafts — a note to that loan officer, or a request that
+            the realtor introduce you. Both wait until the file is <em>covered</em>, because a
+            loan officer who just watched your EOI land correct and early is a different
+            conversation from a cold one. Nothing sends; you read and edit first.
+          </p>
+        </Section>
+
+        <Section title="For processors: your clause library">
+          <p>
+            A processor doesn&apos;t have one mortgagee clause, they have fifteen. On the
+            documents desk in their portal they can upload the sheet they already keep — a
+            spreadsheet, a PDF, a photo of the printed one — and it&apos;s read into a library.
+            Every clause is shown for review before saving, because a clause gets a file kicked
+            back over one wrong word.
+          </p>
+          <p>
+            Each deal then gets the right clause. Most of the time it&apos;s matched
+            automatically from the loan type or investor named on the file; when it&apos;s a
+            guess it says so, and when a processor sets one by hand nothing overwrites it. They
+            can upload their insurance requirements the same way, and every EOI you send gets
+            checked against them.
+          </p>
+        </Section>
+
+        <Section title="Starting from nothing">
+          <p>
+            No partners yet? Two doors. <strong className="text-ink">Someone has sent me a client
+            before</strong> walks you through adding that person — a loan officer, a realtor, a
+            friend, a past client — and backfilling what they&apos;ve already sent, so you have a
+            real close ratio in about five minutes. That number is what makes the next
+            conversation easy.
+          </p>
+          <p>
+            Or <strong className="text-ink">show a lender what they&apos;d get</strong> — a live
+            sample portal with your name and branding on it, clearly labelled as a sample, that
+            you can send with a one-line message. It turns &ldquo;will you send me business?&rdquo;
+            into &ldquo;here&apos;s what I&apos;d give you.&rdquo;
+          </p>
+          <p>
+            Free includes one lender partner plus two others — realtors, CPAs, whoever sends you
+            people. The lender seat is the one Pro unlocks.
           </p>
         </Section>
 

@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/welcome",
   "/terms",
   "/privacy",
+  "/security",
   "/p/",
   "/hub/",
   "/api/auth/",

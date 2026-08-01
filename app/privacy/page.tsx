@@ -37,10 +37,28 @@ export default function PrivacyPage() {
           </p>
           <p>
             <strong className="text-ink">Referral information</strong> — details agents and
-            partners enter about insurance clients: names, contact information, dates of birth,
-            property addresses, closing dates, policy details, and uploaded documents (loan
-            applications, evidence of insurance, and similar). This information belongs to the
-            agent&apos;s book of business; we process it to run the service.
+            partners enter, forward, or upload about insurance clients: names, contact
+            information, dates of birth, property addresses, closing dates, policy details, and
+            documents (evidence of insurance, declarations pages, insurance requests, mortgagee
+            clause letters, and similar). This information belongs to the agent&apos;s book of
+            business; we process it to run the service.
+          </p>
+          <p>
+            <strong className="text-ink">Forwarded email</strong> — each agent can be given a
+            private forwarding address. Messages sent to it are stored with their sender, subject,
+            and body so the agent can review what became a lead, along with what our AI extracted
+            from them. Attachments are read and, other than loan applications (see Retention),
+            attached to the referral.
+          </p>
+          <p>
+            <strong className="text-ink">Loan applications are read but not kept.</strong> A loan
+            application (1003) contains far more personal information than an insurance quote
+            requires. Whenever one reaches us — forwarded, uploaded by an agent, or uploaded by a
+            partner — it is read once in memory and discarded rather than written to storage. We
+            retain only what a quote needs: names, dates of birth, contact details, property
+            address, closing date, and loan number. We instruct our AI provider not to return
+            Social Security numbers, income figures, asset balances, or account numbers, and we
+            do not store them.
           </p>
           <p>
             <strong className="text-ink">Usage and log data</strong> — emails we send on your
@@ -53,8 +71,9 @@ export default function PrivacyPage() {
           <p>
             To operate ReferBound: showing live referral status to the right partner, delivering
             documents, sending the transactional emails you and your partners expect (status
-            updates, closing alerts, recaps), powering AI features you invoke (document
-            extraction, drafted emails), and processing payments. That&apos;s it.{" "}
+            updates, closing alerts, recaps, and the client-facing messages an agent chooses to
+            send), powering AI features (extracting details from documents and forwarded emails,
+            drafting messages for the agent to review), and processing payments. That&apos;s it.{" "}
             <strong className="text-ink">We do not sell your data or your clients&apos; data,
             and we don&apos;t use it for advertising.</strong>
           </p>
@@ -108,6 +127,21 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="Email intake">
+          <p>
+            An agent&apos;s forwarding address is unguessable and belongs to one account. Mail
+            sent to it is processed only for that account. Messages from senders we can&apos;t
+            match to one of the agent&apos;s existing partners are held for the agent&apos;s
+            review rather than acted on, and we never send an automatic reply to an unrecognized
+            sender.
+          </p>
+          <p>
+            Some mail systems encrypt messages in transit to external recipients. We cannot
+            decrypt those and do not attempt to; only the unencrypted parts, such as the subject
+            line, are processed.
+          </p>
+        </Section>
+
         <Section title="Retention and deletion">
           <p>
             We keep data while the account it belongs to is active. Agents can export referrals
@@ -118,6 +152,14 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="Security">
+          <p>
+            A fuller description of how we store data, who can see what, and what we deliberately
+            don&apos;t keep is on the{" "}
+            <Link href="/security" className="link !text-sm">
+              security page
+            </Link>
+            .
+          </p>
           <p>
             Data is encrypted in transit (HTTPS everywhere) and at rest by our infrastructure
             providers. Passwords are stored only as salted scrypt hashes. Documents live in
@@ -152,6 +194,10 @@ export default function PrivacyPage() {
       <footer className="text-center text-xs text-ink-muted py-8">
         <Link href="/" className="link !text-xs">
           ← Back to ReferBound
+        </Link>{" "}
+        ·{" "}
+        <Link href="/security" className="link !text-xs">
+          Security
         </Link>{" "}
         ·{" "}
         <Link href="/terms" className="link !text-xs">

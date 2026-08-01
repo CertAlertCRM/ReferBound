@@ -583,6 +583,8 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           </a>
         </span>
         <span className="block mt-1">
+          <a href="/security" className="link-muted !text-[11px]">Security</a>
+          <span className="text-ink-muted"> · </span>
           <a href="/terms" className="link-muted !text-[11px]">Terms</a>
           {" · "}
           <a href="/privacy" className="link-muted !text-[11px]">Privacy</a>
