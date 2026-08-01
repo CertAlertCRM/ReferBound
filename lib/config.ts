@@ -36,9 +36,60 @@ export const STATUS_LABELS: Record<string, string> = {
 // Statuses that count as "insurance is done" for closing-risk purposes
 export const SAFE_STATUSES = ["bound", "docs_delivered"];
 
+// ── Two tracks ──────────────────────────────────────────────────────────────
+//
+// The lender relationship is what this product is built around, and it needs
+// the whole pipeline: quote out, application, bound, documents delivered before
+// closing. A realtor or a friend who sent you a buyer needs none of that. They
+// want to know you got it, you're working it, and whether it closed. Forcing
+// them through EOI and docs-delivered is asking them to care about paperwork
+// that was never theirs.
+//
+// Both tracks write the same status values — a short track just stops at
+// "bound" and relabels the steps in language that fits who's reading.
+
+export const FULL_TRACK_TYPES = ["lender"];
+
+export function isFullTrack(partnerType?: string | null): boolean {
+  return FULL_TRACK_TYPES.includes(partnerType ?? "lender");
+}
+
+export const SIMPLE_STATUSES = ["new", "quoting", "bound"] as const;
+
+export const SIMPLE_STATUS_LABELS: Record<string, string> = {
+  new: "Got the referral",
+  quoting: "Working on it",
+  quoted: "Working on it",
+  application: "Working on it",
+  bound: "Covered ✔",
+  docs_delivered: "Covered ✔",
+  lost: "Not written",
+};
+
+export function statusesFor(partnerType?: string | null): readonly string[] {
+  return isFullTrack(partnerType) ? STATUSES : SIMPLE_STATUSES;
+}
+
+export function statusLabel(status: string, partnerType?: string | null): string {
+  const table = isFullTrack(partnerType) ? STATUS_LABELS : SIMPLE_STATUS_LABELS;
+  return table[status] ?? STATUS_LABELS[status] ?? status;
+}
+
+// The next step on this partner's track. Returns null at the end of it, which
+// is "docs delivered" for a lender and "covered" for everyone else.
+export function nextStatusFor(status: string, partnerType?: string | null): string | null {
+  const track = statusesFor(partnerType);
+  const i = track.indexOf(status);
+  // A deal already past the end of its track (its partner's type changed after
+  // the fact) has nowhere to go — never offer to move it backwards.
+  if (i === -1 || i === track.length - 1) return null;
+  return track[i + 1];
+}
+
 // Document kinds. The first group is what the agent delivers; the second is
 // what partners typically send with a referral.
 export const DOC_KINDS: Record<string, string> = {
+  quote: "Quote",
   eoi: "Evidence of Insurance (EOI)",
   rce: "Replacement Cost Estimator (RCE)",
   dec: "Declarations Page",
@@ -56,6 +107,17 @@ export const DOC_KINDS_PARTNER: Record<string, string> = {
   hoi_request: "Insurance info sheet",
   mortgagee: "Mortgagee clause / lender info",
 };
+
+// Documents an ORIGINATING loan officer actually signs. Referral Radar only
+// harvests contacts from these.
+//
+// The distinction matters more than it looks. An evidence of insurance, a dec
+// page, and a replacement cost estimate all carry a lender-shaped name — the
+// mortgagee — but that's the servicer holding the note (Mr. Cooper, ServiceMac,
+// LoanCare, an ISAOA/ATIMA entity), not the person who originated the loan.
+// Servicers never refer anybody. Mining those documents produced a prospect
+// list of companies no agent could ever partner with.
+export const ORIGINATOR_DOC_KINDS = ["loan_1003", "hoi_request", "other"];
 
 // Kinds shown in the partner's upload picker
 export const PARTNER_DOC_KINDS = ["loan_1003", "hoi_request", "mortgagee", "other"] as const;
@@ -81,6 +143,26 @@ export const PARTNER_TYPES: Record<string, string> = {
   friend_family: "Friend / Family",
   other: "Other",
 };
+
+// Contact roles on a partner's team. Offered as a list rather than free text
+// so the portal can tell who's actually looking at it — a processor and a loan
+// officer open the same link wanting completely different things. "Other"
+// still allows anything unusual, and existing free-text roles keep working.
+export const CONTACT_ROLES = [
+  "Loan officer",
+  "Processor",
+  "Loan officer assistant",
+  "Transaction coordinator",
+  "Closer",
+  "Branch manager",
+  "Realtor",
+  "Realtor assistant",
+  "Owner",
+];
+
+// Roles whose day job is assembling the file. For these the documents desk
+// leads the portal; for everyone else it sits below the pipeline.
+export const PROCESSOR_ROLE_RE = /process|assistant|coordinat|closer|loa\b|admin/i;
 
 // Days before closing to raise the at-risk flag
 export const AT_RISK_DAYS = 7;

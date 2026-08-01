@@ -7,6 +7,7 @@ import { normalizePhone, normalizeEmail, EMAIL_RE } from "@/lib/format";
 import { fireWebhook } from "@/lib/webhook";
 import { rateLimit, RATE_LIMITED } from "@/lib/ratelimit";
 import { sendSms } from "@/lib/sms";
+import { cleanDealLender, recordLenderFromRealtorDeal } from "@/lib/realtor";
 
 // Partner submits a new referral from their magic-link portal. Three fields.
 
@@ -75,6 +76,16 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     }
   }
 
+  const dealLender =
+    (partner as any).partner_type === "realtor"
+      ? cleanDealLender({
+          name: body?.lender_name,
+          company: body?.lender_company,
+          email: body?.lender_email,
+          source: "realtor",
+        })
+      : null;
+
   const { data: referral, error } = await db()
     .from("referrals")
     .insert({
@@ -90,12 +101,24 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       notes: body?.notes || null,
       source: "partner",
       contact_id: contactId,
+      // A realtor telling us who's on the loan is the most valuable optional
+      // field in this form — it's the introduction the agent can't get anywhere
+      // else.
+      deal_lender: dealLender,
     })
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await db().from("status_events").insert({ referral_id: referral.id, status: "new" });
+
+  if (dealLender) {
+    await recordLenderFromRealtorDeal({
+      accountId: (partner as any).account_id,
+      lender: dealLender,
+      viaPartnerId: partner.id,
+    });
+  }
   await logActivity(
     referral.id,
     "referral_submitted",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
-import { getAccount, partnerLimit } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
 
 export const dynamic = "force-dynamic";
 
@@ -21,19 +21,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .maybeSingle();
   if (!src) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // Plan enforcement, same as adding a partner.
-  const limit = partnerLimit(account.plan);
-  if (limit !== null) {
-    const { count } = await db()
-      .from("partners")
-      .select("id", { count: "exact", head: true })
-      .eq("account_id", account.id);
-    if ((count ?? 0) >= limit) {
-      return NextResponse.json(
-        { error: "The Free plan includes 1 partner. Upgrade to Pro for unlimited partners.", upgrade: true },
-        { status: 402 }
-      );
-    }
+  // Plan enforcement, same as adding a partner — counted by kind.
+  const capacity = await partnerCapacity(
+    account.id,
+    account.plan,
+    (src as any).partner_type ?? "lender",
+    countPartners(account.id)
+  );
+  if (!capacity.ok) {
+    return NextResponse.json({ error: capacity.error, upgrade: true }, { status: 402 });
   }
 
   // Copy the logo file so the two partners never share a storage object.
@@ -63,7 +59,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   // Bring the whole team over.
   const { data: contacts } = await db()
     .from("partner_contacts")
-    .select("name, email, role, phone, sms_opt_in, notify_channel")
+    .select("name, email, role, phone, sms_opt_in, notify_channel, doc_recipient")
     .eq("partner_id", src.id);
   if (contacts?.length) {
     await db()

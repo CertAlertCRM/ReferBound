@@ -21,6 +21,7 @@ type Summary = {
     founderAnnual: number;
     discounted: number;
     viaReferral: number;
+    bySource: Record<string, number>;
     onEarnedPro: number;
     mrr: number;
     partners: number;
@@ -150,6 +151,34 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+
+        {/* Where accounts come from. The lender column is the growth thesis:
+            agents arriving because their loan officer asked them to. */}
+        <section className="card p-5">
+          <h2 className="section-label mb-3">Signup channel</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {[
+              { k: "lender", l: "From a lender board", note: "the growth loop" },
+              { k: "agent", l: "Agent referral" },
+              { k: "partner", l: "From a portal" },
+              { k: "direct", l: "Direct / you" },
+              { k: "team", l: "Agency seats" },
+            ].map((s) => (
+              <div key={s.k} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+                <p className={`tabnum text-lg font-semibold tracking-tight ${s.k === "lender" && (t.bySource?.lender ?? 0) > 0 ? "text-emerald-600" : ""}`}>
+                  {t.bySource?.[s.k] ?? 0}
+                </p>
+                <p className="text-[11px] text-ink-muted leading-tight">{s.l}</p>
+                {s.note && <p className="text-[10px] text-brand">{s.note}</p>}
+              </div>
+            ))}
+          </div>
+          {(t.bySource?.unknown ?? 0) > 0 && (
+            <p className="text-[11px] text-ink-muted mt-2">
+              {t.bySource.unknown} signed up before channel tracking existed.
+            </p>
+          )}
+        </section>
 
         {/* Signups chart + ROI */}
         <div className="grid sm:grid-cols-[1fr_260px] gap-4">

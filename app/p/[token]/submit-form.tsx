@@ -18,6 +18,9 @@ const EMPTY = {
   property_address: "",
   closing_date: "",
   notes: "",
+  lender_name: "",
+  lender_company: "",
+  lender_email: "",
 };
 
 const EXTRACTABLE = /\.(pdf|png|jpe?g)$/i;
@@ -33,6 +36,7 @@ export function PartnerSubmitForm({
 }) {
   const { toast } = useUI();
   const isLender = partnerType === "lender";
+  const isRealtor = partnerType === "realtor";
   const [open, setOpen] = useState(false);
   // Who on the team is sending this? Remembered per device.
   const [senderId, setSenderId] = useState<string>("");
@@ -287,7 +291,7 @@ export function PartnerSubmitForm({
                 onChange={(e) => setForm({ ...form, client_dob: e.target.value })}
               />
             </label>
-            {isLender && (
+            {(isLender || isRealtor) && (
               <label className="block text-xs text-ink-muted">
                 Closing date
                 <input
@@ -312,6 +316,43 @@ export function PartnerSubmitForm({
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
+
+          {/* On a purchase the realtor is the only person who knows all three
+              professionals on the file. Asking here saves them from being the
+              courier for insurance documents later — which is the honest
+              reason, and the one worth giving them. */}
+          {isRealtor && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2.5">
+              <p className="text-xs font-semibold text-ink-secondary">
+                Who&apos;s handling their loan?{" "}
+                <span className="font-normal text-ink-muted">
+                  Optional — but if we have the loan officer we&apos;ll send the evidence of
+                  insurance straight to them instead of routing it through you.
+                </span>
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  className="input !py-2 text-sm"
+                  placeholder="Loan officer's name"
+                  value={form.lender_name}
+                  onChange={(e) => setForm({ ...form, lender_name: e.target.value })}
+                />
+                <input
+                  className="input !py-2 text-sm"
+                  placeholder="Their company"
+                  value={form.lender_company}
+                  onChange={(e) => setForm({ ...form, lender_company: e.target.value })}
+                />
+              </div>
+              <input
+                className="input !py-2 text-sm"
+                type="email"
+                placeholder="Their email (optional)"
+                value={form.lender_email}
+                onChange={(e) => setForm({ ...form, lender_email: e.target.value })}
+              />
+            </div>
+          )}
 
           {/* Who's sending — routes updates on this client to the right person */}
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2.5">

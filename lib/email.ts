@@ -211,12 +211,34 @@ export function statusUpdateEmail(clientName: string, status: string, portalUrl:
   `);
 }
 
-export function docsReadyEmail(clientName: string, docList: string[], portalUrl: string) {
+// Documents ready.
+//
+// The links are the point. A processor pulling this into her file shouldn't
+// have to visit anything to get a PDF — the documents come to the inbox her
+// system already works out of, and the portal link below is the backup copy,
+// not the pickup counter. Falls back to a portal link only when a document
+// has no id to link (older records).
+export function docsReadyEmail(
+  clientName: string,
+  docs: { label: string; url?: string }[],
+  portalUrl: string
+) {
+  const items = docs
+    .map((d) =>
+      d.url
+        ? `<li style="margin:4px 0"><a href="${d.url}" style="color:#1d4ed8;font-weight:600">${esc(d.label)}</a></li>`
+        : `<li style="margin:4px 0">${esc(d.label)}</li>`
+    )
+    .join("");
   return wrap(`
     <h2 style="margin:0 0 12px">${esc(clientName)} is bound — documents ready</h2>
-    <p style="font-size:16px">The following documents are ready to download:</p>
-    <ul>${docList.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
-    <p><a href="${portalUrl}" style="color:#1d4ed8">Download from your referral portal</a></p>
+    <p style="font-size:16px">Download straight from here:</p>
+    <ul style="font-size:16px;padding-left:20px">${items}</ul>
+    <p style="font-size:13px;color:#64748b">
+      Links open the document directly. Everything also stays on
+      <a href="${portalUrl}" style="color:#1d4ed8">your referral portal</a> alongside
+      the rest of your files.
+    </p>
   `);
 }
 

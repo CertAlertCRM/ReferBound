@@ -18,7 +18,7 @@ export function ShareCard({ agentName, agencyName }: { agentName: string; agency
 
   const subject = encodeURIComponent("This referral portal is worth a look");
   const body = encodeURIComponent(
-    `Hey,\n\nMy insurance partner (${agentName} at ${agencyName}) set me up with a live portal for the clients I send over — I can see where every referral stands anytime I want, and the insurance documents show up there once each policy is bound and papers are ready. No login, just a link.\n\nIf you work with an insurance agent, tell them to check out ReferBound — the first partner is free:\n${shareUrl}\n\nWorth passing along.`
+    `Hey,\n\nMy insurance partner (${agentName} at ${agencyName}) set me up with a live portal for the clients I send over — I can see where every referral stands anytime I want, and the insurance documents show up there once each policy is bound and papers are ready. No login, just a link.\n\nIf you work with an insurance agent, tell them to check out ReferBound — it\u2019s free to start:\n${shareUrl}\n\nWorth passing along.`
   );
 
   return (

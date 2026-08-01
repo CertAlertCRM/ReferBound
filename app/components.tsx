@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { STATUS_LABELS, STATUSES } from "@/lib/config";
+import { STATUS_LABELS, STATUSES, statusLabel, statusesFor } from "@/lib/config";
 import { THEMES } from "@/lib/themes";
 import { IconAlert, IconMenu, IconX, IconHome, IconUsers, IconZap, IconUser } from "./icons";
 import { FeedbackWidget } from "./feedback-widget";
@@ -18,12 +18,12 @@ const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
   lost: { pill: "bg-slate-100 text-slate-500", dot: "bg-slate-300" },
 };
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, partnerType }: { status: string; partnerType?: string | null }) {
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.new;
   return (
     <span className={`badge ${s.pill}`}>
       <span className={`inline-block w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {STATUS_LABELS[status] ?? status}
+      {statusLabel(status, partnerType)}
     </span>
   );
 }
@@ -38,22 +38,25 @@ export function AtRiskBadge() {
 }
 
 // ── Segmented pipeline progress bar ──────────────────────────────────────────
-export function StatusProgress({ status }: { status: string }) {
+export function StatusProgress({ status, partnerType }: { status: string; partnerType?: string | null }) {
+  // Three segments on a realtor's referral, six on a lender's — the bar should
+  // show how far along THIS relationship's work actually is.
+  const track = statusesFor(partnerType);
   if (status === "lost") {
     return (
       <div className="flex gap-1 items-center" aria-label="Not written">
-        {STATUSES.map((s) => (
+        {track.map((s) => (
           <div key={s} className="seg opacity-60" />
         ))}
       </div>
     );
   }
-  const idx = STATUSES.indexOf(status as (typeof STATUSES)[number]);
+  const idx = track.indexOf(status);
   const done = status === "bound" || status === "docs_delivered";
   return (
-    <div className="flex gap-1 items-center" aria-label={STATUS_LABELS[status] ?? status}>
-      {STATUSES.map((s, i) => (
-        <div key={s} className={`seg ${i <= idx ? (done ? "seg-done" : "seg-filled") : ""}`} />
+    <div className="flex gap-1 items-center" aria-label={statusLabel(status, partnerType)}>
+      {track.map((s, i) => (
+        <div key={s} className={`seg ${done || i <= idx ? (done ? "seg-done" : "seg-filled") : ""}`} />
       ))}
     </div>
   );
@@ -74,7 +77,7 @@ export function Wordmark({ size = "text-lg" }: { size?: string }) {
 export function TopNav({
   active,
 }: {
-  active?: "referrals" | "partners" | "stats" | "profile" | "billing" | "admin" | "help";
+  active?: "referrals" | "partners" | "closing" | "inbox" | "stats" | "profile" | "billing" | "admin" | "help";
 }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,6 +168,8 @@ export function TopNav({
   const links: { href: string; key: string; label: string }[] = [
     { href: "/", key: "referrals", label: "Referrals" },
     { href: "/partners", key: "partners", label: "Partners" },
+    { href: "/closing", key: "closing", label: "Closing" },
+    { href: "/inbox", key: "inbox", label: "Intake" },
     { href: "/stats", key: "stats", label: "Stats" },
     { href: "/profile", key: "profile", label: "Profile" },
     { href: "/billing", key: "billing", label: "Billing" },

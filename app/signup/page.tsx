@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [invite, setInvite] = useState("");
   const [ref, setRef] = useState("");
+  const [via, setVia] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function SignupPage() {
     const q = new URLSearchParams(window.location.search);
     setInvite(q.get("invite") ?? "");
     setRef(q.get("ref") ?? "");
+    setVia(q.get("via") ?? "");
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -29,7 +31,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_name: name, email, password, invite_code: invite || undefined, ref: ref || undefined }),
+      body: JSON.stringify({ display_name: name, email, password, invite_code: invite || undefined, ref: ref || undefined, via: via || undefined }),
     });
     setBusy(false);
     if (res.ok) {
@@ -48,9 +50,18 @@ export default function SignupPage() {
         <div className="text-center mb-6">
           <Wordmark size="text-2xl" />
           <p className="text-sm text-ink-secondary mt-2">
-            {invite ? "Join your agency's team" : "Create your account — free for your first partner"}
+            {invite ? "Join your agency's team" : "Create your account — free to start"}
           </p>
         </div>
+        {via === "lender" && !invite && (
+          <div className="card px-4 py-3 mb-4 bg-brand-light/60 border-brand-200">
+            <p className="text-xs text-brand-800">
+              <span className="font-semibold">Your referral partner sent you here.</span> Set up
+              your portal and every client they send you shows on their board automatically — right
+              next to the other agents they work with.
+            </p>
+          </div>
+        )}
         {ref && !invite && (
           <div className="card px-4 py-3 mb-4 bg-brand-light/60 border-brand-200">
             <p className="text-xs text-brand-800">

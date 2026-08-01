@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { STATUSES, STATUS_LABELS, DOC_KINDS, SENSITIVE_DOC_KINDS } from "@/lib/config";
+import { STATUSES, STATUS_LABELS, DOC_KINDS, SENSITIVE_DOC_KINDS, statusesFor, statusLabel, isFullTrack } from "@/lib/config";
 import { StatusBadge, StatusProgress, TopNav } from "../../components";
 import {
   IconMail,
@@ -23,6 +23,8 @@ import {
 } from "../../icons";
 import { useUI } from "../../ui";
 import { SkeletonPanels } from "../../skeleton";
+import { ClientTrack } from "./client-track";
+import { LenderLink } from "./lender-link";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string; purged_at?: string | null };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
@@ -42,8 +44,14 @@ type Referral = {
   source: string;
   log_seconds: number | null;
   created_at: string;
-  partners: { name: string } | null;
+  partners: { name: string; partner_type?: string } | null;
   documents: Doc[];
+  closing_date_was?: string | null;
+  closing_date_changed_at?: string | null;
+  deal_lender?: { name?: string | null; company?: string | null; email?: string | null; phone?: string | null } | null;
+  quote_sent_at?: string | null;
+  welcome_sent_at?: string | null;
+  client_nudged_at?: string | null;
 };
 
 export default function DealPage() {
@@ -73,6 +81,11 @@ export default function DealPage() {
   const [docEnd, setDocEnd] = useState("");
   const [lostReason, setLostReason] = useState("");
   const [showLost, setShowLost] = useState(false);
+  // Telling a partner a deal died — one button, never automatic. Most files
+  // just go quiet and that's fine; this is for when they ask.
+  const [lostNote, setLostNote] = useState<string | null>(null);
+  const [lostBusy, setLostBusy] = useState(false);
+  const [lostSent, setLostSent] = useState(false);
   const [reviewState, setReviewState] = useState<"idle" | "sending" | "sent" | "already">("idle");
   const [touchBusy, setTouchBusy] = useState<string | null>(null);
   const [touchDone, setTouchDone] = useState<string | null>(null);
@@ -372,6 +385,8 @@ export default function DealPage() {
   }
 
   const hasEoi = r.documents.some((d) => d.kind === "eoi");
+  const partnerType = r.partners?.partner_type ?? "lender";
+  const fullTrack = isFullTrack(partnerType);
 
   // Quote-readiness: the fields an agent actually needs before quoting.
   const missing: string[] = [];
@@ -436,7 +451,14 @@ export default function DealPage() {
               <span className="meta-item"><IconMapPin size={14} className="text-ink-muted" /> {r.property_address}</span>
             )}
             {r.closing_date && (
-              <span className="meta-item"><IconHome size={14} className="text-ink-muted" /> Closes {r.closing_date}</span>
+              <span className="meta-item">
+                <IconHome size={14} className="text-ink-muted" /> Closes {r.closing_date}
+                {r.closing_date_changed_at && r.closing_date_was && (
+                  <span className="badge bg-amber-50 text-amber-700 ml-1.5 !text-[10px]">
+                    moved from {r.closing_date_was}
+                  </span>
+                )}
+              </span>
             )}
             {r.log_seconds !== null && (
               <span className="text-ink-muted text-xs self-center">logged in {r.log_seconds}s</span>
@@ -467,11 +489,16 @@ export default function DealPage() {
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <h2 className="section-label">Update status</h2>
             <p className="text-[11px] text-ink-muted">
-              ✉ = emails {r.partners?.name ?? "your partner"} · everything else updates silently
+              {fullTrack
+                ? `✉ = emails ${r.partners?.name ?? "your partner"} · everything else updates silently`
+                : "Updates their portal live — no email unless you send one"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {STATUSES.map((s) => (
+            {/* A realtor or a friend who sent you a buyer doesn't need the EOI
+                pipeline — they need got it, working it, covered. Same stored
+                values, shorter track, plainer words. */}
+            {statusesFor(partnerType).map((s) => (
               <button
                 key={s}
                 onClick={() => setStatus(s)}
@@ -485,7 +512,7 @@ export default function DealPage() {
                       : "Updates the portal silently — no email"
                 }
               >
-                {STATUS_LABELS[s]}
+                {statusLabel(s, partnerType)}
                 {(s === "quoted" || s === "docs_delivered") && <span aria-hidden> ✉</span>}
               </button>
             ))}
@@ -510,7 +537,7 @@ export default function DealPage() {
               </button>
             </div>
           )}
-          {r.status === "bound" && (
+          {fullTrack && r.status === "bound" && (
             <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
               Bound ✓ — no email has gone to {r.partners?.name} yet.{" "}
               {hasEoi
@@ -518,6 +545,71 @@ export default function DealPage() {
                 : "Upload the EOI (and RCE) below, then mark “EOI & docs delivered” to send their one combined bound + documents email."}
             </p>
           )}
+          {r.status === "lost" && !lostSent && (
+            <div className="space-y-2 pt-1">
+              {lostNote === null ? (
+                <button
+                  className="btn-ghost !px-3 !py-1.5 text-xs"
+                  disabled={lostBusy}
+                  onClick={async () => {
+                    setLostBusy(true);
+                    const res = await fetch(`/api/referrals/${id}/notify-lost`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({}),
+                    });
+                    setLostBusy(false);
+                    if (res.ok) setLostNote((await res.json()).draft);
+                  }}
+                >
+                  {lostBusy ? "…" : `Let ${r.partners?.name ?? "them"} know`}
+                </button>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <p className="text-[11px] text-ink-secondary">
+                    Only if it&apos;s worth sending. Most files just go quiet, and a note on every
+                    one of those is a small announcement nobody asked for.
+                  </p>
+                  <textarea
+                    className="input !text-[13px] min-h-[130px] font-sans"
+                    value={lostNote}
+                    onChange={(e) => setLostNote(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      className="btn-primary !py-1.5 !px-3 text-xs"
+                      disabled={lostBusy || !lostNote.trim()}
+                      onClick={async () => {
+                        setLostBusy(true);
+                        const res = await fetch(`/api/referrals/${id}/notify-lost`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ message: lostNote }),
+                        });
+                        setLostBusy(false);
+                        if (res.ok) {
+                          setLostSent(true);
+                          toast("Sent");
+                          load();
+                        } else toast((await res.json()).error ?? "Couldn't send", "error");
+                      }}
+                    >
+                      {lostBusy ? "Sending…" : "Send it"}
+                    </button>
+                    <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={() => setLostNote(null)}>
+                      Never mind
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {lostSent && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+              Sent — logged on the timeline.
+            </p>
+          )}
+
           {["bound", "docs_delivered"].includes(r.status) && (
             <div className="flex items-center gap-2 flex-wrap pt-1">
               {reviewState === "sent" || reviewState === "already" ? (
@@ -548,6 +640,34 @@ export default function DealPage() {
             </div>
           )}
         </section>
+
+        {/* A realtor referral carries a second relationship the agent can't see
+            from anywhere else: the loan officer on the same file. */}
+        {partnerType === "realtor" && (
+          <LenderLink
+            referralId={r.id}
+            realtorName={r.partners?.name ?? "your realtor"}
+            clientFirst={r.client_name.split(" ")[0]}
+            lender={r.deal_lender ?? null}
+            covered={["bound", "docs_delivered"].includes(r.status)}
+            onSaved={load}
+          />
+        )}
+
+        {/* The client half of the deal — quote out, check-in, welcome */}
+        <ClientTrack
+          referralId={r.id}
+          clientName={r.client_name}
+          clientEmail={r.client_email}
+          partnerName={r.partners?.name ?? "your partner"}
+          status={r.status}
+          hasQuoteDoc={r.documents.some((d) => d.kind === "quote" && !d.purged_at)}
+          hasEoi={hasEoi}
+          quoteSentAt={r.quote_sent_at ?? null}
+          welcomeSentAt={r.welcome_sent_at ?? null}
+          nudgedAt={r.client_nudged_at ?? null}
+          onDone={load}
+        />
 
         {/* Quick touch log — one tap, lands on the timeline AND the partner's portal */}
         <section className="card p-5 space-y-2.5">
@@ -637,8 +757,10 @@ export default function DealPage() {
         </section>
 
         {/* Pre-delivery cross-check — the last set of eyes before the lender
-            sees the policy. Only shown once there's something to check. */}
-        {r.documents.length > 0 && (
+            sees the policy. Only shown once there's something to check, and
+            only on the lender track: there's no mortgagee clause or loan
+            number on a referral a realtor sent. */}
+        {fullTrack && r.documents.length > 0 && (
           <section
             className={`card p-5 space-y-3 ${
               check?.blockers > 0

@@ -99,9 +99,62 @@ export const PLAN_LABELS: Record<string, string> = {
   agency: "Agency",
 };
 
-// Free tier: full features, one partner. Pro/Agency: unlimited partners.
+// Free tier: full features, one lender plus a couple of other referral sources.
+//
+// The lender relationship is the wall on purpose — it's where the product earns
+// its keep, and where a second one is worth paying for. Realtors, CPAs, and the
+// friend who keeps sending people are how a new agent gets far enough to find
+// that out, so free leaves room for a few of those.
+export const FREE_LENDER_LIMIT = 1;
+export const FREE_OTHER_LIMIT = 2;
+
+export function partnerLimits(plan: string): { lender: number | null; other: number | null } {
+  return plan === "free"
+    ? { lender: FREE_LENDER_LIMIT, other: FREE_OTHER_LIMIT }
+    : { lender: null, other: null };
+}
+
+// The one place every create path asks "can this agent add this partner?" —
+// counted by kind, because the lender seat is the one that's worth money.
+export async function partnerCapacity(
+  accountId: string,
+  plan: string,
+  partnerType: string,
+  countFn: (isLender: boolean) => Promise<number>
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const limits = partnerLimits(plan);
+  const lender = isLenderType(partnerType);
+  const cap = lender ? limits.lender : limits.other;
+  if (cap === null) return { ok: true };
+  const used = await countFn(lender);
+  if (used < cap) return { ok: true };
+  return {
+    ok: false,
+    error: lender
+      ? "Free includes one lender partner. Pro adds unlimited lenders, processors, and everyone else."
+      : `Free includes up to ${cap} non-lender referral partners. Pro removes the limit.`,
+  };
+}
+
+export function isLenderType(partnerType?: string | null): boolean {
+  return (partnerType ?? "lender") === "lender";
+}
+
+// Count an account's partners on one side of the lender line.
+export function countPartners(accountId: string) {
+  return async (lender: boolean) => {
+    const q = db()
+      .from("partners")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", accountId);
+    const { count } = await (lender ? q.eq("partner_type", "lender") : q.neq("partner_type", "lender"));
+    return count ?? 0;
+  };
+}
+
+// Kept for the older call sites that only ask "is there any cap at all".
 export function partnerLimit(plan: string): number | null {
-  return plan === "free" ? 1 : null;
+  return plan === "free" ? FREE_LENDER_LIMIT + FREE_OTHER_LIMIT : null;
 }
 
 // Agency plan: one owner + teammates, 7 users total.

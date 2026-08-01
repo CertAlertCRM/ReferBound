@@ -189,6 +189,119 @@ alter table agent_profile add column if not exists brand_color text not null def
 -- Optional portal speed scorecard (see migration_26)
 alter table agent_profile add column if not exists show_scorecard boolean not null default true;
 
+-- Signup channel attribution (see migration_34)
+alter table accounts add column if not exists signup_source text;
+create index if not exists idx_accounts_signup_source on accounts(signup_source);
+
+-- Closing date changes (see migration_41)
+alter table referrals add column if not exists closing_date_changed_at timestamptz;
+alter table referrals add column if not exists closing_date_was date;
+create index if not exists idx_referrals_date_changed on referrals(account_id, closing_date_changed_at desc) where closing_date_changed_at is not null;
+
+-- Processor clause library (see migration_40)
+create table if not exists mortgagee_clauses (
+  id uuid primary key default gen_random_uuid(),
+  partner_id uuid not null references partners(id) on delete cascade,
+  label text not null,
+  clause text not null,
+  investor text,
+  loan_types text[] not null default '{}',
+  notes text,
+  is_default boolean not null default false,
+  source text not null default 'manual',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_clauses_partner on mortgagee_clauses(partner_id);
+create unique index if not exists idx_clauses_one_default on mortgagee_clauses(partner_id) where is_default;
+alter table mortgagee_clauses enable row level security;
+
+alter table referrals add column if not exists mortgagee_clause_id uuid references mortgagee_clauses(id) on delete set null;
+alter table referrals add column if not exists clause_source text;
+
+create table if not exists partner_files (
+  id uuid primary key default gen_random_uuid(),
+  partner_id uuid not null references partners(id) on delete cascade,
+  kind text not null default 'requirements',
+  file_name text not null,
+  storage_path text,
+  parsed jsonb,
+  uploaded_by text not null default 'partner',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_partner_files on partner_files(partner_id, created_at desc);
+alter table partner_files enable row level security;
+
+-- Realtor track (see migration_39)
+alter table referrals add column if not exists deal_lender jsonb;
+alter table referrals add column if not exists lender_intro_at timestamptz;
+alter table referrals add column if not exists realtor_ask_at timestamptz;
+alter table partner_prospects add column if not exists via_partner_id uuid references partners(id) on delete set null;
+create index if not exists idx_referrals_deal_lender on referrals(account_id) where deal_lender is not null;
+
+-- Demo portal + partner setup sharing (see migration_38)
+alter table accounts add column if not exists demo_token text;
+create unique index if not exists idx_accounts_demo_token on accounts(demo_token) where demo_token is not null;
+alter table partners add column if not exists shared_from uuid references accounts(id) on delete set null;
+create table if not exists partner_shares (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null default replace(gen_random_uuid()::text, '-', ''),
+  partner_id uuid not null references partners(id) on delete cascade,
+  from_account_id uuid not null references accounts(id) on delete cascade,
+  uses integer not null default 0,
+  max_uses integer not null default 25,
+  expires_at timestamptz not null default now() + interval '30 days',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_partner_shares_partner on partner_shares(partner_id);
+alter table partner_shares enable row level security;
+
+-- Client track (see migration_37)
+alter table referrals add column if not exists quote_sent_at timestamptz;
+alter table referrals add column if not exists welcome_sent_at timestamptz;
+alter table referrals add column if not exists client_nudged_at timestamptz;
+create index if not exists idx_referrals_quote_sent on referrals(account_id, quote_sent_at) where quote_sent_at is not null;
+
+-- Email intake (see migration_36)
+alter table accounts add column if not exists inbox_slug text;
+create unique index if not exists idx_accounts_inbox_slug on accounts(inbox_slug) where inbox_slug is not null;
+alter table agent_profile add column if not exists inbox_autocreate boolean not null default true;
+alter table agent_profile add column if not exists inbox_autoack boolean not null default true;
+
+create table if not exists inbound_emails (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  provider_id text,
+  from_email text not null,
+  from_name text,
+  subject text,
+  body text,
+  received_at timestamptz not null default now(),
+  partner_id uuid references partners(id) on delete set null,
+  contact_id uuid references partner_contacts(id) on delete set null,
+  match_kind text,
+  extracted jsonb,
+  status text not null default 'pending',
+  referral_id uuid references referrals(id) on delete set null,
+  acked_at timestamptz,
+  error text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_inbound_account on inbound_emails(account_id, created_at desc);
+create index if not exists idx_inbound_pending on inbound_emails(account_id) where status = 'pending';
+create unique index if not exists idx_inbound_provider on inbound_emails(provider_id) where provider_id is not null;
+
+-- The app reaches Postgres only through the service-role key on the server,
+-- which bypasses RLS. Enabling it with no policies closes the table to anon and
+-- authenticated keys entirely — which matters more here than anywhere else in
+-- the schema, because this table holds the full body of forwarded referral
+-- emails: client names, phones, addresses, whatever the loan officer typed.
+alter table inbound_emails enable row level security;
+
+-- Contacts who receive documents automatically (see migration_35)
+alter table partner_contacts add column if not exists doc_recipient boolean not null default false;
+create index if not exists idx_partner_contacts_doc_recipient
+  on partner_contacts(partner_id) where doc_recipient;
+
 -- Actual charged amount, for real MRR (see migration_33)
 alter table accounts add column if not exists plan_amount_cents integer;
 

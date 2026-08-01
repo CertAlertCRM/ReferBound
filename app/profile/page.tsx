@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { TopNav } from "../components";
 import { formatPhoneInput } from "@/lib/format";
 import { IconDownload, IconZap, IconUsers, IconCopy, IconCheck, IconX, IconArrowLeft, IconArrowRight } from "../icons";
@@ -34,9 +35,11 @@ type Profile = {
   show_scorecard: boolean;
   doc_retention_days: number;
   renewal_watch: boolean;
+  inbox_autocreate: boolean;
+  inbox_autoack: boolean;
 };
 
-const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true, doc_retention_days: 0, renewal_watch: true };
+const EMPTY: Profile = { display_name: "", agency_name: "", office: "", phone: "", email: "", google_review_url: "", sms_new_lead: false, show_scorecard: true, doc_retention_days: 0, renewal_watch: true, inbox_autocreate: true, inbox_autoack: true };
 
 export default function ProfilePage() {
   const { toast, confirm } = useUI();
@@ -96,6 +99,8 @@ export default function ProfilePage() {
             show_scorecard: profile.show_scorecard !== false,
             doc_retention_days: Number(profile.doc_retention_days ?? 0),
             renewal_watch: profile.renewal_watch !== false,
+            inbox_autocreate: profile.inbox_autocreate !== false,
+            inbox_autoack: profile.inbox_autoack !== false,
           };
           setForm(loaded);
           setBaseline(loaded);
@@ -382,7 +387,10 @@ export default function ProfilePage() {
   }
 
   const field = (
-    key: Exclude<keyof Profile, "sms_new_lead" | "show_scorecard" | "doc_retention_days" | "renewal_watch">,
+    key: Exclude<
+      keyof Profile,
+      "sms_new_lead" | "show_scorecard" | "doc_retention_days" | "renewal_watch" | "inbox_autocreate" | "inbox_autoack"
+    >,
     label: string,
     placeholder: string
   ) => {
@@ -649,6 +657,45 @@ export default function ProfilePage() {
                   <span className="text-xs text-ink-muted">
                     Uses the phone number above. The one moment worth a buzz — a partner just sent
                     you business.
+                  </span>
+                </span>
+              </label>
+              {/* Email intake — the address itself lives on /inbox; these are
+                  just the two decisions worth making about it. */}
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-brand"
+                  checked={form.inbox_autocreate}
+                  onChange={(e) => setForm({ ...form, inbox_autocreate: e.target.checked })}
+                />
+                <span>
+                  <span className="text-sm font-medium block">
+                    Log forwarded referrals automatically
+                  </span>
+                  <span className="text-xs text-ink-muted">
+                    Only when the sender is someone you already work with. Everything else waits in{" "}
+                    <Link href="/inbox" className="link !text-xs">
+                      email intake
+                    </Link>{" "}
+                    for you to approve.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-brand"
+                  checked={form.inbox_autoack}
+                  onChange={(e) => setForm({ ...form, inbox_autoack: e.target.checked })}
+                />
+                <span>
+                  <span className="text-sm font-medium block">
+                    Reply &ldquo;got it&rdquo; when a referral is forwarded
+                  </span>
+                  <span className="text-xs text-ink-muted">
+                    The note you&apos;d type anyway, in your words — edit it under Your voice. Never
+                    sent to a sender you don&apos;t already work with.
                   </span>
                 </span>
               </label>

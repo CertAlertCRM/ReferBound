@@ -20,7 +20,7 @@ export async function GET() {
     db()
       .from("partner_prospects")
       .select(
-        "id, name, company, email, phone, nmls, partner_type, source, status, notes, deal_count, converted_partner_id, suggested_partner_id, partners:suggested_partner_id(name)"
+        "id, name, company, email, phone, nmls, partner_type, source, status, notes, deal_count, converted_partner_id, suggested_partner_id, partners:suggested_partner_id(name), via_partner:via_partner_id(name)"
       )
       .eq("account_id", account.id)
       .is("dismissed_at", null)
@@ -40,6 +40,9 @@ export async function GET() {
     prospects: (prospects ?? []).map((p: any) => ({
       ...p,
       suggestedPartnerName: p.partners?.name ?? null,
+      // Which realtor put this loan officer in front of them — "three shared
+      // files through Jamie" is a story; a bare name is a list.
+      via_partner_name: p.via_partner?.name ?? null,
     })),
     statuses: PROSPECT_STATUSES,
   });

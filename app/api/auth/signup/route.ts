@@ -81,6 +81,19 @@ export async function POST(req: NextRequest) {
     if (referrer) referredBy = referrer.id;
   }
 
+  // Channel attribution. An agent invited by their loan officer's referral
+  // board is the signal that this market widens beyond agent-to-agent — it
+  // has to be recorded at signup or it's gone.
+  const SOURCES = new Set(["lender", "partner", "agent", "direct"]);
+  const via = String(body?.via ?? "").trim().toLowerCase();
+  const signupSource = teamOwnerId
+    ? "team"
+    : SOURCES.has(via)
+      ? via
+      : referredBy
+        ? "agent"
+        : "direct";
+
   const { data: account, error } = await db()
     .from("accounts")
     .insert({
@@ -89,6 +102,7 @@ export async function POST(req: NextRequest) {
       display_name: displayName,
       team_owner_id: teamOwnerId,
       referred_by: referredBy,
+      signup_source: signupSource,
     })
     .select("id, email")
     .single();

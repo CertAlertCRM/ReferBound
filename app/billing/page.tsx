@@ -25,14 +25,24 @@ const TIERS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    features: ["1 referral partner", "Full live portal for that partner", "Documents, messages & alerts", "AI intake, extraction & intro emails"],
+    features: [
+      "1 lender partner — the full pipeline",
+      "Plus 2 other referral partners (realtors, CPAs, friends)",
+      "Live portals, documents, messages & alerts",
+      "AI intake, extraction & intro emails",
+    ],
   },
   {
     key: "pro",
     name: "Pro",
     price: "$20",
     period: "per month",
-    features: ["Unlimited referral partners", "Everything in Free", "Premium & ROI tracking", "Monthly partner summaries"],
+    features: [
+      "Unlimited lenders and referral partners",
+      "Everything in Free",
+      "Premium & ROI tracking",
+      "Monthly partner summaries",
+    ],
   },
   {
     key: "agency",

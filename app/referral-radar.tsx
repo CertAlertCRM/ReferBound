@@ -22,6 +22,7 @@ type Prospect = {
   status: string;
   notes: string | null;
   deal_count: number;
+  via_partner_name?: string | null;
   suggested_partner_id: string | null;
   suggestedPartnerName: string | null;
 };
@@ -81,7 +82,7 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
 
   if (!d) return null;
 
-  const radarFinds = d.prospects.filter((p) => p.source === "radar");
+  const radarFinds = d.prospects.filter((p) => p.source === "radar" || p.source === "realtor_deal");
   const contactGaps = d.prospects.filter((p) => p.source === "contact");
   const pipeline = d.prospects.filter((p) => p.source === "manual");
 
@@ -170,9 +171,10 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
             <h3 className="section-label mb-2">Working with you, no portal yet</h3>
             {radarFinds.length === 0 ? (
               <p className="text-xs text-ink-muted">
-                Every 1003 you run through AI names the loan officer who sent it. When that
-                company isn&apos;t one of your partners yet, they show up here — you&apos;re
-                already working together, they just don&apos;t have a portal.
+                Two things fill this list. Loan applications name the loan officer who sent
+                them, and every realtor referral can name the loan officer on the other side of
+                the deal. Either way, these are people you&apos;ve already closed alongside —
+                they just don&apos;t have a portal yet.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -186,8 +188,11 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
                         </p>
                         <p className="text-[11px] text-ink-secondary mt-0.5">
                           {p.deal_count === 1
-                            ? "1 deal in your files — no portal yet"
-                            : `${p.deal_count} deals in your files — no portal yet`}
+                            ? "1 shared file — no portal yet"
+                            : `${p.deal_count} shared files — no portal yet`}
+                          {p.source === "realtor_deal" && p.via_partner_name && (
+                            <> · through {p.via_partner_name}</>
+                          )}
                           {p.email && ` · ${p.email}`}
                         </p>
                       </div>

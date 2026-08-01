@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", params.id)
     .eq("account_id", account.id)
-    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in, notify_channel), documents(kind, file_name)")
+    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in, notify_channel), documents(id, kind, file_name, purged_at)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -98,9 +98,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const wantsSms = smsCapable && channel !== "email";
       const wantsEmail = !contact || channel !== "sms" || !smsCapable;
 
+      // Copy, never the array off the DB response — doc recipients get appended
+      // below and mutating the partner's saved email list would be a bug.
       const recipients: string[] = contact?.email
         ? [contact.email]
-        : (referral.partners.emails ?? []);
+        : [...(referral.partners.emails ?? [])];
 
       // Personal touch: if the agent approved a "Your voice" template, the
       // notification goes out in their words instead of stock wording.
@@ -110,7 +112,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         .eq("account_id", account.id)
         .maybeSingle();
       const voice = (voiceProf?.notify_templates ?? {}) as NotifyTemplates;
-      const docList = (referral.documents ?? []).map((d: any) => DOC_KINDS[d.kind] ?? d.file_name);
+      // Documents as direct links, not a reason to visit us. Purged source
+      // files are skipped — the link would 404 and the recipient would think
+      // the agent lost their paperwork.
+      const liveDocs = (referral.documents ?? []).filter((d: any) => !d.purged_at);
+      const docLinks = liveDocs.map((d: any) => ({
+        label: DOC_KINDS[d.kind] ?? d.file_name,
+        url: `${appUrl()}/api/docs/${d.id}/download?t=${referral.partners.token}`,
+      }));
+      const docList = docLinks.map((d: any) => d.label);
       const vars = {
         client: referral.client_name,
         partner: referral.partners.name,
@@ -119,16 +129,40 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         docs: docList.join(", ") || "EOI",
       };
 
-      if (wantsEmail) {
+      // Contacts flagged as document recipients — processors, closing desks,
+      // whoever actually assembles the file at that shop — go on the docs-ready
+      // email automatically, so the loan officer never has to forward it and
+      // nobody has to come here to collect a PDF. This is separate from the
+      // notify-channel choice: an LO who asked for texts only still gets texts
+      // only, and her processor still gets the documents.
+      const docTo: string[] = wantsEmail ? [...recipients] : [];
+      if (referral.status === "docs_delivered") {
+        const { data: extra } = await db()
+          .from("partner_contacts")
+          .select("email")
+          .eq("partner_id", referral.partner_id)
+          .eq("doc_recipient", true);
+        for (const c of extra ?? []) {
+          if (c.email && !docTo.some((r) => r.toLowerCase() === c.email.toLowerCase())) {
+            docTo.push(c.email);
+          }
+        }
+      }
+
+      if (wantsEmail || docTo.length > 0) {
         if (referral.status === "docs_delivered") {
           await sendEmail({
             referralId: referral.id,
             kind: "docs_ready",
-            to: recipients,
+            to: docTo,
             subject: `${referral.client_name}: insurance documents ready`,
             html: voice.email_docs
-              ? plainBodyEmail(renderVoice(voice.email_docs, vars))
-              : docsReadyEmail(referral.client_name, docList, portalUrl),
+              ? plainBodyEmail(
+                  `${renderVoice(voice.email_docs, vars)}\n\n${docLinks
+                    .map((d: any) => `${d.label}: ${d.url}`)
+                    .join("\n")}`
+                )
+              : docsReadyEmail(referral.client_name, docLinks, portalUrl),
           });
         } else if (referral.status !== "lost") {
           await sendEmail({

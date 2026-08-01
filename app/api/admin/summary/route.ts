@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const s = db();
   const [{ data: accounts }, { data: partners }, { data: referrals }, { data: emails }] =
     await Promise.all([
-      s.from("accounts").select("id, email, plan, billing_interval, plan_amount_cents, created_at, team_owner_id, stripe_subscription_id, referred_by, pro_until"),
+      s.from("accounts").select("id, email, plan, billing_interval, plan_amount_cents, created_at, team_owner_id, stripe_subscription_id, referred_by, pro_until, signup_source"),
       s.from("partners").select("id, account_id, partner_type"),
       s.from("referrals").select("id, account_id, status, premium, created_at, source, backfilled"),
       s.from("email_log").select("kind, sent, created_at"),
@@ -124,6 +124,13 @@ export async function GET(req: NextRequest) {
       // How much of the base came from agents referring agents — the number
       // that tells you whether this thing spreads on its own yet.
       viaReferral: accts.filter((a) => a.referred_by).length,
+      // Channel mix — the lender number is the one that says whether this
+      // spreads through the referral network or only through your calendar.
+      bySource: accts.reduce((acc: Record<string, number>, a) => {
+        const k = a.signup_source ?? "unknown";
+        acc[k] = (acc[k] ?? 0) + 1;
+        return acc;
+      }, {}),
       onEarnedPro: accts.filter(
         (a) => a.plan === "free" && a.pro_until && new Date(a.pro_until).getTime() > Date.now()
       ).length,

@@ -57,7 +57,7 @@ export default function WelcomePage() {
             Create your free account
           </a>
           <p className="text-xs text-ink-muted">
-            Free includes your first partner with every feature — no card required. Pro is $20/mo for
+            Free includes your first lender plus two other referral partners, with every feature — no card required. Pro is $20/mo for
             unlimited partners; Agency is $99/mo. Built inside a working insurance agency.
           </p>
           <p className="text-xs text-ink-muted">

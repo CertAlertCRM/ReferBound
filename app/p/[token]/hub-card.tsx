@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IconMail } from "../../icons";
 
 // Optional lender workspace entry — a quiet one-liner, not a billboard.
@@ -9,7 +9,18 @@ import { IconMail } from "../../icons";
 // if they're curious. The board link goes to their inbox (never shown on
 // screen — delivery IS the ownership check).
 
-export function HubCard() {
+export function HubCard({ weight = 0 }: { weight?: number }) {
+  // Earned prominence: a partner with several referrals on this portal has
+  // shown the tool matters to them, so the combined board gets a real card
+  // instead of a one-line whisper. Still dismissible, still never forced —
+  // and dismissing it is remembered.
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      setDismissed(window.localStorage.getItem("rb_hub_dismissed") === "1");
+    } catch {}
+  }, []);
+  const earned = weight >= 3 && !dismissed;
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
@@ -33,13 +44,46 @@ export function HubCard() {
   }
 
   if (!open && state !== "sent") {
+    if (!earned) {
+      return (
+        <p className="text-center text-xs text-ink-muted">
+          Work with more than one insurance agent?{" "}
+          <button type="button" className="link !text-xs" onClick={() => setOpen(true)}>
+            Get an optional combined view
+          </button>
+        </p>
+      );
+    }
     return (
-      <p className="text-center text-xs text-ink-muted">
-        Work with more than one insurance agent?{" "}
-        <button type="button" className="link !text-xs" onClick={() => setOpen(true)}>
-          Get an optional combined view
-        </button>
-      </p>
+      <div className="card p-5 border-brand-200 bg-brand-light/30">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-sm">One board for every insurance agent you use</p>
+            <p className="text-xs text-ink-secondary mt-1 max-w-md">
+              You&apos;ve got {weight} files on this portal. If you work with other insurance
+              agents too, your referral board puts all of them on one page — every client, every
+              closing date, one link. Free, and this portal keeps working exactly the same either
+              way.
+            </p>
+            <button type="button" className="btn-primary !py-1.5 text-xs mt-3" onClick={() => setOpen(true)}>
+              <IconMail size={13} /> Email me my board
+            </button>
+          </div>
+          <button
+            type="button"
+            className="text-ink-muted hover:text-ink text-xs shrink-0"
+            onClick={() => {
+              setDismissed(true);
+              try {
+                window.localStorage.setItem("rb_hub_dismissed", "1");
+              } catch {}
+            }}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
     );
   }
 

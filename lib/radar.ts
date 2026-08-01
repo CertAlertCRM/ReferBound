@@ -22,6 +22,37 @@ export function loose(v: string | null | undefined): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
+// Loan servicers and lienholder shells. These appear as the mortgagee on
+// insurance documents and are never referral partners — nobody at Mr. Cooper is
+// sending an agent a buyer. Kept as a last line of defence behind the document
+// filter, because one bad prospect makes the whole feature feel guessy.
+const SERVICER_PATTERNS = [
+  /isaoa/i,
+  /atima/i,
+  /\bits\s+successors\b/i,
+  /loan\s*care/i,
+  /servicemac/i,
+  /mr\.?\s*cooper/i,
+  /nationstar/i,
+  /cenlar/i,
+  /dovenmuehle/i,
+  /shellpoint/i,
+  /freedom\s+mortgage/i,
+  /select\s+portfolio/i,
+  /lakeview\s+loan/i,
+  /rushmore/i,
+  /planet\s+home/i,
+  /\bservicing\b/i,
+  /\bsecuritiz/i,
+  /\btrustee\b/i,
+];
+
+export function looksLikeServicer(v: string | null | undefined): boolean {
+  const t = String(v ?? "");
+  if (!t.trim()) return false;
+  return SERVICER_PATTERNS.some((re) => re.test(t));
+}
+
 export type DocContact = {
   loan_officer_name?: string | null;
   loan_officer_company?: string | null;
@@ -41,6 +72,11 @@ export async function recordProspectFromDoc(accountId: string, extracted: DocCon
     const name = String(extracted.loan_officer_name ?? "").trim() || null;
     const company = String(extracted.loan_officer_company ?? "").trim() || null;
     if (!name && !company) return;
+    // A servicer that slipped through is worse than no suggestion at all.
+    if (looksLikeServicer(company) || looksLikeServicer(name)) return;
+    // A company with no human attached is usually a mortgagee box, not a
+    // referral source. Real originators come with a person's name.
+    if (!name) return;
 
     const { data: partners } = await db().from("partners").select("id, name").eq("account_id", accountId);
     const matchedPartner = (partners ?? []).find(

@@ -14,7 +14,9 @@ export async function logActivity(
     | "document_deleted"
     | "message_deleted"
     | "email_sent"
-    | "at_risk_flagged",
+    | "at_risk_flagged"
+    | "closing_date_changed"
+    | "note",
   detail: string,
   actor: ActivityActor = "agent"
 ) {

@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { STATUSES, STATUS_LABELS } from "@/lib/config";
+import { STATUSES, STATUS_LABELS, nextStatusFor, statusLabel, isFullTrack } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import { StatusBadge, AtRiskBadge, StatusProgress, TopNav } from "./components";
-import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck, IconUsers, IconZap, IconFile, IconX } from "./icons";
+import { IconPlus, IconArrowRight, IconChevronDown, IconChevronUp, IconDownload, IconCheck, IconUsers, IconZap, IconFile, IconX, IconCalendar, IconMail } from "./icons";
 import { BackfillButton } from "./backfill";
 import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
+import { EmptyStart } from "./empty-start";
 import { useUI } from "./ui";
 
 type Referral = {
@@ -24,7 +25,7 @@ type Referral = {
   backfilled?: boolean;
   client_dob: string | null;
   property_address: string | null;
-  partners: { name: string } | null;
+  partners: { name: string; partner_type?: string } | null;
   documents: { id: string; kind: string }[];
 };
 
@@ -58,10 +59,9 @@ function atRisk(r: Referral): boolean {
   );
 }
 
-function nextStatus(status: string): string | null {
-  const i = STATUSES.indexOf(status as any);
-  if (i === -1 || i === STATUSES.length - 1) return null;
-  return STATUSES[i + 1];
+// A lender deal runs the whole pipeline; a realtor's referral stops at covered.
+function nextStatus(r: { status: string; partners: { partner_type?: string } | null }): string | null {
+  return nextStatusFor(r.status, r.partners?.partner_type);
 }
 
 export default function Dashboard() {
@@ -75,6 +75,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [inboxPending, setInboxPending] = useState(0);
 
   const formOpenedAt = useRef<number>(0);
   const EMPTY_LEAD = {
@@ -108,6 +109,13 @@ export default function Dashboard() {
       setHeadshotUrl(headshotUrl ?? null);
     }
     setLoading(false);
+
+    // Held forwards, fetched after the page has already painted — a queue
+    // that's empty most days shouldn't slow the dashboard down.
+    fetch("/api/inbox")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setInboxPending((j?.emails ?? []).filter((e: any) => e.status === "pending").length))
+      .catch(() => {});
   }
   useEffect(() => {
     load();
@@ -148,7 +156,7 @@ export default function Dashboard() {
   }
 
   async function advance(r: Referral) {
-    const ns = nextStatus(r.status);
+    const ns = nextStatus(r);
     if (!ns) return;
     if (ns === "docs_delivered" && (r.documents?.length ?? 0) === 0) {
       const ok = await confirm(
@@ -206,6 +214,11 @@ export default function Dashboard() {
         <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-6 xl:items-start">
         <div className="space-y-6 min-w-0">
         <InstallPrompt />
+        {/* No partners yet — the cold start. Give them something to hand a
+            lender instead of an empty board and a description. */}
+        {!loading && partners.length === 0 && (
+          <EmptyStart agentFirstName={profileName?.split(" ")[0]} />
+        )}
         {/* Greeting */}
         {(profileName || headshotUrl) && (
           <div className="flex items-center gap-4 sm:gap-5">
@@ -235,7 +248,13 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1 stagger">
             {[
               { v: String(inProgress), l: "In progress" },
-              { v: String(groups.risk.length), l: "Closing soon", alert: groups.risk.length > 0 },
+              {
+                v: String(groups.risk.length),
+                l: "Closing soon",
+                alert: groups.risk.length > 0,
+                href: "/closing",
+                hint: "see the week",
+              },
               { v: String(groups.done.length), l: "Bound" },
               {
                 // Live business only — imported history has its own ledger on
@@ -249,15 +268,27 @@ export default function Dashboard() {
                 l: "Premium sourced",
                 hint: referrals.some((r) => r.backfilled) ? "live business only" : undefined,
               },
-            ].map((t: any) => (
-              <div key={t.l} className={`card card-hover px-4 py-3 ${t.alert ? "border-red-200" : ""}`}>
-                <p className={`tabnum text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
-                  {t.v}
-                </p>
-                <p className="text-[11px] text-ink-muted mt-0.5">{t.l}</p>
-                {t.hint && <p className="text-[10px] text-ink-muted">{t.hint}</p>}
-              </div>
-            ))}
+            ].map((t: any) => {
+              const inner = (
+                <>
+                  <p className={`tabnum text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
+                    {t.v}
+                  </p>
+                  <p className="text-[11px] text-ink-muted mt-0.5">{t.l}</p>
+                  {t.hint && <p className="text-[10px] text-ink-muted">{t.hint}</p>}
+                </>
+              );
+              const cls = `card card-hover px-4 py-3 block ${t.alert ? "border-red-200" : ""}`;
+              return t.href ? (
+                <Link key={t.l} href={t.href} className={cls}>
+                  {inner}
+                </Link>
+              ) : (
+                <div key={t.l} className={cls}>
+                  {inner}
+                </div>
+              );
+            })}
           </div>
           <div className="flex flex-col items-stretch gap-2 shrink-0">
             <button onClick={openAdd} className="btn-primary">
@@ -399,6 +430,23 @@ export default function Dashboard() {
           <GettingStarted profileDone={Boolean(profileName)} partnerDone={partners.length > 0} />
         ) : (
           <>
+            {inboxPending > 0 && (
+              <Link
+                href="/inbox"
+                className="card card-hover p-4 flex items-center gap-3 border-brand-200 bg-brand-light/40 block"
+              >
+                <IconMail size={16} className="text-brand shrink-0" />
+                <span className="min-w-0">
+                  <span className="text-sm font-semibold block">
+                    {inboxPending} forwarded email{inboxPending === 1 ? "" : "s"} waiting on you
+                  </span>
+                  <span className="text-xs text-ink-secondary">
+                    Details are already pulled out — one click turns each into a lead.
+                  </span>
+                </span>
+                <IconArrowRight size={14} className="ml-auto text-ink-muted shrink-0" />
+              </Link>
+            )}
             <Section title="Closing soon — not bound" items={groups.risk} advance={advance} markLost={markLost} busyId={busyId} highlight />
             <Section title="Active" items={groups.active} advance={advance} markLost={markLost} busyId={busyId} />
             <Section title="Bound & delivered" items={groups.done} advance={advance} markLost={markLost} busyId={busyId} collapsible />
@@ -487,6 +535,12 @@ export default function Dashboard() {
             <h3 className="section-label mb-2">Quick actions</h3>
             <div className="-mx-2">
               {[
+                { href: "/closing", icon: IconCalendar, label: "Closing week" },
+                {
+                  href: "/inbox",
+                  icon: IconMail,
+                  label: inboxPending > 0 ? `Email intake (${inboxPending} waiting)` : "Email intake",
+                },
                 { href: "/partners", icon: IconUsers, label: "Add or manage partners" },
                 { href: "/stats", icon: IconZap, label: "Partner ROI & trends" },
                 {
@@ -674,7 +728,7 @@ function Section({
       </h2>
       <div className="space-y-2.5">
         {items.map((r) => {
-          const ns = nextStatus(r.status);
+          const ns = nextStatus(r);
           const days = daysUntil(r.closing_date);
           return (
             <div
@@ -687,7 +741,7 @@ function Section({
                     <Link href={`/deal/${r.id}`} className="font-semibold hover:text-brand truncate">
                       {r.client_name}
                     </Link>
-                    <StatusBadge status={r.status} />
+                    <StatusBadge status={r.status} partnerType={r.partners?.partner_type} />
                     {atRisk(r) && <AtRiskBadge />}
                     {r.source === "partner" && (
                       <span className="badge bg-brand-light text-brand-700">via portal</span>
@@ -751,7 +805,7 @@ function Section({
                 )}
               </div>
               <div className="mt-3">
-                <StatusProgress status={r.status} />
+                <StatusProgress status={r.status} partnerType={r.partners?.partner_type} />
               </div>
             </div>
           );

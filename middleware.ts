@@ -22,6 +22,13 @@ const PUBLIC_PREFIXES = [
   "/api/docs/",
   "/api/waitlist",
   "/api/stripe/",
+  // Inbound email webhook — guarded by its own signature check, not a session.
+  "/api/inbound/",
+  // A shared partner setup must be viewable before signing up — the preview is
+  // the whole point. Accepting it still requires a session.
+  "/share/",
+  // Sample portals are handed to prospects who have no account by definition.
+  "/demo/",
   "/_next",
   "/favicon.ico",
   "/icon.svg",

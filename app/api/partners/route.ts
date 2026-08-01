@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES } from "@/lib/config";
-import { getAccount, partnerLimit } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
 
 export async function GET() {
   const account = await getAccount();
@@ -35,28 +35,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body?.name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
-  // Plan enforcement: Free = 1 partner, full features.
-  const limit = partnerLimit(account.plan);
-  if (limit !== null) {
-    const { count } = await db()
-      .from("partners")
-      .select("id", { count: "exact", head: true })
-      .eq("account_id", account.id);
-    if ((count ?? 0) >= limit) {
-      return NextResponse.json(
-        {
-          error: "Free includes your first partner. Pro adds unlimited partners.",
-          upgrade: true,
-        },
-        { status: 402 }
-      );
-    }
+  const wantType = PARTNER_TYPES[body.partner_type] ? String(body.partner_type) : "lender";
+
+  // Plan enforcement, counted by kind: the lender seat is the one worth paying
+  // for, so free leaves room for a couple of other referral sources.
+  const capacity = await partnerCapacity(account.id, account.plan, wantType, countPartners(account.id));
+  if (!capacity.ok) {
+    return NextResponse.json({ error: capacity.error, upgrade: true }, { status: 402 });
   }
+
   const emails = String(body.emails ?? "")
     .split(/[,;\s]+/)
     .map((e: string) => e.trim().toLowerCase())
     .filter((e: string) => EMAIL_RE.test(e));
-  const partner_type = PARTNER_TYPES[body.partner_type] ? body.partner_type : "lender";
+  const partner_type = wantType;
   // Custom display label only makes sense with "Other" — the built-in types
   // already have names, and flow logic keys off partner_type either way.
   const type_label =
@@ -69,3 +61,4 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ partner: data });
 }
+

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
+import { clauseForReferral } from "@/lib/clauses";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { DOC_KINDS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
@@ -95,7 +96,16 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .eq("id", params.id)
     .single();
   if (!referral) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const requirements = (referral as any).partners?.requirements ?? null;
+  // The clause that applies to THIS file — what the processor designated, or
+  // what the matcher picked, or the partner's default. Checking an EOI against
+  // a partner's single saved clause was wrong the moment a shop had more than
+  // one investor.
+  const applicable = await clauseForReferral(referral.id);
+  const baseReq = (referral as any).partners?.requirements ?? null;
+  const requirements =
+    applicable.text || baseReq
+      ? { ...(baseReq ?? {}), mortgagee_clause: applicable.text ?? baseReq?.mortgagee_clause ?? null }
+      : null;
 
   const { data: docs } = await db()
     .from("documents")

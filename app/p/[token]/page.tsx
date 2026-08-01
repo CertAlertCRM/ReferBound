@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/lib/db";
 import { currentAccountId } from "@/lib/auth";
-import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS_PARTNER, SAFE_STATUSES } from "@/lib/config";
+import { APP_CONFIG, STATUS_LABELS, STATUSES, DOC_KINDS_PARTNER, SAFE_STATUSES, statusesFor, statusLabel, nextStatusFor, isFullTrack } from "@/lib/config";
 import { isAtRisk, fmtDate, daysUntil, timeAgo } from "@/lib/helpers";
 import { themeStyle } from "@/lib/themes";
 import { ShareCard } from "./share-card";
 import { HubCard } from "./hub-card";
+import { DocDesk } from "./doc-desk";
+import { ClosingDateEdit } from "./closing-date";
 import { FeedbackWidget } from "../../feedback-widget";
 import { PartnerSubmitForm } from "./submit-form";
 import { AutoRefresh } from "./auto-refresh";
@@ -53,22 +55,23 @@ const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
   lost: { pill: "bg-slate-100 text-slate-500", dot: "bg-slate-300" },
 };
 
-function Progress({ status }: { status: string }) {
+function Progress({ status, partnerType }: { status: string; partnerType?: string | null }) {
+  const track = statusesFor(partnerType);
   if (status === "lost") {
     return (
       <div className="flex gap-1">
-        {STATUSES.map((s) => (
+        {track.map((s) => (
           <div key={s} className="seg opacity-60" />
         ))}
       </div>
     );
   }
-  const idx = STATUSES.indexOf(status as (typeof STATUSES)[number]);
+  const idx = track.indexOf(status);
   const done = SAFE_STATUSES.includes(status);
   return (
     <div className="flex gap-1">
-      {STATUSES.map((s, i) => (
-        <div key={s} className={`seg ${i <= idx ? (done ? "seg-done" : "seg-filled") : ""}`} />
+      {track.map((s, i) => (
+        <div key={s} className={`seg ${done || i <= idx ? (done ? "seg-done" : "seg-filled") : ""}`} />
       ))}
     </div>
   );
@@ -81,10 +84,16 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   const slug = params.token.replace(/[^a-zA-Z0-9]/g, "");
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, token, logo_path, partner_type, account_id")
+    .select("id, name, token, logo_path, partner_type, account_id, requirements")
     .or(`token.eq.${slug},short_code.eq.${slug}`)
     .maybeSingle();
   if (!partner) notFound();
+
+  // Which track this relationship runs. A realtor or a friend who sent a buyer
+  // sees got-it / working-it / covered; only lenders get the documents desk and
+  // the full pipeline.
+  const partnerType: string = partner.partner_type ?? "lender";
+  const fullTrack = isFullTrack(partnerType);
 
   let partnerLogoUrl: string | null = null;
   if (partner.logo_path) {
@@ -96,7 +105,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
 
   const { data: referrals, error: refError } = await db()
     .from("referrals")
-    .select("id, client_name, closing_date, status, created_at, updated_at, backfilled, partner_contacts(name), documents(id, kind, file_name, uploaded_by, purged_at)")
+    .select("id, client_name, closing_date, closing_date_was, closing_date_changed_at, status, created_at, updated_at, backfilled, property_address, mortgagee_clause_id, clause_source, partner_contacts(name), documents(id, kind, file_name, uploaded_by, purged_at)")
     .eq("partner_id", partner.id)
     .order("created_at", { ascending: false });
 
@@ -287,7 +296,9 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
               </h1>
               <p className="text-sm text-brand-100 mt-2 max-w-md">
-                Every client you&apos;ve referred to {agentName}, updated in real time. Insurance documents post here as soon as they're ready after binding.
+                {fullTrack
+                  ? `Every client you've referred to ${agentName}, updated in real time. Insurance documents post here once they're issued after binding.`
+                  : `Every client you've referred to ${agentName}, updated in real time — so you always know where they stand.`}
               </p>
               {(prof?.phone || prof?.email) && (
                 <p className="text-xs text-brand-100 mt-3 flex items-center flex-wrap gap-x-3 gap-y-1">
@@ -405,28 +416,38 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                   </div>
                   <span className={`badge ${style.pill}`}>
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                    {STATUS_LABELS[r.status] ?? r.status}
+                    {statusLabel(r.status, partnerType)}
                   </span>
                 </div>
 
                 <div className="mt-3.5">
-                  <Progress status={r.status} />
+                  <Progress status={r.status} partnerType={partnerType} />
+                  {/* Dates move. Until now the only way to say so was a phone
+                      call, which meant the agent's board went quietly stale. */}
+                  {!SAFE_STATUSES.includes(r.status) && r.status !== "lost" && (
+                    <div className="mt-2">
+                      <ClosingDateEdit
+                        token={partner.token}
+                        referralId={r.id}
+                        current={r.closing_date ?? null}
+                      />
+                    </div>
+                  )}
                   {r.status !== "lost" && (
                     <p className="mt-1.5 text-[11px] text-ink-muted">
                       {SAFE_STATUSES.includes(r.status) ? (
                         <span className="text-emerald-600 font-semibold">
-                          {STATUS_LABELS[r.status]} — all set
+                          {statusLabel(r.status, partnerType)} — all set
                         </span>
                       ) : (
                         <>
-                          Now: <span className="font-semibold text-ink-secondary">{STATUS_LABELS[r.status]}</span>
-                          {STATUSES.indexOf(r.status as (typeof STATUSES)[number]) >= 0 &&
-                            STATUSES.indexOf(r.status as (typeof STATUSES)[number]) < STATUSES.length - 1 && (
-                              <>
-                                {" "}· Next:{" "}
-                                {STATUS_LABELS[STATUSES[STATUSES.indexOf(r.status as (typeof STATUSES)[number]) + 1]]}
-                              </>
-                            )}
+                          Now:{" "}
+                          <span className="font-semibold text-ink-secondary">
+                            {statusLabel(r.status, partnerType)}
+                          </span>
+                          {nextStatusFor(r.status, partnerType) && (
+                            <> · Next: {statusLabel(nextStatusFor(r.status, partnerType)!, partnerType)}</>
+                          )}
                         </>
                       )}
                     </p>
@@ -507,7 +528,35 @@ export default async function PartnerPortal({ params }: { params: { token: strin
         </div>
       )}
 
-      <HubCard />
+      {/* Processors live here — it jumps to the top for them, and sits below
+          the pipeline for everyone else. */}
+      {fullTrack && (
+      <DocDesk
+        token={partner.token}
+        contacts={(teamContacts ?? []) as any}
+        mortgagee={(partner as any).requirements?.mortgagee_clause ?? null}
+        deals={refs
+          .map((r: any) => ({
+            id: r.id,
+            client: r.client_name,
+            address: r.property_address ?? null,
+            closing: r.closing_date ? fmtDate(r.closing_date) : null,
+            clauseId: r.mortgagee_clause_id ?? null,
+            clauseSource: r.clause_source ?? null,
+            docs: (r.documents ?? [])
+              .filter((d: any) => !d.purged_at && d.uploaded_by !== "partner")
+              .map((d: any) => ({
+                id: d.id,
+                kind: d.kind,
+                label: DOC_KINDS_PARTNER[d.kind] ?? d.file_name,
+              })),
+          }))}
+      />
+      )}
+
+      {/* Earned prominence: a partner with real volume here has shown this
+          matters to them, so the combined board stops being a whisper. */}
+      <HubCard weight={refs.length} />
 
       <ShareCard agentName={agentName} agencyName={agencyName} />
 

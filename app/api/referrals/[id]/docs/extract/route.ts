@@ -5,6 +5,8 @@ import { logActivity } from "@/lib/activity";
 import { DOC_KINDS } from "@/lib/config";
 import { getAccount, ownedReferral } from "@/lib/account";
 import { recordProspectFromDoc } from "@/lib/radar";
+import { ORIGINATOR_DOC_KINDS } from "@/lib/config";
+import { autoMatchClause } from "@/lib/clauses";
 
 // Agent-only (protected by middleware): extract structured details from an
 // uploaded document (1003, dec page, EOI, HOI request…) and fill EMPTY fields
@@ -18,6 +20,13 @@ Rules:
 - Extract ONLY what is explicitly present in the document. Never guess or infer.
 - Use null for anything not clearly present.
 - Dates in ISO format (YYYY-MM-DD). Phone as digits with punctuation as written.
+- CRITICAL: a mortgagee, lienholder, loss payee, servicer, or any "ISAOA/ATIMA"
+  entity is NOT a loan officer. On an evidence of insurance, declarations page,
+  or replacement cost estimate, the only lender-shaped name present is the
+  mortgagee — the servicer who holds the note, not the person who originated it.
+  Put that in mortgagee_name and leave every loan_officer_* field null. Only
+  fill loan_officer_* when a named individual originator appears, which in
+  practice means a loan application, a pre-approval, or an insurance request.
 - premium is the annual premium as a plain number (no $ or commas), null if absent.
 
 Respond with ONLY a JSON object (no markdown fences, no commentary):
@@ -34,11 +43,14 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
   "policy_lines": string|null,       // e.g. "Homeowners", "Home + Flood"
   "effective_start": string|null,    // policy effective date
   "effective_end": string|null,      // policy expiration date
-  "loan_officer_name": string|null,    // originating loan officer / agent named on the document
-  "loan_officer_company": string|null, // their lender / brokerage / company name
+  "loan_officer_name": string|null,    // ONLY a named human loan officer / originator. null on anything else.
+  "loan_officer_company": string|null, // the ORIGINATING lender or brokerage that person works for
   "loan_officer_email": string|null,
   "loan_officer_phone": string|null,
   "loan_officer_nmls": string|null,    // NMLS ID if shown
+  "loan_type": string|null,            // FHA, VA, USDA, Conventional, Jumbo, Portfolio — only if stated
+  "investor": string|null,             // investor / servicer named on the file, if stated
+  "mortgagee_name": string|null,       // mortgagee / lienholder / loss payee exactly as printed
   "doc_summary": string              // one sentence: what this document is
 }`;
 
@@ -153,7 +165,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Referral Radar: a loan officer on this document who isn't a partner yet is
   // someone who already sends this agent business. Best-effort, never blocking.
-  await recordProspectFromDoc(account.id, extracted);
+  // Radar only harvests from documents an ORIGINATOR signs. An EOI, dec page,
+  // or RCE carries the mortgagee — a national servicer who has never referred
+  // anybody and never will. Mining those built a prospect list of Mr. Cooper
+  // and ServiceMac.
+  if (ORIGINATOR_DOC_KINDS.includes(doc.kind)) {
+    await recordProspectFromDoc(account.id, extracted);
+  }
+
+  // Match the file to the right mortgagee clause from the processor's library.
+  // Never overwrites a clause a processor set by hand — they know something the
+  // document doesn't.
+  await autoMatchClause(doc.referral_id, {
+    loanType: extracted.loan_type ?? null,
+    investor: extracted.investor ?? null,
+    text: extracted.doc_summary ?? null,
+  });
 
   await logActivity(
     params.id,

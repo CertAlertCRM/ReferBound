@@ -44,7 +44,7 @@ export default async function HubPage({ params }: { params: { token: string } })
   const { data: referrals } = partnerIds.length
     ? await db()
         .from("referrals")
-        .select("id, client_name, closing_date, status, partner_id, created_at")
+        .select("id, client_name, closing_date, status, partner_id, created_at, backfilled")
         .in("partner_id", partnerIds)
         .order("created_at", { ascending: false })
     : { data: [] as any[] };
@@ -76,9 +76,42 @@ export default async function HubPage({ params }: { params: { token: string } })
     };
   };
 
+  // Responsiveness per agent — only for agents who opted into being measured
+  // (the scorecard toggle in their profile). Backfilled deals are excluded:
+  // imported history has no honest clock.
+  const { data: speedProfiles } = accountIds.length
+    ? await db().from("agent_profile").select("account_id, show_scorecard").in("account_id", accountIds)
+    : { data: [] as any[] };
+  const showsScore = new Map((speedProfiles ?? []).map((p: any) => [p.account_id, p.show_scorecard !== false]));
+
+  const { data: quoteEvents } = partnerIds.length
+    ? await db()
+        .from("status_events")
+        .select("referral_id, status, created_at")
+        .in("referral_id", refs.map((r: any) => r.id))
+        .in("status", ["new", "quoted"])
+        .order("created_at", { ascending: true })
+    : { data: [] as any[] };
+  const firstAt = new Map<string, number>();
+  for (const e of quoteEvents ?? []) {
+    const k = `${e.referral_id}:${e.status}`;
+    if (!firstAt.has(k)) firstAt.set(k, new Date(e.created_at).getTime());
+  }
+  function quoteSpeedFor(partnerId: string): string | null {
+    const hours: number[] = [];
+    for (const r of refs.filter((x: any) => x.partner_id === partnerId && !x.backfilled)) {
+      const t0 = firstAt.get(`${r.id}:new`) ?? new Date(r.created_at).getTime();
+      const tq = firstAt.get(`${r.id}:quoted`);
+      if (tq && tq > t0) hours.push((tq - t0) / 3600000);
+    }
+    if (hours.length < 2) return null; // one data point isn't a pattern
+    const avg = hours.reduce((a, b) => a + b, 0) / hours.length;
+    return avg <= 48 ? `${Math.max(1, Math.round(avg))}h to quote` : `${Math.round((avg / 24) * 10) / 10}d to quote`;
+  }
+
   const inviteSubject = encodeURIComponent("Get on my referral board");
   const inviteBody = encodeURIComponent(
-    `Hey,\n\nI track the insurance side of my closings on a live board — every agent I work with, every client, real-time status, documents at bind. One of my agents set it up and it's been great.\n\nCan you get set up on it too, so your deals show on my board? It's free for your first partner (me):\nhttps://referbound.com/?via=lender\n\nTakes about ten minutes.`
+    `Hey,\n\nI track the insurance side of my closings on a live board — every agent I work with, every client, real-time status, documents the moment they're issued. One of my agents set it up and it's made my files a lot easier to keep straight.\n\nCan you get set up on it too, so your deals show on my board? It's free to start:\nhttps://referbound.com/signup?via=lender\n\nTakes about ten minutes.`
   );
 
   return (
@@ -171,6 +204,9 @@ export default async function HubPage({ params }: { params: { token: string } })
                   </p>
                   <p className="text-xs text-ink-secondary mt-0.5">
                     {act} in progress · {bnd} bound
+                    {showsScore.get(p.account_id) && quoteSpeedFor(p.id) && (
+                      <span className="text-ink-muted"> · avg {quoteSpeedFor(p.id)}</span>
+                    )}
                     {flagged && (
                       <span className="text-red-600 font-medium inline-flex items-center gap-1 ml-2">
                         <IconAlert size={11} /> closing soon
@@ -190,7 +226,7 @@ export default async function HubPage({ params }: { params: { token: string } })
             <p className="font-semibold text-sm">Work with another insurance agent?</p>
             <p className="text-xs text-ink-secondary mt-1">
               Their deals aren&apos;t on your board yet. Ask them to set up ReferBound — free for
-              their first partner (you) — and every referral you send them shows up here too.
+              free to start — and every referral you send them shows up here too.
             </p>
             <a
               href={`mailto:?subject=${inviteSubject}&body=${inviteBody}`}

@@ -46,6 +46,8 @@ export async function PUT(req: NextRequest) {
   if ("sms_new_lead" in body) row.sms_new_lead = Boolean(body.sms_new_lead);
   if ("show_scorecard" in body) row.show_scorecard = Boolean(body.show_scorecard);
   if ("renewal_watch" in body) row.renewal_watch = Boolean(body.renewal_watch);
+  if ("inbox_autocreate" in body) row.inbox_autocreate = Boolean(body.inbox_autocreate);
+  if ("inbox_autoack" in body) row.inbox_autoack = Boolean(body.inbox_autoack);
   if ("doc_retention_days" in body) {
     const n = Number(body.doc_retention_days);
     row.doc_retention_days = [0, 30, 90, 180].includes(n) ? n : 0;

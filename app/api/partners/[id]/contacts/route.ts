@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data, error } = await db()
     .from("partner_contacts")
-    .select("id, name, email, role, phone, sms_opt_in, notify_channel, created_at")
+    .select("id, name, email, role, phone, sms_opt_in, notify_channel, doc_recipient, created_at")
     .eq("partner_id", params.id)
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -44,14 +44,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const phone = String(body?.phone ?? "").trim() || null;
   const sms_opt_in = Boolean(body?.sms_opt_in) && Boolean(phone);
   const notify_channel = CHANNELS.has(String(body?.notify_channel)) ? String(body.notify_channel) : "both";
+  // Send documents to this person automatically when a policy is delivered —
+  // for processors and closing desks who need the EOI in the file but aren't
+  // the one who sent the lead.
+  const doc_recipient = Boolean(body?.doc_recipient);
   if (!name || !email || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Name and a valid email are required" }, { status: 400 });
   }
 
   const { data, error } = await db()
     .from("partner_contacts")
-    .insert({ partner_id: params.id, name, email, role, phone, sms_opt_in, notify_channel })
-    .select("id, name, email, role, phone, sms_opt_in, notify_channel")
+    .insert({ partner_id: params.id, name, email, role, phone, sms_opt_in, notify_channel, doc_recipient })
+    .select("id, name, email, role, phone, sms_opt_in, notify_channel, doc_recipient")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ contact: data });
@@ -84,6 +88,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("role" in body) patch.role = String(body.role ?? "").trim() || null;
   if ("phone" in body) patch.phone = String(body.phone ?? "").trim() || null;
   if ("sms_opt_in" in body) patch.sms_opt_in = Boolean(body.sms_opt_in);
+  if ("doc_recipient" in body) patch.doc_recipient = Boolean(body.doc_recipient);
   if ("notify_channel" in body) {
     const ch = String(body.notify_channel);
     if (!CHANNELS.has(ch)) return NextResponse.json({ error: "invalid channel" }, { status: 400 });
@@ -97,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", cid)
     .eq("partner_id", params.id)
-    .select("id, name, email, role, phone, sms_opt_in, notify_channel")
+    .select("id, name, email, role, phone, sms_opt_in, notify_channel, doc_recipient")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ contact: data });

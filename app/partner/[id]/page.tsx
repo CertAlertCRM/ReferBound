@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { TopNav, StatusBadge } from "../../components";
-import { PARTNER_TYPES } from "@/lib/config";
+import { PARTNER_TYPES, CONTACT_ROLES } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
 import {
   IconArrowLeft,
@@ -16,6 +16,7 @@ import {
   IconPencil,
   IconX,
   IconMessage,
+  IconUsers,
 } from "../../icons";
 import { PartnerInviteButton } from "../../partner-invite";
 import { LeadPrefillBox } from "../../lead-prefill";
@@ -86,6 +87,7 @@ export default function PartnerWorkspacePage() {
       phone?: string | null;
       sms_opt_in?: boolean;
       notify_channel?: string;
+      doc_recipient?: boolean;
     }[]
   >([]);
   // Inline contact editor (add a mobile later, SMS consent, channel choice)
@@ -93,14 +95,22 @@ export default function PartnerWorkspacePage() {
   const [ecPhone, setEcPhone] = useState("");
   const [ecSms, setEcSms] = useState(false);
   const [ecChannel, setEcChannel] = useState("both");
+  const [ecDocs, setEcDocs] = useState(false);
   const [ecBusy, setEcBusy] = useState(false);
   const [textBusy, setTextBusy] = useState<string | null>(null);
   const [textSent, setTextSent] = useState<string | null>(null);
+  // Share this partner's SETUP with another agent — contacts, requirements,
+  // mortgagee clause. Never the relationship, never a referral.
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [cName, setCName] = useState("");
   const [cEmail, setCEmail] = useState("");
   const [cRole, setCRole] = useState("");
+  const [cRoleOther, setCRoleOther] = useState(false);
   const [cPhone, setCPhone] = useState("");
   const [cSms, setCSms] = useState(false);
+  const [cDocs, setCDocs] = useState(false);
   const [cBusy, setCBusy] = useState(false);
   const [missing, setMissing] = useState(false);
   const [refs, setRefs] = useState<Referral[]>([]);
@@ -260,15 +270,17 @@ export default function PartnerWorkspacePage() {
     const res = await fetch(`/api/partners/${id}/contacts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: cName, email: cEmail, role: cRole, phone: cPhone, sms_opt_in: cSms }),
+      body: JSON.stringify({ name: cName, email: cEmail, role: cRole, phone: cPhone, sms_opt_in: cSms, doc_recipient: cDocs }),
     });
     setCBusy(false);
     if (res.ok) {
       setCName("");
       setCEmail("");
       setCRole("");
+      setCRoleOther(false);
       setCPhone("");
       setCSms(false);
+      setCDocs(false);
       const { contact } = await res.json();
       setContacts((c) => [...c, contact]);
     } else toast((await res.json()).error ?? "Couldn't add contact", "error");
@@ -279,6 +291,7 @@ export default function PartnerWorkspacePage() {
     setEcPhone(c.phone ?? "");
     setEcSms(Boolean(c.sms_opt_in));
     setEcChannel(c.notify_channel ?? "both");
+    setEcDocs(Boolean(c.doc_recipient));
   }
 
   async function saveContactEdit() {
@@ -287,7 +300,13 @@ export default function PartnerWorkspacePage() {
     const res = await fetch(`/api/partners/${id}/contacts`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cid: ecId, phone: ecPhone, sms_opt_in: ecSms, notify_channel: ecChannel }),
+      body: JSON.stringify({
+        cid: ecId,
+        phone: ecPhone,
+        sms_opt_in: ecSms,
+        notify_channel: ecChannel,
+        doc_recipient: ecDocs,
+      }),
     });
     setEcBusy(false);
     if (res.ok) {
@@ -295,6 +314,18 @@ export default function PartnerWorkspacePage() {
       setContacts((cs) => cs.map((x) => (x.id === contact.id ? contact : x)));
       setEcId(null);
     } else toast((await res.json()).error ?? "Couldn't save", "error");
+  }
+
+  async function makeShare() {
+    setShareBusy(true);
+    const r = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ partner_id: id }),
+    });
+    setShareBusy(false);
+    if (r.ok) setShareUrl((await r.json()).url);
+    else toast((await r.json()).error ?? "Couldn't create the link", "error");
   }
 
   async function textPortalLink(cid: string) {
@@ -627,6 +658,11 @@ export default function PartnerWorkspacePage() {
                                     {c.notify_channel === "sms" ? "text only" : c.notify_channel === "email" ? "email only" : "email + text"}
                                   </span>
                                 )}
+                                {c.doc_recipient && (
+                                  <span className="badge bg-brand-light text-brand ml-1.5 !text-[10px]" title="Gets the documents automatically when a policy is delivered">
+                                    gets docs
+                                  </span>
+                                )}
                               </span>
                               <span className="flex items-center gap-2 shrink-0">
                                 {c.phone && (
@@ -645,7 +681,7 @@ export default function PartnerWorkspacePage() {
                                   type="button"
                                   className="text-ink-muted hover:text-brand shrink-0"
                                   onClick={() => (ecId === c.id ? setEcId(null) : openContactEdit(c))}
-                                  title="Edit mobile & notifications"
+                                  title="Edit mobile, notifications & document delivery"
                                 >
                                   <IconPencil size={13} />
                                 </button>
@@ -681,6 +717,16 @@ export default function PartnerWorkspacePage() {
                                     They&apos;re OK receiving texts (msg &amp; data rates may apply; reply STOP anytime)
                                   </label>
                                 )}
+                                <label className="flex items-start gap-2 cursor-pointer text-[11px] text-ink-secondary">
+                                  <input type="checkbox" className="accent-brand mt-0.5" checked={ecDocs} onChange={(e) => setEcDocs(e.target.checked)} />
+                                  <span>
+                                    Send them the documents automatically when a policy is delivered
+                                    <span className="block text-ink-muted">
+                                      For processors and closing desks — the documents arrive in their inbox
+                                      whether or not they sent the lead.
+                                    </span>
+                                  </span>
+                                </label>
                                 {ecChannel === "sms" && (!ecPhone || !ecSms) && (
                                   <p className="text-[11px] text-amber-700">
                                     Text-only needs a mobile + their OK — until then, updates fall back to email.
@@ -703,18 +749,52 @@ export default function PartnerWorkspacePage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input className="input !py-2 text-sm" placeholder="Name" value={cName} onChange={(e) => setCName(e.target.value)} />
                       <input className="input !py-2 text-sm" type="email" placeholder="Email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} />
-                      <input className="input !py-2 text-sm" placeholder="Role (LO, processor…)" value={cRole} onChange={(e) => setCRole(e.target.value)} />
+                      {/* A list, not free text — the portal reads the role to decide
+                          whether to lead with the documents desk (processors) or the
+                          pipeline (loan officers). "Other" keeps the escape hatch. */}
+                      {cRoleOther ? (
+                        <input
+                          className="input !py-2 text-sm"
+                          placeholder="Their role"
+                          value={cRole}
+                          onChange={(e) => setCRole(e.target.value)}
+                          autoFocus
+                        />
+                      ) : (
+                        <select
+                          className="input !py-2 text-sm"
+                          value={cRole}
+                          onChange={(e) => {
+                            if (e.target.value === "__other") {
+                              setCRole("");
+                              setCRoleOther(true);
+                            } else setCRole(e.target.value);
+                          }}
+                        >
+                          <option value="">Role…</option>
+                          {CONTACT_ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                          <option value="__other">Other…</option>
+                        </select>
+                      )}
                       <input className="input !py-2 text-sm" type="tel" placeholder="Mobile (optional)" value={cPhone} onChange={(e) => setCPhone(formatPhoneInput(e.target.value))} />
                     </div>
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      {cPhone ? (
+                    <div className="space-y-1.5">
+                      {cPhone && (
                         <label className="flex items-center gap-2 cursor-pointer text-[11px] text-ink-secondary">
                           <input type="checkbox" className="accent-brand" checked={cSms} onChange={(e) => setCSms(e.target.checked)} />
                           Text them at quote &amp; docs-ready (only with their OK)
                         </label>
-                      ) : (
-                        <span />
                       )}
+                      <label className="flex items-center gap-2 cursor-pointer text-[11px] text-ink-secondary">
+                        <input type="checkbox" className="accent-brand" checked={cDocs} onChange={(e) => setCDocs(e.target.checked)} />
+                        Send them the documents automatically (processors, closing desk)
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
                       <button type="button" className="btn-ghost !py-2 text-xs" onClick={addContact} disabled={cBusy}>
                         {cBusy ? "…" : "Add contact"}
                       </button>
@@ -731,6 +811,9 @@ export default function PartnerWorkspacePage() {
                       </button>
                     </div>
                     <div className="flex gap-2">
+                      <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={makeShare} disabled={shareBusy}>
+                        <IconUsers size={12} /> {shareBusy ? "…" : "Share this setup…"}
+                      </button>
                       <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={rotateLink}>
                         ↻ Rotate magic link…
                       </button>
@@ -739,6 +822,48 @@ export default function PartnerWorkspacePage() {
                       </button>
                     </div>
                   </div>
+
+                  {shareUrl && (
+                    <div className="rounded-xl border border-brand-200 bg-brand-light/30 p-4 space-y-2">
+                      <p className="text-sm font-semibold">Share this partner&apos;s setup</p>
+                      <p className="text-xs text-ink-secondary max-w-xl">
+                        Another agent who opens this gets {partner.name}&apos;s contacts,
+                        requirements, and mortgagee clause copied into their own account with their
+                        own portal link — so they aren&apos;t retyping an hour of detail. It shares
+                        the setup, not the relationship: no clients, no history, and{" "}
+                        {partner.name} still decides who they send business to. Text consent
+                        doesn&apos;t transfer either — the other agent has to ask for it themselves.
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <code className="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 select-all break-all min-w-0 flex-1">
+                          {shareUrl}
+                        </code>
+                        <button
+                          type="button"
+                          className="btn-ghost !py-2 text-xs shrink-0"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(shareUrl);
+                            setShareCopied(true);
+                            setTimeout(() => setShareCopied(false), 1600);
+                          }}
+                        >
+                          {shareCopied ? (
+                            <>
+                              <IconCheck size={13} /> Copied
+                            </>
+                          ) : (
+                            <>
+                              <IconCopy size={13} /> Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-ink-muted">
+                        Good for 30 days. Nothing is shared back — you can&apos;t see their board
+                        and they can&apos;t see yours.
+                      </p>
+                    </div>
+                  )}
                 </form>
               ) : (
               <div className="flex items-center justify-between gap-4 flex-wrap">

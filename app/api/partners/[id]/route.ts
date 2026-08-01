@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES } from "@/lib/config";
-import { getAccount } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners, isLenderType } from "@/lib/account";
 
 // Agent-only (protected by middleware): edit a partner's name / notification emails.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -24,6 +24,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .filter((e: string) => EMAIL_RE.test(e));
   }
   if ("partner_type" in body && PARTNER_TYPES[body.partner_type]) {
+    // Changing type crosses the lender line, so it has to clear the same gate
+    // creating one does — otherwise "add a realtor, then edit it to lender" is
+    // a free second lender seat.
+    const { data: current } = await db()
+      .from("partners")
+      .select("partner_type")
+      .eq("id", params.id)
+      .eq("account_id", account.id)
+      .maybeSingle();
+    if (current && isLenderType(body.partner_type) && !isLenderType(current.partner_type)) {
+      const capacity = await partnerCapacity(
+        account.id,
+        account.plan,
+        "lender",
+        countPartners(account.id)
+      );
+      if (!capacity.ok) {
+        return NextResponse.json({ error: capacity.error, upgrade: true }, { status: 402 });
+      }
+    }
     patch.partner_type = body.partner_type;
     // Custom label rides only with "Other"; switching to a built-in type clears it.
     patch.type_label =
