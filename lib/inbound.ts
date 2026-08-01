@@ -254,7 +254,9 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
   "is_referral": boolean,
   "confidence": "high"|"medium"|"low",
   "client_name": string|null,
+  "client_dob": string|null,
   "coborrower_name": string|null,
+  "coborrower_dob": string|null,
   "client_phone": string|null,
   "client_email": string|null,
   "property_address": string|null,
@@ -269,7 +271,9 @@ export type Extracted = {
   is_referral?: boolean;
   confidence?: string;
   client_name?: string | null;
+  client_dob?: string | null;
   coborrower_name?: string | null;
+  coborrower_dob?: string | null;
   client_phone?: string | null;
   client_email?: string | null;
   property_address?: string | null;
@@ -323,6 +327,8 @@ export async function createReferralFromInbound(opts: {
       coborrower_name: String(e.coborrower_name ?? "").trim() || null,
       client_phone: normalizePhone(e.client_phone),
       client_email: normalizeEmail(e.client_email) || null,
+      client_dob: isoDate(e.client_dob),
+      coborrower_dob: isoDate(e.coborrower_dob),
       property_address: String(e.property_address ?? "").trim() || null,
       closing_date: isoDate(e.closing_date),
       notes: noteParts.join(" · ").slice(0, 1000) || null,

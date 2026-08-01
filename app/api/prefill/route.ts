@@ -26,6 +26,7 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
   "client_phone": string|null,
   "client_email": string|null,
   "client_dob": string|null,
+  "coborrower_dob": string|null,
   "property_address": string|null,  // subject property, one line
   "closing_date": string|null,
   "loan_officer_name": string|null,    // originating loan officer / agent named on the document
@@ -43,6 +44,7 @@ const FORM_FIELDS = [
   "client_phone",
   "client_email",
   "client_dob",
+  "coborrower_dob",
   "property_address",
   "closing_date",
 ] as const;

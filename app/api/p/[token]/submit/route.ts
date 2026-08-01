@@ -96,6 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       client_phone: normalizePhone(body?.client_phone),
       client_email: email,
       client_dob: body?.client_dob || null,
+      coborrower_dob: body?.coborrower_dob || null,
       property_address: body?.property_address || null,
       closing_date: body?.closing_date || null,
       notes: body?.notes || null,

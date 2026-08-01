@@ -194,15 +194,23 @@ Rules:
 - Dates in ISO format (YYYY-MM-DD).
 - A mortgagee, lienholder, or servicer is NOT the originating loan officer.
   Leave loan_officer_* null unless a named individual originator appears.
+- DO extract dates of birth and email addresses for the borrower and any
+  co-borrower. A carrier cannot rate a policy without dates of birth, and the
+  agent needs somewhere to send the quote. On a 1003 these sit in the borrower
+  and co-borrower information sections.
 - Never extract Social Security numbers, income figures, asset balances, or
-  account numbers. They are not needed to quote and must not be returned.
+  account numbers. They are not needed to quote and must not be returned. A
+  date of birth is needed; the nine digits next to it are not.
 
 Respond with ONLY a JSON object (no markdown fences, no commentary):
 {
   "client_name": string|null,
+  "client_dob": string|null,          // borrower's date of birth
   "coborrower_name": string|null,
+  "coborrower_dob": string|null,      // co-borrower's date of birth
   "client_phone": string|null,
   "client_email": string|null,
+  "coborrower_email": string|null,
   "property_address": string|null,
   "closing_date": string|null,
   "loan_number": string|null,
@@ -269,19 +277,22 @@ export async function applyExtractedToReferral(
   if (!fields) return [];
   const { data: r } = await db()
     .from("referrals")
-    .select("client_name, coborrower_name, client_phone, client_email, property_address, closing_date, notes")
+    .select("client_name, coborrower_name, client_phone, client_email, client_dob, coborrower_dob, property_address, closing_date, notes")
     .eq("id", referralId)
     .maybeSingle();
   if (!r) return [];
 
   const patch: Record<string, unknown> = {};
   const filled: string[] = [];
+  const asDate = (v: any) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "")) ? String(v) : null);
   const map: [string, any][] = [
     ["coborrower_name", fields.coborrower_name],
     ["client_phone", normalizePhone(fields.client_phone)],
     ["client_email", normalizeEmail(fields.client_email)],
+    ["client_dob", asDate(fields.client_dob)],
+    ["coborrower_dob", asDate(fields.coborrower_dob)],
     ["property_address", fields.property_address],
-    ["closing_date", /^\d{4}-\d{2}-\d{2}$/.test(String(fields.closing_date ?? "")) ? fields.closing_date : null],
+    ["closing_date", asDate(fields.closing_date)],
   ];
   for (const [k, v] of map) {
     if (v && !(r as any)[k]) {
@@ -289,8 +300,13 @@ export async function applyExtractedToReferral(
       filled.push(k.replace(/_/g, " "));
     }
   }
+  const coEmail = normalizeEmail(fields.coborrower_email);
+  if (coEmail && coEmail !== r.client_email && !String(r.notes ?? "").includes(coEmail)) {
+    patch.notes = [patch.notes ?? r.notes, `Co-borrower email: ${coEmail}`].filter(Boolean).join(" · ").slice(0, 1000);
+    filled.push("co-borrower email");
+  }
   if (fields.loan_number && !String(r.notes ?? "").includes(String(fields.loan_number))) {
-    patch.notes = [r.notes, `Loan #${fields.loan_number}`].filter(Boolean).join(" · ").slice(0, 1000);
+    patch.notes = [patch.notes ?? r.notes, `Loan #${fields.loan_number}`].filter(Boolean).join(" · ").slice(0, 1000);
     filled.push("loan number");
   }
   if (Object.keys(patch).length > 0) {

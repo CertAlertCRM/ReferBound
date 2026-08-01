@@ -36,6 +36,7 @@ type Referral = {
   client_phone: string | null;
   client_email: string | null;
   client_dob: string | null;
+  coborrower_dob: string | null;
   property_address: string | null;
   closing_date: string | null;
   status: string;
@@ -414,6 +415,7 @@ export default function DealPage() {
   // Quote-readiness: the fields an agent actually needs before quoting.
   const missing: string[] = [];
   if (!r.client_dob) missing.push("date of birth");
+  if (r.coborrower_name && !r.coborrower_dob) missing.push("co-borrower date of birth");
   if (!r.property_address) missing.push("property address");
   if (!r.client_phone) missing.push("phone number");
   const activeDeal = !["bound", "docs_delivered", "lost"].includes(r.status);
@@ -459,7 +461,12 @@ export default function DealPage() {
           <StatusProgress status={r.status} />
           <div className="text-sm text-ink-secondary flex flex-wrap gap-x-5 gap-y-1.5">
             {r.coborrower_name && (
-              <span className="meta-item"><IconUsers size={14} className="text-ink-muted" /> {r.coborrower_name}</span>
+              <span className="meta-item">
+                <IconUsers size={14} className="text-ink-muted" /> {r.coborrower_name}
+                {r.coborrower_dob && (
+                  <span className="text-ink-muted"> · {r.coborrower_dob}</span>
+                )}
+              </span>
             )}
             {r.client_phone && (
               <span className="meta-item"><IconPhone size={14} className="text-ink-muted" /> {r.client_phone}</span>

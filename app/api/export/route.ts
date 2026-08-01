@@ -14,6 +14,7 @@ const COLUMNS: [string, (r: any) => unknown][] = [
   ["Phone", (r) => r.client_phone],
   ["Email", (r) => r.client_email],
   ["Date of birth", (r) => r.client_dob],
+  ["Co-borrower date of birth", (r) => r.coborrower_dob],
   ["Property address", (r) => r.property_address],
   ["Closing date", (r) => r.closing_date],
   ["Status", (r) => STATUS_LABELS[r.status] ?? r.status],

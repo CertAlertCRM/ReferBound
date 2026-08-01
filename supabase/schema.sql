@@ -112,6 +112,8 @@ alter table agent_profile enable row level security;
 alter table referrals add column if not exists coborrower_name text;
 alter table referrals add column if not exists property_address text;
 alter table referrals add column if not exists client_dob date;
+-- Coborrower date of birth (see migration_44)
+alter table referrals add column if not exists coborrower_dob date;
 alter table documents add column if not exists uploaded_by text not null default 'agent';
 
 -- Partner types (see migration_08)

@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     client_phone: normalizePhone(body.client_phone),
     client_email: normalizeEmail(body.client_email),
     client_dob: body.client_dob || null,
+    coborrower_dob: body.coborrower_dob || null,
     property_address: String(body.property_address ?? "").trim() || null,
     closing_date: body.closing_date || null,
     notes: body.notes || null,

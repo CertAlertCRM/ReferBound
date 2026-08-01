@@ -36,6 +36,7 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
   "client_phone": string|null,
   "client_email": string|null,
   "client_dob": string|null,
+  "coborrower_dob": string|null,
   "property_address": string|null,   // full one-line address of the subject/insured property
   "closing_date": string|null,
   "carrier_name": string|null,       // insurance carrier named on the document
@@ -60,6 +61,7 @@ const REFERRAL_FIELDS = [
   "client_phone",
   "client_email",
   "client_dob",
+  "coborrower_dob",
   "property_address",
   "closing_date",
   "premium",
