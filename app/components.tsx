@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STATUS_LABELS, STATUSES, statusLabel, statusesFor } from "@/lib/config";
 import { THEMES } from "@/lib/themes";
 import { IconAlert, IconMenu, IconX, IconHome, IconUsers, IconZap, IconUser } from "./icons";
@@ -83,6 +83,7 @@ export function TopNav({
   const [menuOpen, setMenuOpen] = useState(false);
   // Desktop overflow menu — Billing, Help, Admin, Sign out.
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   // Support view marker — set by /api/admin/impersonate, shown as an amber bar
   // so there's never ambiguity about whose account is on screen.
   const [supportView, setSupportView] = useState<string | null>(null);
@@ -156,6 +157,31 @@ export function TopNav({
     setMenuOpen(false);
   }, [active]);
 
+  // Dismiss the overflow menu on any click outside it, or on Escape.
+  //
+  // This deliberately listens on the document rather than using an invisible
+  // full-screen backdrop: the header sets backdrop-blur, and a filtered
+  // ancestor becomes the containing block for position:fixed children — so a
+  // "fixed inset-0" overlay would only ever cover the header strip, leaving
+  // the rest of the page unclickable-through and the menu stuck open.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown, { passive: true });
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [moreOpen]);
+
   // Reserve room for the fixed bottom tab bar on small screens.
   useEffect(() => {
     document.body.classList.add("has-bottomnav");
@@ -226,7 +252,7 @@ export function TopNav({
         <nav className="hidden md:flex items-center gap-1">
           {primary.map((l) => tab(l.href, l.key, l.label))}
 
-          <div className="relative">
+          <div className="relative" ref={moreRef}>
             <button
               onClick={() => setMoreOpen(!moreOpen)}
               className={`px-2.5 py-1.5 rounded-lg transition-colors ${
@@ -242,9 +268,6 @@ export function TopNav({
 
             {moreOpen && (
               <>
-                {/* Click anywhere to dismiss — cheaper and more reliable than
-                    listening for outside clicks on the document. */}
-                <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
                 <div className="absolute right-0 top-full mt-1.5 z-20 w-44 rounded-xl border border-slate-200 bg-white shadow-lift py-1.5 animate-dialog-in">
                   {overflow.map((l) => (
                     <Link
