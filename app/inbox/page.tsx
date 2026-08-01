@@ -181,7 +181,12 @@ export default function InboxPage() {
                           {e.client_name || r.subject || "(no subject)"}
                         </p>
                         <p className="text-xs text-ink-muted mt-0.5">
-                          from {r.from_name ? `${r.from_name} · ` : ""}
+                          from{" "}
+                          {/* Mail without a display name gives us the address as
+                              the "name" too — printing both reads as a stutter. */}
+                          {r.from_name && r.from_name !== (r.forwarded_from ?? r.from_email)
+                            ? `${r.from_name} · `
+                            : ""}
                           {r.forwarded_from ?? r.from_email}
                           {r.forwarded_from && (
                             <span className="text-ink-muted"> · forwarded by you</span>

@@ -21,6 +21,7 @@ import {
   extractFromAttachment,
   mergeExtracted,
   finishInboundDocs,
+  isSealedMessage,
   type InboundAttachment,
 } from "@/lib/inbound-docs";
 
@@ -125,10 +126,25 @@ export async function POST(req: NextRequest) {
 
   // The webhook may or may not carry the body depending on the provider's
   // plan and version — fall back to the API when it doesn't.
+  // The webhook carries metadata only — the body has to be fetched. Where it
+  // came from is recorded, because "no body" and "couldn't fetch the body" look
+  // identical from the outside and only one of them is my bug.
+  let bodySource = "webhook";
   let body = String(d.text ?? d.plain ?? "").trim();
   if (!body && d.html) body = stripHtml(String(d.html));
-  if (!body && providerId) body = await fetchBody(providerId);
+  let bodyNote = "";
+  if (!body && providerId) {
+    const fetched = await fetchBody(providerId);
+    body = fetched.body;
+    bodyNote = fetched.note;
+    bodySource = body ? "api" : "none";
+  }
   body = body.slice(0, 40000);
+
+  // Outlook message encryption seals the whole body. Nothing we can open —
+  // but the subject line survives in clear text, and lender subjects are often
+  // structured enough to carry the client and the address on their own.
+  const sealed = isSealedMessage(d.attachments ?? []);
 
   // Who actually sent this referral. On a forward that's not the envelope
   // sender — it's whoever's From: line sits inside the body. Without this,
@@ -177,7 +193,14 @@ export async function POST(req: NextRequest) {
   // work they do today, not worse.
   let extracted: any = null;
   try {
-    if (body || subject) extracted = await extractFromEmail(subject, body);
+    if (body || subject) {
+      extracted = await extractFromEmail(
+        subject,
+        sealed
+          ? `[This message was encrypted by the sender's mail system and its body could not be read. Everything below the subject line is unavailable — extract only from the subject.]`
+          : body
+      );
+    }
     row.extracted = extracted;
   } catch (e: any) {
     row.error = String(e?.message ?? e).slice(0, 500);
@@ -208,10 +231,22 @@ export async function POST(req: NextRequest) {
   }
   row.id = inboundId;
   row.attachments = stored.length > 0 ? stored : null;
+  if (sealed) {
+    row.error =
+      "Encrypted message — the sender's mail system sealed the body, so only the subject line could be read.";
+  } else if (bodySource === "none" && !docFields) {
+    row.error = bodyNote || "Couldn't retrieve the message body from the mail provider.";
+  }
 
   const looksLikeReferral = extracted?.is_referral !== false && Boolean(extracted?.client_name);
   const autoCreate =
-    prof?.inbox_autocreate !== false && match.partnerId && looksLikeReferral && extracted?.confidence !== "low";
+    prof?.inbox_autocreate !== false &&
+    match.partnerId &&
+    looksLikeReferral &&
+    extracted?.confidence !== "low" &&
+    // A sealed message gives us a subject line and nothing else. That's worth
+    // showing the agent, never worth logging behind their back.
+    !sealed;
 
   if (!autoCreate) {
     const saveErr = await saveInbound(row);
@@ -298,25 +333,40 @@ export async function POST(req: NextRequest) {
 
 // Provider payloads vary on whether the body ships with the event. Try the
 // documented shapes in order rather than betting the feature on one path.
-async function fetchBody(emailId: string): Promise<string> {
+async function fetchBody(emailId: string): Promise<{ body: string; note: string }> {
   const key = process.env.RESEND_API_KEY;
-  if (!key) return "";
+  if (!key) return { body: "", note: "RESEND_API_KEY not set" };
+
+  const tried: string[] = [];
   for (const path of [`emails/receiving/${emailId}`, `emails/received/${emailId}`, `emails/${emailId}`]) {
     try {
       const res = await fetch(`https://api.resend.com/${path}`, {
         headers: { Authorization: `Bearer ${key}` },
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        tried.push(`${path.split("/")[1]} → ${res.status}`);
+        continue;
+      }
       const j = await res.json();
       const text = j?.text ?? j?.plain ?? j?.data?.text ?? "";
-      if (text) return String(text);
+      if (text) return { body: String(text), note: "" };
       const html = j?.html ?? j?.data?.html ?? "";
-      if (html) return stripHtml(String(html));
-    } catch {
-      // Try the next shape.
+      if (html) return { body: stripHtml(String(html)), note: "" };
+      tried.push(`${path.split("/")[1]} → 200 but empty`);
+    } catch (e: any) {
+      tried.push(`${path.split("/")[1]} → ${String(e?.message ?? e).slice(0, 40)}`);
     }
   }
-  return "";
+  // A 401 or 403 here almost always means the API key has Sending access only.
+  // Retrieving a received message needs a Full access key, and silently
+  // shrugging at that cost an afternoon once already.
+  const auth = tried.some((t) => /401|403/.test(t));
+  return {
+    body: "",
+    note: auth
+      ? `Resend rejected the body request (${tried.join("; ")}). A key with Sending access only can't read received mail — use a Full access key.`
+      : `Couldn't retrieve the body (${tried.join("; ")})`,
+  };
 }
 
 function toArray(v: unknown): any[] {
