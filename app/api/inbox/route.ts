@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccount } from "@/lib/account";
 import { createReferralFromInbound, sendAcknowledgment, makeInboxSlug, inboxAddress } from "@/lib/inbound";
+import { finishInboundDocs } from "@/lib/inbound-docs";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +113,15 @@ export async function POST(req: NextRequest) {
     subject: row.subject ?? "",
   });
   if (!referral) return NextResponse.json({ error: "Couldn't create the lead" }, { status: 500 });
+
+  // The paperwork that arrived with the email has been parked in storage since
+  // it landed. Now that there's a referral, put it on the file.
+  await finishInboundDocs({
+    accountId: account.id,
+    referralId: referral.id,
+    stored: Array.isArray(row.attachments) ? row.attachments : [],
+    docFields: row.extracted ?? {},
+  });
 
   const patch: Record<string, unknown> = {
     status: "created",

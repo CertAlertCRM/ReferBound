@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "../components";
-import { IconMail, IconCheck, IconX, IconCopy, IconArrowRight, IconAlert } from "../icons";
+import { IconMail, IconCheck, IconX, IconCopy, IconArrowRight, IconAlert, IconPaperclip } from "../icons";
 import { SkeletonPage } from "../skeleton";
 import { useUI } from "../ui";
 
@@ -20,6 +20,7 @@ type Row = {
   from_email: string;
   from_name: string | null;
   forwarded_from?: string | null;
+  attachments?: { filename: string; kind: string; bytes: number }[] | null;
   subject: string | null;
   body: string | null;
   match_kind: string | null;
@@ -188,6 +189,14 @@ export default function InboxPage() {
                         </p>
                       </div>
                       <span className="shrink-0 flex items-center gap-1.5">
+                        {(r.attachments?.length ?? 0) > 0 && (
+                          <span
+                            className="badge bg-slate-100 text-ink-secondary"
+                            title={r.attachments!.map((a) => a.filename).join(", ")}
+                          >
+                            <IconPaperclip size={10} /> {r.attachments!.length}
+                          </span>
+                        )}
                         {r.match_kind === "none" ? (
                           <span className="badge bg-amber-50 text-amber-700">
                             <IconAlert size={10} /> unknown sender
@@ -204,6 +213,21 @@ export default function InboxPage() {
 
                   {isOpen && (
                     <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                      {(r.attachments?.length ?? 0) > 0 && (
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <p className="text-[11px] font-semibold text-ink-secondary">
+                            Attached — these go onto the file when you log it
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {r.attachments!.map((a, i) => (
+                              <li key={i} className="text-[11px] text-ink-muted flex items-center gap-1.5">
+                                <IconPaperclip size={10} /> {a.filename}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
                       {r.body && (
                         <details className="text-xs">
                           <summary className="cursor-pointer text-ink-secondary hover:text-ink">

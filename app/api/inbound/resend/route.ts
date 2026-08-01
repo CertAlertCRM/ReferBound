@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
@@ -14,6 +15,14 @@ import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
 import { sendSms } from "@/lib/sms";
 import { fireWebhook } from "@/lib/webhook";
 import { appUrl } from "@/lib/helpers";
+import {
+  fetchInboundAttachments,
+  storeInboundAttachments,
+  extractFromAttachment,
+  mergeExtracted,
+  finishInboundDocs,
+  type InboundAttachment,
+} from "@/lib/inbound-docs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -157,6 +166,32 @@ export async function POST(req: NextRequest) {
     row.error = String(e?.message ?? e).slice(0, 500);
   }
 
+  // Attachments. A loan officer's intro is often three words and a PDF, so the
+  // document has to be read BEFORE the auto-create decision — otherwise "see
+  // attached" can never clear the confidence bar and the best referrals are
+  // exactly the ones that get held.
+  let stored: InboundAttachment[] = [];
+  let docFields: any = null;
+  const inboundId = crypto.randomUUID();
+  try {
+    const files = await fetchInboundAttachments(providerId ?? "", d.attachments ?? []);
+    if (files.length > 0) {
+      stored = await storeInboundAttachments(account.id, inboundId, files);
+      for (const f of files) {
+        const fields = await extractFromAttachment(f.buffer, f.filename);
+        if (fields?.client_name || fields?.property_address) {
+          docFields = { ...(docFields ?? {}), ...fields };
+        }
+      }
+      if (docFields) extracted = mergeExtracted(extracted, docFields);
+      row.extracted = extracted;
+    }
+  } catch (e: any) {
+    row.error = String(e?.message ?? e).slice(0, 500);
+  }
+  row.id = inboundId;
+  row.attachments = stored.length > 0 ? stored : null;
+
   const looksLikeReferral = extracted?.is_referral !== false && Boolean(extracted?.client_name);
   const autoCreate =
     prof?.inbox_autocreate !== false && match.partnerId && looksLikeReferral && extracted?.confidence !== "low";
@@ -183,6 +218,13 @@ export async function POST(req: NextRequest) {
 
   row.status = "created";
   row.referral_id = referral.id;
+
+  await finishInboundDocs({
+    accountId: account.id,
+    referralId: referral.id,
+    stored,
+    docFields,
+  });
 
   // Acknowledge — but only to a sender we actually recognize.
   if (prof?.inbox_autoack !== false && replyTo && match.kind !== "none") {
