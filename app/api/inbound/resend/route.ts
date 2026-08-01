@@ -38,6 +38,23 @@ export const maxDuration = 60;
 // that gets a 500 retries, and a retry loop on a poison message is worse than
 // a dropped one — the row is stored with the error either way.
 
+
+// Store the inbound row, and never lose an email to a column that isn't there
+// yet. A missing migration used to mean the insert failed silently, the webhook
+// returned 200, and the referral simply vanished — the worst possible failure
+// for an intake feature. Now the newer optional fields are dropped and the
+// message still lands.
+async function saveInbound(row: Record<string, unknown>): Promise<string | null> {
+  const { error } = await db().from("inbound_emails").insert(row);
+  if (!error) return null;
+
+  const stripped = { ...row };
+  for (const k of ["attachments", "forwarded_from"]) delete stripped[k];
+  const retry = await db().from("inbound_emails").insert(stripped);
+  if (!retry.error) return `stored without: ${error.message}`;
+  return retry.error.message;
+}
+
 export async function POST(req: NextRequest) {
   const raw = await req.text();
 
@@ -197,8 +214,8 @@ export async function POST(req: NextRequest) {
     prof?.inbox_autocreate !== false && match.partnerId && looksLikeReferral && extracted?.confidence !== "low";
 
   if (!autoCreate) {
-    await db().from("inbound_emails").insert(row);
-    return NextResponse.json({ ok: true, held: true });
+    const saveErr = await saveInbound(row);
+    return NextResponse.json({ ok: !saveErr, held: true, error: saveErr ?? undefined });
   }
 
   const referral = await createReferralFromInbound({
@@ -212,8 +229,8 @@ export async function POST(req: NextRequest) {
   });
 
   if (!referral) {
-    await db().from("inbound_emails").insert({ ...row, error: "could not create referral" });
-    return NextResponse.json({ ok: true, held: true });
+    const saveErr = await saveInbound({ ...row, error: "could not create referral" });
+    return NextResponse.json({ ok: !saveErr, held: true, error: saveErr ?? undefined });
   }
 
   row.status = "created";
@@ -247,7 +264,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await db().from("inbound_emails").insert(row);
+  const saveErr = await saveInbound(row);
 
   // Same downstream treatment a portal submission gets — the agent shouldn't
   // have to learn which door a lead came through.
@@ -276,7 +293,7 @@ export async function POST(req: NextRequest) {
     html: newPartnerLeadEmail(String(extracted.client_name), match.partnerName ?? "", appUrl()),
   });
 
-  return NextResponse.json({ ok: true, referral_id: referral.id });
+  return NextResponse.json({ ok: !saveErr, referral_id: referral.id, error: saveErr ?? undefined });
 }
 
 // Provider payloads vary on whether the body ships with the event. Try the
