@@ -1,24 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { SAFE_STATUSES } from "@/lib/config";
-import { sendEmail, monthlySummaryEmail, thankYouEmail, plainBodyEmail } from "@/lib/email";
+import { monthlySummaryEmail, thankYouEmail, plainBodyEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { renderVoice, type NotifyTemplates } from "@/lib/voice";
+import { Budget, cronGuard, cronReport, fetchAll, sendBatch, type BatchItem } from "@/lib/cron";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 // Monthly partner summary — runs on the 1st (see vercel.json) and reports on
 // the PREVIOUS calendar month. Guarded by CRON_SECRET; safe to trigger
 // manually: GET /api/cron/monthly-summary?secret=...
-// Dedupe: one summary per partner per month, keyed on the email subject.
+//
+// This was the heaviest of the crons by a distance: four sequential queries
+// and a send for every partner, so two hundred partners meant a thousand
+// round-trips in one invocation. It now reads every partner's referrals and
+// bound events in a handful of chunked queries and sends in batches of a
+// hundred. The dedupe still keys on the email subject, which carries the
+// month name — so a re-run inside the same month stays quiet.
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization");
-  const qs = req.nextUrl.searchParams.get("secret");
-  if (secret && auth !== `Bearer ${secret}` && qs !== secret) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const denied = cronGuard(req);
+  if (denied) return denied;
 
-  // Previous calendar month boundaries (UTC).
+  const budget = new Budget(240);
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -28,62 +34,121 @@ export async function GET(req: NextRequest) {
     timeZone: "UTC",
   });
 
-  // Per-account agent names + "Your voice" templates (from each profile).
   const { data: profiles } = await db()
     .from("agent_profile")
     .select("account_id, display_name, notify_templates");
-  const nameByAccount = new Map(
-    (profiles ?? []).filter((p) => p.account_id).map((p) => [p.account_id, p.display_name])
-  );
-  const voiceByAccount = new Map(
-    (profiles ?? [])
+  const nameByAccount = new Map<string, string>(
+    ((profiles ?? []) as any[])
       .filter((p) => p.account_id)
-      .map((p) => [p.account_id, (p.notify_templates ?? {}) as NotifyTemplates])
+      .map((p) => [String(p.account_id), String(p.display_name ?? "")])
+  );
+  const voiceByAccount = new Map<string, NotifyTemplates>(
+    ((profiles ?? []) as any[])
+      .filter((p) => p.account_id)
+      .map((p) => [String(p.account_id), (p.notify_templates ?? {}) as NotifyTemplates])
   );
 
-  const { data: partners, error: pErr } = await db()
-    .from("partners")
-    .select("id, name, token, emails, account_id, monthly_summary, thankyou_cadence");
-  if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
+  const partnerRead = await fetchAll<any>((from, to) =>
+    db()
+      .from("partners")
+      .select("id, name, token, emails, account_id, monthly_summary, thankyou_cadence")
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  if (partnerRead.error) {
+    return NextResponse.json(cronReport("monthly-summary", { error: partnerRead.error }), {
+      status: 500,
+    });
+  }
+  const partners = partnerRead.rows;
 
-  let sent = 0;
+  const isQuarterStart = [0, 3, 6, 9].includes(now.getUTCMonth());
+  const wantsSummary = (p: any) => Boolean(p.emails?.length) && p.monthly_summary !== false;
+  const wantsThanks = (p: any) => {
+    const cadence = p.thankyou_cadence ?? "off";
+    if (!p.emails?.length || cadence === "off") return false;
+    return cadence !== "quarterly" || isQuarterStart;
+  };
+
+  // Every partner we might write to this run — read their referrals once.
+  const relevant = partners.filter((p) => wantsSummary(p) || wantsThanks(p));
+  const relevantIds = relevant.map((p) => p.id);
+
+  const refsByPartner = new Map<string, { id: string; status: string; created_at: string }[]>();
+  for (let i = 0; i < relevantIds.length; i += 200) {
+    const slice = relevantIds.slice(i, i + 200);
+    const read = await fetchAll<any>((from, to) =>
+      db()
+        .from("referrals")
+        .select("id, status, created_at, partner_id")
+        .in("partner_id", slice)
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
+    for (const r of read.rows) {
+      if (!r.partner_id) continue;
+      if (!refsByPartner.has(r.partner_id)) refsByPartner.set(r.partner_id, []);
+      refsByPartner.get(r.partner_id)!.push(r);
+    }
+  }
+
+  // Bound-this-month comes from status_events so a deal referred earlier but
+  // bound last month still counts. One pass over every referral id we hold.
+  const allRefIds = Array.from(refsByPartner.values()).flatMap((rs) => rs.map((r) => r.id));
+  const boundRefIds = new Set<string>();
+  for (let i = 0; i < allRefIds.length; i += 200) {
+    const { data } = await db()
+      .from("status_events")
+      .select("referral_id")
+      .eq("status", "bound")
+      .in("referral_id", allRefIds.slice(i, i + 200))
+      .gte("created_at", monthStart.toISOString())
+      .lt("created_at", monthEnd.toISOString());
+    for (const e of data ?? []) if (e.referral_id) boundRefIds.add(e.referral_id);
+  }
+
+  // Dedupe history for both message types, read once.
+  const { data: priorSummaries } = await db()
+    .from("email_log")
+    .select("subject")
+    .eq("kind", "monthly_summary")
+    .eq("sent", true)
+    .gte("created_at", monthStart.toISOString());
+  const summarySubjects = new Set((priorSummaries ?? []).map((r) => r.subject));
+
+  const { data: priorThanks } = await db()
+    .from("email_log")
+    .select("subject, recipients")
+    .eq("kind", "thank_you")
+    .eq("sent", true)
+    .gte("created_at", monthStart.toISOString());
+  const thankKeys = new Set<string>();
+  for (const row of priorThanks ?? []) {
+    for (const addr of (row.recipients as string[]) ?? []) thankKeys.add(`${row.subject}|${addr}`);
+  }
+
+  const queue: BatchItem[] = [];
   const skipped: string[] = [];
 
-  for (const partner of partners ?? []) {
-    if (!partner.emails || partner.emails.length === 0) {
+  // ── Monthly recaps ────────────────────────────────────────────────────────
+  for (const partner of partners) {
+    if (!partner.emails?.length) {
       skipped.push(`${partner.name}: no emails`);
       continue;
     }
     // Per-partner opt-out: some partners want the service, not the scoreboard.
-    if ((partner as any).monthly_summary === false) {
+    if (partner.monthly_summary === false) {
       skipped.push(`${partner.name}: recap turned off`);
       continue;
     }
 
     const subject = `${monthLabel} referral summary — ${partner.name}`;
-
-    // Dedupe: already sent this month's summary to this partner?
-    const { data: existing } = await db()
-      .from("email_log")
-      .select("id")
-      .eq("kind", "monthly_summary")
-      .eq("subject", subject)
-      .eq("sent", true)
-      .limit(1);
-    if (existing && existing.length > 0) {
+    if (summarySubjects.has(subject)) {
       skipped.push(`${partner.name}: already sent`);
       continue;
     }
 
-    const { data: refs, error: rErr } = await db()
-      .from("referrals")
-      .select("id, status, created_at")
-      .eq("partner_id", partner.id);
-    if (rErr) {
-      skipped.push(`${partner.name}: ${rErr.message}`);
-      continue;
-    }
-    const all = refs ?? [];
+    const all = refsByPartner.get(partner.id) ?? [];
     if (all.length === 0) {
       skipped.push(`${partner.name}: no referrals ever`);
       continue;
@@ -92,19 +157,7 @@ export async function GET(req: NextRequest) {
     const referredThisMonth = all.filter(
       (r) => r.created_at >= monthStart.toISOString() && r.created_at < monthEnd.toISOString()
     ).length;
-
-    // Bound-this-month comes from status_events so a deal referred earlier
-    // but bound last month still counts.
-    const ids = all.map((r) => r.id);
-    const { data: boundEvents } = await db()
-      .from("status_events")
-      .select("referral_id, created_at")
-      .eq("status", "bound")
-      .in("referral_id", ids)
-      .gte("created_at", monthStart.toISOString())
-      .lt("created_at", monthEnd.toISOString());
-    const boundThisMonth = new Set((boundEvents ?? []).map((e) => e.referral_id)).size;
-
+    const boundThisMonth = all.filter((r) => boundRefIds.has(r.id)).length;
     const inProgress = all.filter(
       (r) => !SAFE_STATUSES.includes(r.status) && r.status !== "lost"
     ).length;
@@ -116,9 +169,8 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const agentName =
-      nameByAccount.get((partner as any).account_id) || "Your agent";
-    const voice = voiceByAccount.get((partner as any).account_id);
+    const agentName = nameByAccount.get(partner.account_id) || "Your agent";
+    const voice = voiceByAccount.get(partner.account_id);
     const intro = voice?.email_recap_intro
       ? renderVoice(voice.email_recap_intro, {
           partner: partner.name,
@@ -127,7 +179,7 @@ export async function GET(req: NextRequest) {
         })
       : null;
 
-    await sendEmail({
+    queue.push({
       kind: "monthly_summary",
       to: partner.emails,
       subject,
@@ -140,44 +192,25 @@ export async function GET(req: NextRequest) {
         intro
       ),
     });
-    sent++;
   }
+  const summariesQueued = queue.length;
 
   // ── Partner thank-you notes (per-PARTNER cadence, set on the partner) ─────
   // Monthly cadence fires every run; quarterly fires on Jan/Apr/Jul/Oct 1st.
   // Metric-free by design — a warm note, never a scoreboard.
-  const isQuarterStart = [0, 3, 6, 9].includes(now.getUTCMonth());
-  let thanked = 0;
-
-  for (const partner of partners ?? []) {
-    const cadence = (partner as any).thankyou_cadence ?? "off";
-    if (cadence === "off") continue;
-    if (cadence === "quarterly" && !isQuarterStart) continue;
-    if (!partner.emails || partner.emails.length === 0) continue;
-
+  for (const partner of partners) {
+    if (!wantsThanks(partner)) continue;
     // Only thank partners who've actually referred someone, ever.
-    const { count } = await db()
-      .from("referrals")
-      .select("id", { count: "exact", head: true })
-      .eq("partner_id", partner.id);
-    if (!count) continue;
+    if ((refsByPartner.get(partner.id) ?? []).length === 0) continue;
 
+    const cadence = partner.thankyou_cadence ?? "off";
     const periodLabel = cadence === "quarterly" ? "this past quarter" : "this past month";
-    const agentName = nameByAccount.get((partner as any).account_id) || "Your agent";
-
+    const agentName = nameByAccount.get(partner.account_id) || "Your agent";
     const subject = `A thank-you from ${agentName} — ${monthLabel}`;
-    const { data: existing } = await db()
-      .from("email_log")
-      .select("id")
-      .eq("kind", "thank_you")
-      .eq("subject", subject)
-      .contains("recipients", [partner.emails[0]])
-      .eq("sent", true)
-      .limit(1);
-    if (existing && existing.length > 0) continue;
+    if (partner.emails.some((e: string) => thankKeys.has(`${subject}|${e}`))) continue;
 
-    const voice = voiceByAccount.get((partner as any).account_id);
-    await sendEmail({
+    const voice = voiceByAccount.get(partner.account_id);
+    queue.push({
       kind: "thank_you",
       to: partner.emails,
       subject,
@@ -191,8 +224,22 @@ export async function GET(req: NextRequest) {
           )
         : thankYouEmail(partner.name, agentName, periodLabel),
     });
-    thanked++;
   }
 
-  return NextResponse.json({ month: monthLabel, sent, thanked, skipped });
+  const result = await sendBatch(queue);
+
+  return NextResponse.json(
+    cronReport("monthly-summary", {
+      month: monthLabel,
+      partners: partners.length,
+      summariesQueued,
+      thanksQueued: queue.length - summariesQueued,
+      sent: result.sent,
+      failed: result.failed,
+      truncated: partnerRead.truncated,
+      secondsLeft: budget.secondsLeft,
+      error: result.error,
+      skipped,
+    })
+  );
 }

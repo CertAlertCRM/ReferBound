@@ -12,6 +12,7 @@ import {
   INBOX_DOMAIN,
 } from "@/lib/inbound";
 import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
+import { INBOUND_DAILY_LIMIT, INBOUND_LIMIT_NOTE } from "@/lib/config";
 import { sendSms } from "@/lib/sms";
 import { fireWebhook } from "@/lib/webhook";
 import { appUrl } from "@/lib/helpers";
@@ -116,6 +117,19 @@ export async function POST(req: NextRequest) {
     if (seen) return NextResponse.json({ ok: true, skipped: "already processed" });
   }
 
+  // Spend guard. Reading a message costs money, and the one shape that can run
+  // away is a forwarding rule pointed at the whole inbox rather than at
+  // referrals. Past the daily ceiling we still receive and store the message —
+  // the agent sees it in Intake and can log it by hand — we just stop paying
+  // to read mail nobody chose to send us. See INBOUND_DAILY_LIMIT.
+  const dayAgo = new Date(Date.now() - 86400000).toISOString();
+  const { count: todayCount } = await db()
+    .from("inbound_emails")
+    .select("id", { count: "exact", head: true })
+    .eq("account_id", account.id)
+    .gte("created_at", dayAgo);
+  const overQuota = (todayCount ?? 0) >= INBOUND_DAILY_LIMIT;
+
   const fromRaw = typeof d.from === "string" ? d.from : (d.from?.address ?? d.from?.email ?? "");
   const fromEmail = String(fromRaw).match(/[^\s<>]+@[^\s<>]+/)?.[0]?.toLowerCase() ?? "";
   const fromName =
@@ -193,7 +207,7 @@ export async function POST(req: NextRequest) {
   // work they do today, not worse.
   let extracted: any = null;
   try {
-    if (body || subject) {
+    if (!overQuota && (body || subject)) {
       extracted = await extractFromEmail(
         subject,
         sealed
@@ -214,7 +228,9 @@ export async function POST(req: NextRequest) {
   let docFields: any = null;
   const inboundId = crypto.randomUUID();
   try {
-    const files = await fetchInboundAttachments(providerId ?? "", d.attachments ?? []);
+    const files = overQuota
+      ? []
+      : await fetchInboundAttachments(providerId ?? "", d.attachments ?? []);
     if (files.length > 0) {
       stored = await storeInboundAttachments(account.id, inboundId, files);
       for (const f of files) {
@@ -231,7 +247,9 @@ export async function POST(req: NextRequest) {
   }
   row.id = inboundId;
   row.attachments = stored.length > 0 ? stored : null;
-  if (sealed) {
+  if (overQuota) {
+    row.error = INBOUND_LIMIT_NOTE;
+  } else if (sealed) {
     row.error =
       "Encrypted message — the sender's mail system sealed the body, so only the subject line could be read.";
   } else if (bodySource === "none" && !docFields) {
@@ -244,6 +262,9 @@ export async function POST(req: NextRequest) {
     match.partnerId &&
     looksLikeReferral &&
     extracted?.confidence !== "low" &&
+    // Nothing was read, so there is nothing to be confident about — a capped
+    // message always waits for the agent.
+    !overQuota &&
     // A sealed message gives us a subject line and nothing else. That's worth
     // showing the agent, never worth logging behind their back.
     !sealed;

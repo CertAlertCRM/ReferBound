@@ -179,3 +179,27 @@ export const PROCESSOR_ROLE_RE = /process|assistant|coordinat|closer|loa\b|admin
 
 // Days before closing to raise the at-risk flag
 export const AT_RISK_DAYS = 7;
+
+// ── Email intake spend guard ────────────────────────────────────────────────
+//
+// Reading a forwarded email costs real money — a message with a loan
+// application attached runs a few cents once the document is parsed. That's
+// fine per referral and fine per day. What isn't fine is the failure mode:
+// an agent sets an Outlook rule forwarding their whole inbox to their intake
+// address, and a free account quietly bills hundreds of dollars of API time
+// for mail nobody ever meant to send us.
+//
+// So there's a ceiling per account per rolling 24 hours. Past it, messages
+// are still received and still stored — the agent sees them in Intake and can
+// log them by hand — they just don't get read by AI. Nothing is lost, only
+// deferred, and the agent is told exactly what happened and why.
+//
+// The number is deliberately far above a real day's referrals. An agent
+// taking twenty referrals a day is having an extraordinary day; an address
+// receiving 150 messages a day is a misconfigured rule.
+export const INBOUND_DAILY_LIMIT = Number(process.env.INBOUND_DAILY_LIMIT || 150);
+
+export const INBOUND_LIMIT_NOTE =
+  "Daily intake limit reached — this message was saved but not read automatically. " +
+  "Its details are below and you can log it by hand. If you're forwarding mail in bulk, " +
+  "narrow the rule that sends here.";

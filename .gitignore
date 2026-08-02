@@ -4,3 +4,7 @@ node_modules
 .env
 .vercel
 _to_delete/
+_incoming/
+
+# File-transfer leftovers from Cowork sessions — never part of the app.
+*.zip

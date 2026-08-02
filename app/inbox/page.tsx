@@ -212,12 +212,25 @@ export default function InboxPage() {
                         {e.is_referral === false && (
                           <span className="badge bg-slate-100 text-ink-muted">not a referral?</span>
                         )}
+                        {r.error && !r.extracted && (
+                          <span className="badge bg-slate-100 text-ink-muted">not read</span>
+                        )}
                       </span>
                     </div>
                   </button>
 
                   {isOpen && (
                     <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                      {/* Why this one didn't fill itself in. Silence here reads
+                          as "the product is broken"; a sentence reads as a
+                          product that knows what it's doing. */}
+                      {r.error && (
+                        <p className="rounded-lg bg-amber-50 text-amber-800 text-[11px] leading-relaxed px-3 py-2 flex items-start gap-1.5">
+                          <IconAlert size={11} className="mt-0.5 shrink-0" />
+                          <span>{r.error}</span>
+                        </p>
+                      )}
+
                       {(r.attachments?.length ?? 0) > 0 && (
                         <div className="rounded-lg bg-slate-50 px-3 py-2">
                           <p className="text-[11px] font-semibold text-ink-secondary">

@@ -4,24 +4,28 @@ import { APP_CONFIG, STATUS_LABELS } from "@/lib/config";
 // Email is best-effort: if RESEND_API_KEY isn't configured, every send is
 // logged to email_log with sent=false so the pilot still works end-to-end.
 
+// Exported so the batch sender in lib/cron.ts writes the same email_log kinds
+// a one-off send does — the crons dedupe by reading that column back.
+export type EmailKind =
+  | "status_update"
+  | "docs_ready"
+  | "new_partner_lead"
+  | "at_risk"
+  | "monthly_summary"
+  | "message"
+  | "agent_digest"
+  | "welcome"
+  | "review_request"
+  | "thank_you"
+  | "partner_closings"
+  | "hub_link"
+  | "feedback"
+  | "portal_invite"
+  | "team_invite";
+
 type SendArgs = {
   referralId?: string;
-  kind:
-    | "status_update"
-    | "docs_ready"
-    | "new_partner_lead"
-    | "at_risk"
-    | "monthly_summary"
-    | "message"
-    | "agent_digest"
-    | "welcome"
-    | "review_request"
-    | "thank_you"
-    | "partner_closings"
-    | "hub_link"
-    | "feedback"
-    | "portal_invite"
-    | "team_invite";
+  kind: EmailKind;
   to: string[];
   subject: string;
   html: string;
