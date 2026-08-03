@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { IconZap } from "./icons";
 
-// Agent-side docs-first box: drop the 1003 an LO emailed you, the lead form
+// Agent-side docs-first box: drop the loan document an LO emailed you, the lead form
 // fills itself. The file is held and attached to the referral after creation.
 
 const EXTRACTABLE = /\.(pdf|png|jpe?g)$/i;
@@ -57,7 +57,7 @@ export function LeadPrefillBox({
     <div className="rounded-xl border border-dashed border-brand-300 bg-brand-light/40 p-3.5">
       <label className="flex items-center gap-2.5 cursor-pointer">
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-800">
-          <IconZap size={15} /> Fastest way: drop the 1003 (or any client doc)
+          <IconZap size={15} /> Fastest way: drop the loan document (or any client doc)
         </span>
         <span className="btn-ghost !py-1.5 !px-3 text-xs shrink-0 ml-auto">
           {busy ? "Reading…" : fileName ? "Replace file" : "Choose file"}

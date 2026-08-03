@@ -1,6 +1,6 @@
 // Opening a password-protected PDF.
 //
-// Lenders send the 1003 encrypted and the password in a separate email, so
+// Lenders send loan documents encrypted with the password in a separate email, so
 // without this the most valuable document in the workflow is a file nothing can
 // read. With the password it decrypts cleanly.
 //

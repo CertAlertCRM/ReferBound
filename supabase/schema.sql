@@ -428,3 +428,9 @@ alter table team_invites enable row level security;
 insert into storage.buckets (id, name, public)
 values ('docs', 'docs', false)
 on conflict (id) do nothing;
+
+-- Migration 45: retire the "1003" form number from stored document kinds.
+update documents set kind = 'loan_doc' where kind = 'loan_1003';
+update inbound_emails
+   set attachments = replace(attachments::text, '"loan_1003"', '"loan_doc"')::jsonb
+ where attachments::text like '%loan_1003%';

@@ -87,7 +87,7 @@ export default function DealPage() {
   const [lostNote, setLostNote] = useState<string | null>(null);
   const [lostBusy, setLostBusy] = useState(false);
   const [lostSent, setLostSent] = useState(false);
-  // Password-protected loan applications: lenders send the file and the
+  // Password-protected loan documents: lenders send the file and the
   // password in separate emails, so the agent supplies it once here.
   const [unlockFor, setUnlockFor] = useState<string | null>(null);
   const [unlockPw, setUnlockPw] = useState("");
@@ -806,7 +806,7 @@ export default function DealPage() {
                   <IconSparkles size={15} className="text-brand" /> Pre-delivery check
                 </h2>
                 <p className="text-xs text-ink-secondary mt-0.5">
-                  Reads your EOI and RCE against the loan application, insurance request, and
+                  Reads your EOI and RCE against the loan document, insurance request, and
                   mortgagee clause your partner sent — names, co-borrower, property address,
                   mortgagee wording, loan number, effective date, and Coverage A vs replacement
                   cost.

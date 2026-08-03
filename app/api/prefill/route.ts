@@ -2,17 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccount } from "@/lib/account";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { normalizePhone } from "@/lib/format";
-import { recordProspectFromDoc } from "@/lib/radar";
+import { recordContactFromDoc } from "@/lib/radar";
 
 export const dynamic = "force-dynamic";
 
 // Agent-side prefill: same magic as the partner portal's docs-first flow.
-// The agent drops the 1003 an LO emailed them, the log-lead form fills
+// The agent drops the loan document an LO emailed them, the log-lead form fills
 // itself. Nothing is stored here — the file attaches to the referral after
 // it's created.
 
 const SYSTEM = `You extract client details from mortgage and insurance documents
-(loan applications/1003s, HOI requests, pre-approvals, etc.) so a referral form
+(loan documents, HOI requests, pre-approvals, etc.) so a referral form
 can be prefilled.
 
 Rules:
@@ -79,9 +79,9 @@ export async function POST(req: NextRequest) {
     const extracted = parseJsonLoose(raw);
     if (extracted.client_phone) extracted.client_phone = normalizePhone(extracted.client_phone);
 
-    // Radar: the LO on this 1003 may be someone who already sends this agent
-    // work but was never set up as a partner.
-    await recordProspectFromDoc(account.id, extracted);
+    // If the loan officer named here belongs to a partner the agent already
+    // has but isn't on their contact list, flag it — nothing else.
+    await recordContactFromDoc(account.id, extracted);
 
     const fields: Record<string, unknown> = {};
     for (const f of FORM_FIELDS) fields[f] = extracted[f] ?? null;

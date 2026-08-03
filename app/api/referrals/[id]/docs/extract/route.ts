@@ -4,17 +4,17 @@ import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { logActivity } from "@/lib/activity";
 import { DOC_KINDS } from "@/lib/config";
 import { getAccount, ownedReferral } from "@/lib/account";
-import { recordProspectFromDoc } from "@/lib/radar";
+import { recordContactFromDoc } from "@/lib/radar";
 import { ORIGINATOR_DOC_KINDS } from "@/lib/config";
 import { autoMatchClause } from "@/lib/clauses";
 
 // Agent-only (protected by middleware): extract structured details from an
-// uploaded document (1003, dec page, EOI, HOI request…) and fill EMPTY fields
+// uploaded document (loan document, dec page, EOI, HOI request…) and fill EMPTY fields
 // on the referral / document record. Existing values are never overwritten —
 // conflicts are reported as mismatches instead.
 
 const SYSTEM = `You extract structured data from insurance and mortgage documents
-(loan applications/1003s, HOI requests, declarations pages, EOIs, mortgagee clauses).
+(loan documents, HOI requests, declarations pages, EOIs, mortgagee clauses).
 
 Rules:
 - Extract ONLY what is explicitly present in the document. Never guess or infer.
@@ -165,14 +165,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     filled.push(...Object.keys(docPatch).map((k) => `document ${k.replace(/_/g, " ")}`));
   }
 
-  // Referral Radar: a loan officer on this document who isn't a partner yet is
-  // someone who already sends this agent business. Best-effort, never blocking.
-  // Radar only harvests from documents an ORIGINATOR signs. An EOI, dec page,
-  // or RCE carries the mortgagee — a national servicer who has never referred
-  // anybody and never will. Mining those built a prospect list of Mr. Cooper
-  // and ServiceMac.
+  // A named person on this document who belongs to a partner the agent already
+  // has, but isn't on that partner's contact list, gets flagged — their leads
+  // would otherwise land unattributed. Only documents an ORIGINATOR signs are
+  // read this way: an EOI, dec page or RCE carries the mortgagee, which is a
+  // national servicer, not somebody's colleague. Best-effort, never blocking.
   if (ORIGINATOR_DOC_KINDS.includes(doc.kind)) {
-    await recordProspectFromDoc(account.id, extracted);
+    await recordContactFromDoc(account.id, extracted);
   }
 
   // Match the file to the right mortgagee clause from the processor's library.

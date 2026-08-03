@@ -105,7 +105,7 @@ export default function HelpPage() {
 
           <Item title="Working a lead" open>
             <p>
-              Log a lead in seconds (paste a 1003 and AI fills the details), then advance it with
+              Log a lead in seconds (paste a loan document and AI fills the details), then advance it with
               one tap as it moves: <strong className="text-ink">Working on quote → Quoted → Working
               with client → Bound → EOI &amp; docs delivered</strong>. Deals that won&apos;t close
               get marked <strong className="text-ink">Not written</strong> (the ✕ on any lead row).
@@ -158,7 +158,7 @@ export default function HelpPage() {
             <p>
               It reads the subject line as well as the body — lender subjects are often structured
               enough to carry the client and the address on their own — and it reads attachments, so
-              a three-word email with a loan application attached still produces a full lead.
+              a three-word email with a loan document attached still produces a full lead.
             </p>
             <p>
               Anything from a sender we don&apos;t recognize waits in Intake for you rather than
@@ -202,7 +202,7 @@ export default function HelpPage() {
             <p>
               Once you&apos;ve uploaded the EOI (and RCE), the deal page offers a{" "}
               <strong className="text-ink">pre-delivery check</strong>. It reads your documents
-              against whatever your partner sent — the loan application, insurance request, or
+              against whatever your partner sent — the loan document, insurance request, or
               mortgagee clause — and compares the things that cause real closing problems: named
               insured and co-borrower, property address, mortgagee wording, loan number, effective
               date versus closing, and Coverage A against the replacement cost.
@@ -335,8 +335,8 @@ export default function HelpPage() {
               five seconds.
             </p>
             <p>
-              <strong className="text-ink">Loan applications are never stored.</strong> A 1003
-              carries the borrower&apos;s SSN, income, and assets — none of which is needed to
+              <strong className="text-ink">Loan documents are never stored.</strong> A borrower&apos;s
+              loan paperwork carries their SSN, income, and assets — none of which is needed to
               quote. However one reaches us, forwarded or uploaded, it&apos;s read once and
               discarded. What it said lands on the referral: names, both dates of birth, the
               address, the closing date, the loan number. The original stays wherever you already

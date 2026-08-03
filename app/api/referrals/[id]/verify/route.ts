@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 // findings — a checker that cries wolf gets ignored, and then it's worse than
 // no checker at all.
 
-const LENDER_KINDS = ["loan_1003", "hoi_request", "mortgagee"];
+const LENDER_KINDS = ["loan_doc", "loan_1003", "hoi_request", "mortgagee"];
 const AGENT_KINDS = ["eoi", "rce", "dec"];
 const MAX_DOCS = 6;
 const MAX_BYTES = 6 * 1024 * 1024;

@@ -47,13 +47,13 @@ export default function PrivacyPage() {
             <strong className="text-ink">Forwarded email</strong> — each agent can be given a
             private forwarding address. Messages sent to it are stored with their sender, subject,
             and body so the agent can review what became a lead, along with what our AI extracted
-            from them. Attachments are read and, other than loan applications (see Retention),
+            from them. Attachments are read and, other than loan documents (see Retention),
             attached to the referral.
           </p>
           <p>
-            <strong className="text-ink">Loan applications are read but not kept.</strong> A loan
-            application (1003) contains far more personal information than an insurance quote
-            requires. Whenever one reaches us — forwarded, uploaded by an agent, or uploaded by a
+            <strong className="text-ink">Loan documents are read but not kept.</strong> A
+            borrower&apos;s loan paperwork contains far more personal information than an insurance
+            quote requires. Whenever one reaches us — forwarded, uploaded by an agent, or uploaded by a
             partner — it is read once in memory and discarded rather than written to storage. We
             retain only what a quote needs: names, dates of birth, contact details, property
             address, closing date, and loan number. We instruct our AI provider not to return

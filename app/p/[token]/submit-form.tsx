@@ -95,7 +95,7 @@ export function PartnerSubmitForm({
     const picked = Array.from(e.target.files ?? []);
     setFiles((prev) => [
       ...prev,
-      ...picked.map((file) => ({ file, kind: isLender ? "loan_1003" : "other" })),
+      ...picked.map((file) => ({ file, kind: isLender ? "loan_doc" : "other" })),
     ]);
     e.target.value = "";
     // Auto-fill from the first readable document if the form is still fresh.
@@ -197,7 +197,7 @@ export function PartnerSubmitForm({
               <span>
                 Fastest way:{" "}
                 {isLender
-                  ? "upload the 1003 (or any client doc) and we'll fill this form for you"
+                  ? "upload the loan document (or any client doc) and we'll fill this form for you"
                   : "have a document with the client's details? Upload it and we'll fill this form for you"}
               </span>
             </p>
@@ -234,7 +234,7 @@ export function PartnerSubmitForm({
                 : files.length > 0
                 ? "Add another file"
                 : isLender
-                ? "Upload 1003 / HOI request / other docs"
+                ? "Upload loan document / HOI request / other docs"
                 : "Upload a document (optional)"}
               <input
                 type="file"

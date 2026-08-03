@@ -715,9 +715,9 @@ export default function ProfilePage() {
                 </span>
               </label>
               <label className="block">
-                <span className="section-label">Loan application files</span>
+                <span className="section-label">Loan document files</span>
                 <span className="text-xs text-ink-muted block">
-                  A loan application carries far more personal information than you need to quote.
+                  A borrower's loan document carries far more personal information than you need to quote.
                   ReferBound only ever stores the details it extracts — name, address, dates,
                   premium — never SSNs, income, or assets. This controls how long the original
                   file itself sticks around; the extracted details always stay on the referral.

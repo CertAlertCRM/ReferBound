@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 // Unlocking a password-protected loan application.
 //
-// Lenders routinely send the 1003 encrypted and the password in a separate
+// Lenders routinely send loan documents encrypted, with the password in a separate
 // email. Nothing can read the file without it — so the agent supplies it once,
 // here, and we decrypt, extract, and replace the stored copy with a readable
 // one.

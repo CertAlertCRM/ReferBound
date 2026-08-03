@@ -93,23 +93,27 @@ export const DOC_KINDS: Record<string, string> = {
   eoi: "Evidence of Insurance (EOI)",
   rce: "Replacement Cost Estimator (RCE)",
   dec: "Declarations Page",
-  loan_1003: "Loan application (1003)",
+  loan_doc: "Loan document",
   hoi_request: "HOI request",
   mortgagee: "Mortgagee clause / lender info",
   other: "Other document",
+  // Retired key. Migration 45 rewrites stored rows, but a label stays here so
+  // anything missed still renders as words rather than a raw enum.
+  loan_1003: "Loan document",
 };
 
-// Partner-facing labels. Partners shouldn't need to know industry form
-// numbers — "loan application" is the same document in plain language.
+// Partner-facing labels. A partner is uploading whatever the lender sent;
+// naming it plainly keeps the picker readable for someone who isn't in
+// insurance all day.
 export const DOC_KINDS_PARTNER: Record<string, string> = {
   ...DOC_KINDS,
-  loan_1003: "Loan application",
+  loan_doc: "Loan document",
   hoi_request: "Insurance info sheet",
   mortgagee: "Mortgagee clause / lender info",
 };
 
-// Documents an ORIGINATING loan officer actually signs. Referral Radar only
-// harvests contacts from these.
+// Documents an ORIGINATING loan officer actually signs. Contact gaps are only
+// read from these.
 //
 // The distinction matters more than it looks. An evidence of insurance, a dec
 // page, and a replacement cost estimate all carry a lender-shaped name — the
@@ -117,24 +121,24 @@ export const DOC_KINDS_PARTNER: Record<string, string> = {
 // LoanCare, an ISAOA/ATIMA entity), not the person who originated the loan.
 // Servicers never refer anybody. Mining those documents produced a prospect
 // list of companies no agent could ever partner with.
-export const ORIGINATOR_DOC_KINDS = ["loan_1003", "hoi_request", "other"];
+export const ORIGINATOR_DOC_KINDS = ["loan_doc", "loan_1003", "hoi_request", "other"];
 
 // Kinds shown in the partner's upload picker
-export const PARTNER_DOC_KINDS = ["loan_1003", "hoi_request", "mortgagee", "other"] as const;
+export const PARTNER_DOC_KINDS = ["loan_doc", "hoi_request", "mortgagee", "other"] as const;
 
 // Document kinds that routinely carry more personal information than an agent
 // needs to quote. The source file for these can be purged after extraction —
 // the details pulled off it stay on the referral. See lib/retention.
-export const SENSITIVE_DOC_KINDS = ["loan_1003"];
+export const SENSITIVE_DOC_KINDS = ["loan_doc", "loan_1003"];
 
 // Documents that are read and then thrown away, never written to storage.
 //
-// A loan application carries the borrower's SSN, income, and assets. None of it
+// A borrower's loan document carries their SSN, income, and assets. None of it
 // is needed to quote, and the safest copy of a document like that is the one
 // that was never kept. What it told us — names, address, closing date, loan
 // number — lands on the referral; the file itself does not survive the request
 // that read it. The agent still has the original in the inbox it arrived in.
-export const NEVER_STORE_KINDS = ["loan_1003"];
+export const NEVER_STORE_KINDS = ["loan_doc", "loan_1003"];
 
 export function shouldPersistDoc(kind: string): boolean {
   return !NEVER_STORE_KINDS.includes(kind);

@@ -1,8 +1,26 @@
 import { db } from "@/lib/db";
 
-// Referral Radar: turn documents the agent already uploads into a warm list of
-// people who have sent them business but were never set up as partners.
-// Everything here is best-effort — radar must never break an upload or an
+// Partner gaps.
+//
+// This used to mine uploaded documents for loan officers the agent had never
+// set up as partners, on the theory that a book of documents hides a book of
+// relationships. That theory was wrong. An agent does not receive loan
+// documents from strangers — every one arrives from somebody they already
+// work with, which means "discovering" a new company on a document discovers
+// nothing. All it produced was a list of names the agent already knew, mixed
+// with servicers and mortgagee boxes it took a denylist to suppress.
+//
+// What survived is the part that was never about discovery:
+//
+//   1. A PERSON missing from a partner the agent already has. Cowart is set
+//      up; a new loan officer on their team sends a file; her leads land
+//      unattributed and she gets no updates. The agent cannot see this on
+//      their own, and the document genuinely knows it.
+//
+//   2. A lender a REALTOR named on their deal (see lib/realtor). That's an
+//      introduction someone made on purpose, not a name scraped off a form.
+//
+// Everything here is best-effort — none of it may ever break an upload or an
 // extraction.
 
 export const PROSPECT_STATUSES: Record<string, string> = {
@@ -61,118 +79,70 @@ export type DocContact = {
   loan_officer_nmls?: string | null;
 };
 
-// Record (or bump) someone found on a document. Two useful cases:
-//   1. Their company isn't a partner yet → a portal that should exist.
-//   2. Their company IS a partner but they're not on its team contact list →
-//      their leads land unattributed and they get no updates. This one the
-//      agent can't easily spot on their own.
-// Silent when there's nothing usable or they're already fully set up.
-export async function recordProspectFromDoc(accountId: string, extracted: DocContact): Promise<void> {
+// Record (or bump) a person found on a document who belongs to a partner the
+// agent ALREADY has, but who isn't on that partner's team contact list.
+//
+// Deliberately narrow. If the company on the document isn't already a partner,
+// nothing happens — a document from a company the agent hasn't set up is a
+// document from someone they know and chose not to add, not a discovery.
+export async function recordContactFromDoc(accountId: string, extracted: DocContact): Promise<void> {
   try {
     const name = String(extracted.loan_officer_name ?? "").trim() || null;
     const company = String(extracted.loan_officer_company ?? "").trim() || null;
-    if (!name && !company) return;
-    // A servicer that slipped through is worse than no suggestion at all.
-    if (looksLikeServicer(company) || looksLikeServicer(name)) return;
-    // A company with no human attached is usually a mortgagee box, not a
-    // referral source. Real originators come with a person's name.
+    // Without a person's name there is no contact to add. A bare company name
+    // on a document is usually a mortgagee box.
     if (!name) return;
+    if (looksLikeServicer(company) || looksLikeServicer(name)) return;
 
     const { data: partners } = await db().from("partners").select("id, name").eq("account_id", accountId);
     const matchedPartner = (partners ?? []).find(
-      (p) => (company && loose(p.name) === loose(company)) || (name && loose(p.name) === loose(name))
+      (p) => (company && loose(p.name) === loose(company)) || loose(p.name) === loose(name)
     );
+    // No existing partner → nothing to say. This is the branch that used to
+    // invent prospects.
+    if (!matchedPartner) return;
 
-    // ── Case 2: known partner, unknown person on their team ──────────────────
-    if (matchedPartner) {
-      if (!name) return; // company already has a portal; nothing to add
-      const email = String(extracted.loan_officer_email ?? "").trim() || null;
-      const { data: contacts } = await db()
-        .from("partner_contacts")
-        .select("name, email")
-        .eq("partner_id", matchedPartner.id);
-      const known = (contacts ?? []).some(
-        (c) => loose(c.name) === loose(name) || (email && String(c.email).toLowerCase() === email.toLowerCase())
-      );
-      if (known) return;
+    const email = String(extracted.loan_officer_email ?? "").trim() || null;
+    const { data: contacts } = await db()
+      .from("partner_contacts")
+      .select("name, email")
+      .eq("partner_id", matchedPartner.id);
+    const known = (contacts ?? []).some(
+      (c) => loose(c.name) === loose(name) || (email && String(c.email).toLowerCase() === email.toLowerCase())
+    );
+    if (known) return;
 
-      const { data: already } = await db()
-        .from("partner_prospects")
-        .select("id, deal_count")
-        .eq("account_id", accountId)
-        .eq("source", "contact")
-        .eq("suggested_partner_id", matchedPartner.id)
-        .ilike("name", name)
-        .maybeSingle();
-      if (already) {
-        await db()
-          .from("partner_prospects")
-          .update({ deal_count: (already.deal_count ?? 0) + 1, last_seen_at: new Date().toISOString() })
-          .eq("id", already.id);
-        return;
-      }
-      await db().from("partner_prospects").insert({
-        account_id: accountId,
-        name,
-        company: matchedPartner.name,
-        email,
-        phone: extracted.loan_officer_phone ?? null,
-        nmls: extracted.loan_officer_nmls ?? null,
-        source: "contact",
-        status: "idea",
-        suggested_partner_id: matchedPartner.id,
-        deal_count: 1,
-        last_seen_at: new Date().toISOString(),
-      });
-      return;
-    }
-
-    // ── Case 1: a working relationship with no portal yet ────────────────────
-
-    // Already tracked? Bump the deal count — "you've worked 3 deals with them"
-    // is what makes the suggestion land.
-    const { data: existing } = await db()
+    const { data: already } = await db()
       .from("partner_prospects")
-      .select("id, deal_count, name, company, email, phone, nmls")
+      .select("id, deal_count")
       .eq("account_id", accountId)
-      .limit(200);
-    const match = (existing ?? []).find(
-      (p) =>
-        (company && loose(p.company) === loose(company)) ||
-        (name && company === null && loose(p.name) === loose(name))
-    );
-
-    if (match) {
+      .eq("source", "contact")
+      .eq("suggested_partner_id", matchedPartner.id)
+      .ilike("name", name)
+      .maybeSingle();
+    if (already) {
       await db()
         .from("partner_prospects")
-        .update({
-          deal_count: (match.deal_count ?? 0) + 1,
-          last_seen_at: new Date().toISOString(),
-          // Fill blanks we learn later without overwriting anything.
-          name: match.name ?? name,
-          email: match.email ?? extracted.loan_officer_email ?? null,
-          phone: match.phone ?? extracted.loan_officer_phone ?? null,
-          nmls: match.nmls ?? extracted.loan_officer_nmls ?? null,
-        })
-        .eq("id", match.id);
+        .update({ deal_count: (already.deal_count ?? 0) + 1, last_seen_at: new Date().toISOString() })
+        .eq("id", already.id);
       return;
     }
 
     await db().from("partner_prospects").insert({
       account_id: accountId,
       name,
-      company,
-      email: extracted.loan_officer_email ?? null,
+      company: matchedPartner.name,
+      email,
       phone: extracted.loan_officer_phone ?? null,
       nmls: extracted.loan_officer_nmls ?? null,
-      partner_type: "lender",
-      source: "radar",
+      source: "contact",
       status: "idea",
+      suggested_partner_id: matchedPartner.id,
       deal_count: 1,
       last_seen_at: new Date().toISOString(),
     });
   } catch (e) {
-    console.error("radar: prospect record failed", e);
+    console.error("partner gaps: contact record failed", e);
   }
 }
 

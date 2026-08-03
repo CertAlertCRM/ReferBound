@@ -5,7 +5,7 @@ import { extractFromAttachment, applyExtractedToReferral } from "@/lib/inbound-d
 import { autoMatchClause } from "@/lib/clauses";
 import { logActivity } from "@/lib/activity";
 
-// Public (token-guarded): partner uploads a document (1003, HOI request,
+// Public (token-guarded): partner uploads a document (loan document, HOI request,
 // mortgagee info, etc.) onto one of THEIR OWN referrals.
 
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {

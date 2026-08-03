@@ -8,7 +8,7 @@ import { normalizePhone } from "@/lib/format";
 // here — the file itself is uploaded through the normal flow after submit.
 
 const SYSTEM = `You extract client details from mortgage and insurance documents
-(loan applications/1003s, HOI requests, pre-approvals, etc.) so a referral form
+(loan documents, HOI requests, pre-approvals, etc.) so a referral form
 can be prefilled.
 
 Rules:

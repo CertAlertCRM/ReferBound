@@ -411,7 +411,7 @@ export default function PartnerWorkspacePage() {
     if (pendingFile && referral?.id) {
       const fd = new FormData();
       fd.append("file", pendingFile);
-      fd.append("kind", "loan_1003");
+      fd.append("kind", "loan_doc");
       await fetch(`/api/referrals/${referral.id}/docs`, { method: "POST", body: fd }).catch(() => {});
     }
     setSaving(false);

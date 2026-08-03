@@ -5,10 +5,15 @@ import { IconPlus, IconX, IconArrowRight, IconSparkles } from "./icons";
 import { PARTNER_TYPES } from "@/lib/config";
 import { useUI } from "./ui";
 
-// Referral Radar — the mirror, not a megaphone. It shows agents where their
-// referrals actually come from and who they've already worked with but never
-// set up as a partner. Every number here is their own; no benchmarks, no
-// claims about what more partners will do for them.
+// Referral Radar — the mirror, not a megaphone. Every number here is the
+// agent's own: no benchmarks, no claims about what more partners will do.
+//
+// It used to also claim to FIND new partners by reading names off uploaded
+// documents. That was wrong at the premise — an agent never receives a loan
+// document from a stranger, so a name on one is always somebody they already
+// know. What's left are the two lists that were never guesses: loan officers a
+// realtor deliberately named on their own deal, and people missing from the
+// team list of a partner the agent already has.
 
 type Prospect = {
   id: string;
@@ -82,7 +87,9 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
 
   if (!d) return null;
 
-  const radarFinds = d.prospects.filter((p) => p.source === "radar" || p.source === "realtor_deal");
+  // "radar" is a retired source kept in the filter so anything captured under
+  // the old document-mining behaviour still appears until it's actioned.
+  const introduced = d.prospects.filter((p) => p.source === "realtor_deal" || p.source === "radar");
   const contactGaps = d.prospects.filter((p) => p.source === "contact");
   const pipeline = d.prospects.filter((p) => p.source === "manual");
 
@@ -142,9 +149,9 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
         <span className="flex items-center gap-2">
           <IconSparkles size={15} className="text-brand" />
           <span className="font-semibold">Referral Radar</span>
-          {radarFinds.length + contactGaps.length > 0 && (
+          {introduced.length + contactGaps.length > 0 && (
             <span className="badge bg-brand-light text-brand-700">
-              {radarFinds.length + contactGaps.length} to review
+              {introduced.length + contactGaps.length} to review
             </span>
           )}
         </span>
@@ -166,19 +173,20 @@ export function ReferralRadar({ onConvert }: { onConvert: (p: Prospect) => void 
 
       {open && (
         <>
-          {/* Gap 1: people they demonstrably work with, with no portal yet */}
+          {/* Gap 1: lenders a realtor named on their own deal — an
+              introduction somebody made on purpose, not a scraped name. */}
           <div>
-            <h3 className="section-label mb-2">Working with you, no portal yet</h3>
-            {radarFinds.length === 0 ? (
+            <h3 className="section-label mb-2">Named on a realtor&apos;s deal</h3>
+            {introduced.length === 0 ? (
               <p className="text-xs text-ink-muted">
-                Two things fill this list. Loan applications name the loan officer who sent
-                them, and every realtor referral can name the loan officer on the other side of
-                the deal. Either way, these are people you&apos;ve already closed alongside —
-                they just don&apos;t have a portal yet.
+                When a realtor sends you a buyer, their portal can name the loan officer on the
+                other side of that deal. Those loan officers show up here — people you&apos;ve
+                closed alongside, introduced by someone you both trust, who don&apos;t have a
+                portal with you yet.
               </p>
             ) : (
               <ul className="space-y-2">
-                {radarFinds.map((p) => (
+                {introduced.map((p) => (
                   <li key={p.id} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

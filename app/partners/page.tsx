@@ -4,11 +4,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
-import { IconPencil, IconExternal, IconCopy, IconCheck, IconPlus, IconTrash, IconMessage } from "../icons";
+import { IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
 import { ReferralRadar } from "../referral-radar";
 import { prepareLogo, sharpnessNote } from "@/lib/image";
 import { useUI } from "../ui";
+
+type PartnerStats = {
+  total: number;
+  active: number;
+  bound: number;
+  lost: number;
+  byStatus: Record<string, number>;
+  lastAt: string | null;
+  closeRate: number | null;
+};
 
 type Partner = {
   id: string;
@@ -22,7 +32,51 @@ type Partner = {
   thankyou_cadence: string;
   short_code: string | null;
   referrals: { count: number }[];
+  stats?: PartnerStats;
 };
+
+const EMPTY_STATS: PartnerStats = {
+  total: 0, active: 0, bound: 0, lost: 0, byStatus: {}, lastAt: null, closeRate: null,
+};
+
+// Initials for partners with no logo. A dashed "add logo" box on every card
+// makes a page of real relationships look like a page of unfinished chores; a
+// monogram looks deliberate and still opens the file picker on click.
+function initials(name: string): string {
+  const words = name.replace(/[^\w\s]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+function sinceLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "active today";
+  if (days === 1) return "active yesterday";
+  if (days < 30) return `active ${days} days ago`;
+  const months = Math.round(days / 30);
+  return months === 1 ? "quiet for a month" : `quiet for ${months} months`;
+}
+
+// The pipeline bar. Proportional, three states, no axis and no legend of its
+// own — the numbers sit directly beneath it. An empty track still draws, so a
+// partner with no referrals reads as "nothing yet" rather than as a broken card.
+function PipelineBar({ s }: { s: PartnerStats }) {
+  if (s.total === 0) {
+    return (
+      <div className="h-1.5 rounded-full bg-slate-100 border border-dashed border-slate-200" />
+    );
+  }
+  const seg = (n: number) => `${(n / s.total) * 100}%`;
+  return (
+    <div className="h-1.5 rounded-full overflow-hidden bg-slate-100 flex">
+      {s.bound > 0 && <span className="bg-emerald-500" style={{ width: seg(s.bound) }} />}
+      {s.active > 0 && <span className="bg-brand" style={{ width: seg(s.active) }} />}
+      {s.lost > 0 && <span className="bg-slate-300" style={{ width: seg(s.lost) }} />}
+    </div>
+  );
+}
 
 export default function PartnersPage() {
   const { toast, confirm, prompt } = useUI();
@@ -51,11 +105,45 @@ export default function PartnersPage() {
   const [txContacts, setTxContacts] = useState<{ id: string; name: string; phone: string }[] | null>(null);
   const [txBusy, setTxBusy] = useState<string | null>(null);
   const [txSent, setTxSent] = useState<string | null>(null);
+  // Per-card action menu. Six buttons on every row turned a page of
+  // relationships into a page of controls; everything but the one action an
+  // agent actually repeats now lives behind this.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  // The add form is a task, not the point of the page — collapsed until wanted.
+  const [addOpen, setAddOpen] = useState(false);
 
   async function load() {
     const res = await fetch("/api/partners");
     if (res.ok) setPartners((await res.json()).partners ?? []);
   }
+
+  // Close the action menu on any click outside it, or on Escape. A fixed
+  // backdrop can't be used here: an ancestor with a blur filter becomes the
+  // containing block and traps it (learned on the header menu).
+  useEffect(() => {
+    if (!menuFor && !txFor) return;
+    const away = (e: Event) => {
+      const el = e.target as HTMLElement;
+      if (el.closest?.("[data-partner-menu]")) return;
+      setMenuFor(null);
+      setTxFor(null);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuFor(null);
+        setTxFor(null);
+      }
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("touchstart", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("touchstart", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menuFor, txFor]);
+
   useEffect(() => {
     load();
     // Checkout links, ready for the moment they're actually earned.
@@ -69,6 +157,7 @@ export default function PartnersPage() {
 
   // Prefill the add-partner form from a Radar find or pipeline prospect.
   function fromProspect(p: { name: string | null; company: string | null; email: string | null; partner_type: string }) {
+    setAddOpen(true);
     setName(p.company || p.name || "");
     setEmails(p.email ?? "");
     setPtype(p.partner_type || "lender");
@@ -290,11 +379,21 @@ export default function PartnersPage() {
     <>
       <TopNav active="partners" />
       <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Referral partners</h1>
-          <p className="text-sm text-ink-secondary mt-1">
-            Each partner gets a private magic link — their live window into every referral they&apos;ve sent you.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight">Referral partners</h1>
+            <p className="text-sm text-ink-secondary mt-1">
+              Each partner gets a private magic link — their live window into every referral
+              they&apos;ve sent you.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={addOpen ? "btn-ghost !py-2 text-xs shrink-0" : "btn-primary !py-2 text-xs shrink-0"}
+            onClick={() => setAddOpen(!addOpen)}
+          >
+            {addOpen ? "Close" : (<><IconPlus size={13} /> Add partner</>)}
+          </button>
         </div>
 
         {logoNote && (
@@ -305,7 +404,8 @@ export default function PartnersPage() {
 
         <ReferralRadar onConvert={fromProspect} />
 
-        <form onSubmit={add} className="card p-5 space-y-3">
+        {addOpen && (
+        <form onSubmit={add} className="card p-5 space-y-3 border-brand-200">
           <div className="flex items-center justify-between gap-2">
             <h2 className="section-label">Add a partner</h2>
             <button
@@ -377,17 +477,26 @@ export default function PartnersPage() {
             </label>
           </div>
           <p className="text-xs text-ink-muted">
-            The type shapes their portal: lenders get the closing-date + 1003 flow; everyone else gets
-            a simple client-details form.
+            The type shapes their portal: lenders get the closing-date and document flow; everyone
+            else gets a simple client-details form.
           </p>
           <button className="btn-primary" disabled={saving}>
             {saving ? "Adding…" : "Add partner"}
           </button>
         </form>
+        )}
 
         <div className="space-y-3">
-          {partners.map((p) => (
-            <div key={p.id} className="card card-hover p-5">
+          {partners.map((p) => {
+            const s = p.stats ?? EMPTY_STATS;
+            const since = sinceLabel(s.lastAt);
+            return (
+            <div
+              key={p.id}
+              className={`card p-5 transition-shadow ${
+                editingId === p.id ? "" : "hover:shadow-lift"
+              }`}
+            >
               {editingId === p.id ? (
                 <form onSubmit={saveEdit} className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
@@ -528,11 +637,12 @@ export default function PartnersPage() {
                   </div>
                 </form>
               ) : (
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3.5">
-                    {/* Logo box IS the upload/replace control — hover it */}
+                <div className="space-y-4">
+                  {/* ── Identity row ──────────────────────────────────────── */}
+                  <div className="flex items-start gap-4">
+                    {/* The logo box is still the upload control — hover it */}
                     <label
-                      className="relative w-16 h-16 rounded-lg cursor-pointer group/logo shrink-0"
+                      className="relative w-14 h-14 rounded-xl cursor-pointer group/logo shrink-0"
                       title={p.logoUrl ? "Replace this partner's logo" : "Upload this partner's logo"}
                     >
                       {p.logoUrl ? (
@@ -541,16 +651,15 @@ export default function PartnersPage() {
                           <img
                             src={p.logoUrl}
                             alt=""
-                            className="w-16 h-16 rounded-lg object-contain bg-white border border-slate-200 p-1.5"
+                            className="w-14 h-14 rounded-xl object-contain bg-white border border-slate-200 p-1.5"
                           />
-                          <span className="absolute inset-0 rounded-lg bg-slate-900/60 text-white text-[11px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
+                          <span className="absolute inset-0 rounded-xl bg-slate-900/60 text-white text-[10px] font-semibold flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity">
                             Replace
                           </span>
                         </>
                       ) : (
-                        <span className="w-16 h-16 rounded-lg border border-dashed border-slate-300 text-ink-muted flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold hover:border-brand hover:text-brand text-center leading-tight">
-                          <IconPlus size={14} />
-                          logo
+                        <span className="w-14 h-14 rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 border border-brand-100 text-brand-800 flex items-center justify-center font-bold tracking-tight text-lg group-hover/logo:from-brand-100 group-hover/logo:to-brand-200 transition-colors">
+                          {initials(p.name)}
                         </span>
                       )}
                       <input
@@ -560,107 +669,205 @@ export default function PartnersPage() {
                         onChange={(e) => uploadLogo(p, e)}
                       />
                     </label>
-                    <Link href={`/partner/${p.id}`} className="block group/name min-w-0">
-                      <p className="font-semibold group-hover/name:text-brand transition-colors">
-                        {p.name}{" "}
-                        <span className="badge bg-slate-100 text-slate-700 align-middle ml-1">
+
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/partner/${p.id}`} className="block group/name min-w-0">
+                        <p className="font-bold tracking-tight text-[15px] truncate group-hover/name:text-brand transition-colors">
+                          {p.name}
+                        </p>
+                      </Link>
+                      <p className="text-[11px] text-ink-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="badge bg-slate-100 text-slate-700">
                           {p.type_label || (PARTNER_TYPES[p.partner_type] ?? "Lender")}
                         </span>
+                        {since && <span>{since}</span>}
                       </p>
-                      <p className="text-xs text-ink-muted mt-0.5">
-                        {p.referrals?.[0]?.count ?? 0} referral{(p.referrals?.[0]?.count ?? 0) === 1 ? "" : "s"}
-                        {p.emails.length > 0 && <> · notifies {p.emails.join(", ")}</>}
-                        <span className="text-brand font-medium"> · open workspace →</span>
-                      </p>
-                    </Link>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => startEdit(p)}>
-                      <IconPencil size={12} /> Edit
-                    </button>
-                    <Link className="btn-ghost !px-3 !py-1.5 text-xs" href={`/p/${p.short_code || p.token}`}>
-                      <IconExternal size={12} /> View portal
-                    </Link>
-                    <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => showQr(p)}>
-                      ▦ QR
-                    </button>
-                    <div className="relative">
-                      <button
-                        className="btn-ghost !px-3 !py-1.5 text-xs"
-                        onClick={() => openTx(p)}
-                        disabled={txBusy === p.id}
-                      >
-                        <IconMessage size={12} />{" "}
-                        {txSent === p.id ? "Sent ✓" : txBusy === p.id ? "Sending…" : "Text link"}
-                      </button>
-                      {txFor === p.id && (
-                        <div className="absolute right-0 top-full mt-1.5 z-30 card p-2 w-60 space-y-0.5 shadow-lift text-left">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted px-2 pt-1 pb-1.5">
-                            Text the portal link to…
-                          </p>
-                          {txContacts === null ? (
-                            <p className="text-[11px] text-ink-muted px-2 py-1.5">Loading contacts…</p>
-                          ) : (
-                            <>
-                              {txContacts.map((c) => (
-                                <div key={c.id} className="rounded-lg hover:bg-brand-light/40 transition-colors px-2 py-1.5">
-                                  <p className="text-xs">
-                                    <span className="font-medium">{c.name}</span>
-                                    <span className="text-ink-muted"> · {c.phone}</span>
-                                  </p>
-                                  <div className="flex gap-3 mt-0.5">
-                                    <button
-                                      className="link !text-[11px]"
-                                      onClick={() => sendTx(p.id, { contactId: c.id })}
-                                    >
-                                      Send portal link
-                                    </button>
-                                    <button
-                                      className="link !text-[11px]"
-                                      title="Asks them to add the files they have working right now"
-                                      onClick={() => sendTx(p.id, { contactId: c.id, purpose: "backfill" })}
-                                    >
-                                      Ask for active files
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                              {txContacts.length === 0 && (
-                                <p className="text-[11px] text-ink-muted px-2 py-1.5">
-                                  No contacts with a mobile yet — or just:
-                                </p>
-                              )}
-                            </>
-                          )}
-                          <button
-                            className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 text-brand font-semibold transition-colors"
-                            onClick={() => {
-                              setTxFor(null);
-                              txToNumber(p.id);
-                            }}
-                          >
-                            Enter a number…
-                          </button>
-                        </div>
-                      )}
                     </div>
-                    <PartnerInviteButton partnerId={p.id} partnerName={p.name} />
-                    <button className="btn-primary !px-3 !py-1.5 text-xs" onClick={() => copy(p)}>
-                      {copied === p.id ? (
-                        <>
-                          <IconCheck size={12} /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <IconCopy size={12} /> Copy magic link
-                        </>
-                      )}
-                    </button>
+
+                    {/* One repeated action, one menu for the rest. */}
+                    <div className="flex items-center gap-1.5 shrink-0" data-partner-menu>
+                      <button
+                        className="btn-primary !px-3 !py-1.5 text-xs"
+                        onClick={() => copy(p)}
+                        title="Copy this partner's private portal link"
+                      >
+                        {copied === p.id ? (
+                          <>
+                            <IconCheck size={12} /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <IconCopy size={12} /> Copy link
+                          </>
+                        )}
+                      </button>
+                      <div className="relative">
+                        <button
+                          className="w-8 h-8 rounded-lg text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors flex items-center justify-center"
+                          aria-label={`More actions for ${p.name}`}
+                          aria-expanded={menuFor === p.id}
+                          onClick={() => {
+                            setTxFor(null);
+                            setMenuFor(menuFor === p.id ? null : p.id);
+                          }}
+                        >
+                          <span className="text-lg leading-none tracking-widest -mt-1">···</span>
+                        </button>
+
+                        {menuFor === p.id && txFor !== p.id && (
+                          <div className="absolute right-0 top-full mt-1.5 z-30 card p-1.5 w-52 shadow-lift text-left">
+                            <Link
+                              href={`/partner/${p.id}`}
+                              className="block rounded-lg px-2.5 py-2 text-xs font-medium hover:bg-brand-light/60 transition-colors"
+                            >
+                              Open workspace
+                            </Link>
+                            <button
+                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                              onClick={() => {
+                                setMenuFor(null);
+                                startEdit(p);
+                              }}
+                            >
+                              Edit details
+                            </button>
+                            <Link
+                              href={`/p/${p.short_code || p.token}`}
+                              className="block rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                            >
+                              View their portal
+                            </Link>
+                            <button
+                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                              onClick={() => {
+                                setMenuFor(null);
+                                showQr(p);
+                              }}
+                            >
+                              Show QR code
+                            </button>
+                            <button
+                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                              onClick={() => openTx(p)}
+                              disabled={txBusy === p.id}
+                            >
+                              {txSent === p.id ? "Texted ✓" : txBusy === p.id ? "Sending…" : "Text the link"}
+                            </button>
+                            <PartnerInviteButton
+                              partnerId={p.id}
+                              partnerName={p.name}
+                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors flex items-center gap-1.5"
+                            />
+                          </div>
+                        )}
+
+                        {txFor === p.id && (
+                          <div className="absolute right-0 top-full mt-1.5 z-30 card p-2 w-60 space-y-0.5 shadow-lift text-left">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted px-2 pt-1 pb-1.5">
+                              Text the portal link to…
+                            </p>
+                            {txContacts === null ? (
+                              <p className="text-[11px] text-ink-muted px-2 py-1.5">Loading contacts…</p>
+                            ) : (
+                              <>
+                                {txContacts.map((c) => (
+                                  <div key={c.id} className="rounded-lg hover:bg-brand-light/40 transition-colors px-2 py-1.5">
+                                    <p className="text-xs">
+                                      <span className="font-medium">{c.name}</span>
+                                      <span className="text-ink-muted"> · {c.phone}</span>
+                                    </p>
+                                    <div className="flex gap-3 mt-0.5">
+                                      <button
+                                        className="link !text-[11px]"
+                                        onClick={() => sendTx(p.id, { contactId: c.id })}
+                                      >
+                                        Send portal link
+                                      </button>
+                                      <button
+                                        className="link !text-[11px]"
+                                        title="Asks them to add the files they have working right now"
+                                        onClick={() => sendTx(p.id, { contactId: c.id, purpose: "backfill" })}
+                                      >
+                                        Ask for active files
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {txContacts.length === 0 && (
+                                  <p className="text-[11px] text-ink-muted px-2 py-1.5">
+                                    No contacts with a mobile yet — or just:
+                                  </p>
+                                )}
+                              </>
+                            )}
+                            <button
+                              className="w-full text-left text-xs px-2 py-2 rounded-lg hover:bg-brand-light/60 text-brand font-semibold transition-colors"
+                              onClick={() => {
+                                setTxFor(null);
+                                setMenuFor(null);
+                                txToNumber(p.id);
+                              }}
+                            >
+                              Enter a number…
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* ── The pipeline, which is the reason to open this page ── */}
+                  <div>
+                    <PipelineBar s={s} />
+                    {s.total === 0 ? (
+                      <p className="text-[11px] text-ink-muted mt-2">
+                        No referrals logged yet.{" "}
+                        <Link href={`/partner/${p.id}`} className="link !text-[11px]">
+                          Add what they&apos;ve already sent you
+                        </Link>{" "}
+                        — a real close ratio makes the next conversation easy.
+                      </p>
+                    ) : (
+                      <div className="mt-2.5 flex items-baseline gap-5 flex-wrap">
+                        <span className="text-[11px] text-ink-muted">
+                          <span className="text-base font-bold tracking-tight text-ink tabular-nums">
+                            {s.total}
+                          </span>{" "}
+                          referral{s.total === 1 ? "" : "s"}
+                        </span>
+                        {s.active > 0 && (
+                          <span className="text-[11px] text-ink-muted inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-brand" />
+                            <span className="font-semibold text-ink tabular-nums">{s.active}</span> in
+                            motion
+                          </span>
+                        )}
+                        {s.bound > 0 && (
+                          <span className="text-[11px] text-ink-muted inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="font-semibold text-ink tabular-nums">{s.bound}</span> covered
+                          </span>
+                        )}
+                        {s.closeRate !== null && (
+                          <span className="text-[11px] text-ink-muted">
+                            <span className="font-semibold text-ink tabular-nums">{s.closeRate}%</span>{" "}
+                            close rate
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {p.emails.length > 0 && (
+                    <p className="text-[11px] text-ink-muted truncate border-t border-slate-100 pt-2.5">
+                      Notifies {p.emails.join(", ")}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
 
           {/* The partner-#2 milestone. They've already decided the product
               works — this reads as a moment, not a toll booth. */}

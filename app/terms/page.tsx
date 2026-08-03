@@ -56,7 +56,7 @@ export default function TermsPage() {
         <Section n={3} title="Client information and your responsibilities">
           <p>
             Agents and partners submit information about insurance clients (names, contact
-            details, property addresses, documents like loan applications and evidence of
+            details, property addresses, documents like loan documents and evidence of
             insurance). By submitting it, you confirm you have the legal right and any necessary
             consent to share that information for the purpose of placing or servicing insurance.
             You are responsible for complying with the laws that apply to your profession,
@@ -127,7 +127,7 @@ export default function TermsPage() {
             your existing partners is held for your review rather than acted on automatically.
           </p>
           <p>
-            Loan applications reaching the service by any route are read once and discarded, not
+            Loan documents reaching the service by any route are read once and discarded, not
             stored. We keep only the details required to quote. The original remains wherever you
             already hold it, and you should not rely on ReferBound as a system of record for
             lender documents.

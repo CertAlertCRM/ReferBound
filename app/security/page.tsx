@@ -41,9 +41,9 @@ export default function SecurityPage() {
       <Section title="The data we deliberately don't keep">
         <p>
           The strongest protection for a piece of information is not holding it.{" "}
-          <strong className="text-ink">Loan applications are never stored.</strong> A 1003 reaching
-          ReferBound by any route — forwarded email, agent upload, or partner upload — is read once
-          in memory and discarded rather than written to disk.
+          <strong className="text-ink">Loan documents are never stored.</strong> A borrower&apos;s
+          loan paperwork reaching ReferBound by any route — forwarded email, agent upload, or
+          partner upload — is read once in memory and discarded rather than written to disk.
         </p>
         <p>
           What we keep from it is what a quote requires: names, dates of birth, contact details,
@@ -143,7 +143,7 @@ export default function SecurityPage() {
         <p>
           Agents choose how long uploaded source documents are kept — indefinitely, or purged after
           30, 90, or 180 days. Details already extracted onto a referral survive the purge; the
-          file does not. Loan applications are exempt from this choice because they are never
+          file does not. Loan documents are exempt from this choice because they are never
           stored in the first place.
         </p>
         <p>
@@ -160,7 +160,7 @@ export default function SecurityPage() {
         </p>
         <p>
           What we do claim is specific: no data selling, no advertising trackers, no carrier
-          credentials, no loan applications on disk, and no automated messages to your clients.
+          credentials, no loan documents on disk, and no automated messages to your clients.
         </p>
       </Section>
 
