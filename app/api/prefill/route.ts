@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAccount } from "@/lib/account";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { normalizePhone } from "@/lib/format";
-import { recordContactFromDoc } from "@/lib/radar";
+import { recordContactFromDoc } from "@/lib/partner-gaps";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ Respond with ONLY a JSON object (no markdown fences, no commentary):
 }`;
 
 // Fields that belong to the referral form — the loan-officer block feeds
-// Referral Radar instead and is stripped before the form sees it.
+// the partner-gaps list instead, and is stripped before the form sees it.
 const FORM_FIELDS = [
   "client_name",
   "coborrower_name",

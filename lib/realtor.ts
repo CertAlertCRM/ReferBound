@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { loose, looksLikeServicer } from "@/lib/radar";
+import { loose, looksLikeServicer } from "@/lib/partner-gaps";
 
 // The realtor triangle.
 //
@@ -131,7 +131,7 @@ export async function recordLenderFromRealtorDeal(opts: {
       via_partner_id: viaPartnerId,
     });
   } catch {
-    // Radar is never allowed to break the thing that triggered it.
+    // Partner gaps are never allowed to break the thing that triggered them.
   }
 }
 

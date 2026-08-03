@@ -6,7 +6,7 @@ import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
 import { IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
-import { ReferralRadar } from "../referral-radar";
+import { PartnerGaps } from "../partner-gaps";
 import { prepareLogo, sharpnessNote } from "@/lib/image";
 import { useUI } from "../ui";
 
@@ -155,7 +155,7 @@ export default function PartnersPage() {
     });
   }, []);
 
-  // Prefill the add-partner form from a Radar find or pipeline prospect.
+  // Prefill the add-partner form from a partner gap or pipeline prospect.
   function fromProspect(p: { name: string | null; company: string | null; email: string | null; partner_type: string }) {
     setAddOpen(true);
     setName(p.company || p.name || "");
@@ -402,7 +402,7 @@ export default function PartnersPage() {
           </div>
         )}
 
-        <ReferralRadar onConvert={fromProspect} />
+        <PartnerGaps onConvert={fromProspect} />
 
         {addOpen && (
         <form onSubmit={add} className="card p-5 space-y-3 border-brand-200">

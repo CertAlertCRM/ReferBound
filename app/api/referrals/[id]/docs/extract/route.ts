@@ -4,7 +4,7 @@ import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { logActivity } from "@/lib/activity";
 import { DOC_KINDS } from "@/lib/config";
 import { getAccount, ownedReferral } from "@/lib/account";
-import { recordContactFromDoc } from "@/lib/radar";
+import { recordContactFromDoc } from "@/lib/partner-gaps";
 import { ORIGINATOR_DOC_KINDS } from "@/lib/config";
 import { autoMatchClause } from "@/lib/clauses";
 

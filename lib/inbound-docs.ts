@@ -2,7 +2,7 @@ import { db, DOCS_BUCKET } from "@/lib/db";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
 import { autoMatchClause } from "@/lib/clauses";
-import { recordContactFromDoc } from "@/lib/radar";
+import { recordContactFromDoc } from "@/lib/partner-gaps";
 import { shouldPersistDoc } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
 

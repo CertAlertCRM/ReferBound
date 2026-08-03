@@ -156,7 +156,7 @@ export default async function HubPage({ params }: { params: { token: string } })
           ))}
         </div>
 
-        {/* Closings radar */}
+        {/* Closings watch */}
         {closingSoon.length > 0 && (
           <section className="card p-5">
             <h2 className="section-label mb-3">Closing in the next 14 days</h2>
