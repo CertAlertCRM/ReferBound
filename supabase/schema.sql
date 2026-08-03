@@ -434,3 +434,6 @@ update documents set kind = 'loan_doc' where kind = 'loan_1003';
 update inbound_emails
    set attachments = replace(attachments::text, '"loan_1003"', '"loan_doc"')::jsonb
  where attachments::text like '%loan_1003%';
+
+-- Migration 46: when the mortgage team was sent the documents.
+alter table referrals add column if not exists lender_docs_sent_at timestamptz;

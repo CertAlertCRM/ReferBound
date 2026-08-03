@@ -50,6 +50,7 @@ type Referral = {
   closing_date_was?: string | null;
   closing_date_changed_at?: string | null;
   deal_lender?: { name?: string | null; company?: string | null; email?: string | null; phone?: string | null } | null;
+  lender_docs_sent_at?: string | null;
   quote_sent_at?: string | null;
   welcome_sent_at?: string | null;
   client_nudged_at?: string | null;
@@ -680,6 +681,8 @@ export default function DealPage() {
             clientFirst={r.client_name.split(" ")[0]}
             lender={r.deal_lender ?? null}
             covered={["bound", "docs_delivered"].includes(r.status)}
+            hasDocs={r.documents.some((d) => ["eoi", "rce", "dec"].includes(d.kind) && !d.purged_at)}
+            docsSentAt={r.lender_docs_sent_at ?? null}
             onSaved={load}
           />
         )}

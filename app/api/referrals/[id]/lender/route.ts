@@ -7,21 +7,29 @@ import {
   recordLenderFromRealtorDeal,
   draftLenderIntro,
   draftRealtorAsk,
+  draftRealtorContactAsk,
+  draftLenderDocs,
 } from "@/lib/realtor";
-import { SAFE_STATUSES } from "@/lib/config";
+import { DOC_KINDS, SAFE_STATUSES } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
-import { appUrl } from "@/lib/helpers";
+import { appUrl, fmtDate } from "@/lib/helpers";
+import { signDocUrl } from "@/lib/doclink";
 
 export const dynamic = "force-dynamic";
 
 // The other side of a realtor's deal.
 //
-// Save who's handling the loan, then turn that into the introduction the agent
-// would otherwise never get — either straight to the loan officer, or by asking
-// the realtor to make it. Nothing sends from here; both actions return DRAFT
-// TEXT the agent reads, edits, and sends themselves. An introduction that goes
-// out without the agent seeing it isn't an introduction, it's a cold email with
-// their name forged on it.
+// Realtors refer by phone. No loan application arrives, no insurance request,
+// nothing that names the loan officer — so the only way to learn who's on the
+// other side is to ask, and the only reason worth asking is that it lets the
+// agent get documents to the mortgage team before anyone chases them.
+//
+// Four drafts, in the order they're useful: ask the realtor who the lender is,
+// send that lender the documents unprompted, then — once they've seen it —
+// either introduce yourself or ask the realtor to. Nothing sends from here.
+// Every action returns DRAFT TEXT the agent reads, edits, and sends themselves.
+// An introduction that goes out without the agent seeing it isn't an
+// introduction, it's a cold email with their name forged on it.
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
@@ -64,20 +72,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.json().catch(() => null);
   const kind = String(body?.kind ?? "");
-  if (!["lender_intro", "realtor_ask"].includes(kind)) {
+  if (!["contact_ask", "lender_docs", "lender_intro", "realtor_ask"].includes(kind)) {
     return NextResponse.json({ error: "unknown draft" }, { status: 400 });
   }
 
   const { data: referral } = await db()
     .from("referrals")
-    .select("id, client_name, property_address, status, deal_lender, partners(id, name, partner_type)")
+    .select(
+      "id, client_name, property_address, closing_date, status, deal_lender, partners(id, name, partner_type)"
+    )
     .eq("id", params.id)
     .eq("account_id", account.id)
     .maybeSingle();
   if (!referral) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const lender = (referral as any).deal_lender ?? null;
-  if (!lender?.name && !lender?.company) {
+  // Asking the realtor who the lender is obviously can't require knowing who
+  // the lender is. Every other draft can.
+  if (kind !== "contact_ask" && !lender?.name && !lender?.company) {
     return NextResponse.json({ error: "Add who's handling the loan first" }, { status: 400 });
   }
 
@@ -89,6 +101,72 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const agentName = prof?.display_name || "your insurance agent";
   const agencyName = prof?.agency_name || "";
   const realtorName = (referral as any).partners?.name ?? "your realtor";
+
+  // ── Day one: who's handling the loan? ────────────────────────────────────
+  if (kind === "contact_ask") {
+    await logActivity(
+      referral.id,
+      "note",
+      `Drafted a request to ${realtorName} for the loan officer's details`,
+      "agent"
+    );
+    return NextResponse.json({
+      text: draftRealtorContactAsk({
+        realtorFirst: String(realtorName).split(" ")[0],
+        clientName: referral.client_name,
+        agentName,
+      }),
+    });
+  }
+
+  // ── Bound: send the mortgage team their documents, unprompted ────────────
+  if (kind === "lender_docs") {
+    const { data: docs } = await db()
+      .from("documents")
+      .select("id, kind, file_name")
+      .eq("referral_id", referral.id)
+      .in("kind", ["eoi", "rce", "dec"])
+      .is("purged_at", null)
+      .order("created_at", { ascending: true });
+
+    if (!docs?.length) {
+      return NextResponse.json(
+        { error: "Upload the EOI first — there's nothing to send yet." },
+        { status: 400 }
+      );
+    }
+
+    // One signed link per document. The loan officer has no account and no
+    // portal, and must never be handed a partner token.
+    const links = (docs as any[]).map((d) => ({
+      label: DOC_KINDS[d.kind] ?? d.file_name ?? "Document",
+      url: signDocUrl(d.id),
+    }));
+
+    await db()
+      .from("referrals")
+      .update({ lender_docs_sent_at: new Date().toISOString() })
+      .eq("id", referral.id);
+    await logActivity(
+      referral.id,
+      "note",
+      `Drafted a document hand-off to ${lender.name ?? lender.company} (${links.length} document${links.length === 1 ? "" : "s"})`,
+      "agent"
+    );
+
+    return NextResponse.json({
+      text: draftLenderDocs({
+        lenderFirst: String(lender.name ?? lender.company).split(" ")[0],
+        agentName,
+        agencyName,
+        clientName: referral.client_name,
+        address: referral.property_address ?? null,
+        realtorName,
+        closingDate: referral.closing_date ? fmtDate(referral.closing_date) : null,
+        docs: links,
+      }),
+    });
+  }
 
   if (kind === "realtor_ask") {
     await db()

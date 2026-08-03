@@ -326,8 +326,9 @@ export function PartnerSubmitForm({
               <p className="text-xs font-semibold text-ink-secondary">
                 Who&apos;s handling their loan?{" "}
                 <span className="font-normal text-ink-muted">
-                  Optional — but if we have the loan officer we&apos;ll send the evidence of
-                  insurance straight to them instead of routing it through you.
+                  Optional. With the loan officer&apos;s email we&apos;ll send them the proof of
+                  insurance as soon as it&apos;s issued, rather than waiting to be asked for it —
+                  one less thing chasing you the week of closing.
                 </span>
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

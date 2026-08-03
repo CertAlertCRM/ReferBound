@@ -6,14 +6,24 @@ import { loose, looksLikeServicer } from "@/lib/radar";
 // On every purchase there are three professionals around one buyer: the
 // realtor, the loan officer, and the insurance agent. The realtor is the only
 // one who reliably knows the other two. That makes a realtor referral worth
-// more than the single client it carries — it's an introduction to a lender,
-// on a file where the agent is about to prove the exact thing that lender
-// cares about.
+// more than the single client it carries.
 //
-// The timing is the whole trick. Asking a loan officer for their business
-// cold is a coin flip. Asking one week after they watched your evidence of
-// insurance land correct and early on a shared closing is a different
-// conversation entirely.
+// Two things about how realtors actually refer shape everything here.
+//
+// They call. They don't send a loan application, an insurance request, or any
+// document at all — they ring up and say a name. So nothing in this flow may
+// depend on a document arriving, and the loan officer's details can only come
+// from one place: asking the realtor.
+//
+// And the reason to ask is not "I'd like your business." It's that knowing the
+// loan officer lets the agent send the mortgage team their documents BEFORE
+// anyone requests them. A processor who receives a correct evidence of
+// insurance unprompted, days ahead of the file needing it, remembers the agent
+// who did that. The introduction is the by-product; being early is the point.
+//
+// Hence the sequence: ask the realtor on day one because it helps the closing,
+// deliver unprompted when the policy binds, and only then — once the loan
+// officer has actually watched the work — talk about working together.
 
 export type DealLender = {
   name?: string | null;
@@ -125,7 +135,58 @@ export async function recordLenderFromRealtorDeal(opts: {
   }
 }
 
-// ── The two asks ────────────────────────────────────────────────────────────
+// ── Step one: get the loan officer's details from the realtor ───────────────
+//
+// Short enough to send as a text, because that's how realtors answer. The ask
+// is framed entirely around their closing — an agent asking "who's the lender
+// so I can get them what they need" is helping; an agent asking "who's the
+// lender so I can pitch them" is asking for a favour. The first one gets
+// answered in four minutes.
+
+export function draftRealtorContactAsk(opts: {
+  realtorFirst: string;
+  clientName: string;
+  agentName: string;
+}): string {
+  return (
+    `Hi ${opts.realtorFirst} — got ${opts.clientName} and I'm on the quote.\n\n` +
+    `Who's handling their loan? If you can send me the loan officer's email (or their processor's), ` +
+    `I'll get the evidence of insurance straight to them as soon as it's issued instead of waiting ` +
+    `for someone to chase it. Saves a step at closing.\n\n` +
+    `Thanks — ${opts.agentName}`
+  );
+}
+
+// ── Step two: deliver before anyone asks ────────────────────────────────────
+//
+// The whole reason for step one. Links are signed per-document and expiring —
+// the loan officer is not a partner and must never receive a portal token.
+
+export function draftLenderDocs(opts: {
+  lenderFirst: string;
+  agentName: string;
+  agencyName: string;
+  clientName: string;
+  address: string | null;
+  realtorName: string;
+  closingDate: string | null;
+  docs: { label: string; url: string }[];
+}): string {
+  const where = opts.address ? ` at ${opts.address}` : "";
+  const closing = opts.closingDate ? ` closing ${opts.closingDate}` : "";
+  const list = opts.docs.map((d) => `${d.label}: ${d.url}`).join("\n");
+
+  return (
+    `Hi ${opts.lenderFirst},\n\n` +
+    `I'm the insurance agent on ${opts.clientName}${where}${closing} — ${opts.realtorName} connected us.\n\n` +
+    `The policy is bound and here's everything for your file, ahead of the request:\n\n${list}\n\n` +
+    `If your processor needs the mortgagee clause worded differently, a different effective date, or ` +
+    `anything else adjusted to match the file, reply here and I'll reissue it the same day.\n\n` +
+    `${opts.agentName}\n${opts.agencyName}`
+  );
+}
+
+// ── Step three: only once they've seen the work ─────────────────────────────
 
 export function draftLenderIntro(opts: {
   agentName: string;
@@ -139,7 +200,7 @@ export function draftLenderIntro(opts: {
 }): string {
   const where = opts.address ? ` on ${opts.address}` : "";
   const proof = opts.bound
-    ? `I handled the insurance for ${opts.clientName}${where} — evidence of insurance went out ahead of closing with the mortgagee clause and loan number already matched to your file.`
+    ? `I handled the insurance for ${opts.clientName}${where} — you should already have the evidence of insurance; I sent it over as soon as it was issued rather than waiting for the request.`
     : `I'm handling the insurance for ${opts.clientName}${where}, so we're on the same file this month.`;
 
   return (
@@ -160,9 +221,9 @@ export function draftRealtorAsk(opts: {
 }): string {
   return (
     `Hi ${opts.realtorFirst},\n\n` +
-    `Quick favour — I've got ${opts.clientName} handled on the insurance side. ` +
+    `Quick favour — I've got ${opts.clientName} handled on the insurance side and their documents are already with the lender. ` +
     `Would you mind introducing me to ${opts.lenderLabel}? ` +
-    `If I'm connected to the loan officer directly I can get them the evidence of insurance the moment it's issued instead of routing it through you, which takes one more thing off your plate on this closing and the next one.\n\n` +
+    `Being connected to the loan officer directly means I can keep doing what I did on this one — getting them the evidence of insurance before anybody has to ask — which takes a step off your plate on the next closing too.\n\n` +
     `A one-line email is all it takes. Thanks either way.\n\n` +
     `${opts.agentName}`
   );

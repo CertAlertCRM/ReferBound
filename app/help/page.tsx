@@ -264,12 +264,20 @@ export default function HelpPage() {
               person who knows all three of you.
             </p>
             <p>
-              Their portal asks who&apos;s handling the loan (the honest reason: so you can send
-              documents straight to the lender instead of routing them through the realtor), and the
-              deal grows a panel with two drafts — a note to that loan officer, or a request that
-              the realtor introduce you. Both wait until the file is <em>covered</em>, because a
-              loan officer who just watched your EOI land correct and early is a different
-              conversation from a cold one. Nothing sends; you read and edit first.
+              Realtors refer by phone. No loan application, no insurance request — just a call with
+              a name. So the deal page asks you one thing: who&apos;s handling the loan? It drafts
+              a short message asking the realtor for the loan officer&apos;s email, and the reason
+              it gives is the true one — you want to get the mortgage team their documents without
+              them having to chase you. That&apos;s an easy yes, because it helps the realtor&apos;s
+              closing.
+            </p>
+            <p>
+              Once the policy binds and the EOI is uploaded, one button drafts the hand-off to that
+              loan officer with signed download links attached. Sending it before anyone asks is the
+              whole play: a processor who receives a correct evidence of insurance days early
+              remembers who sent it. Only after that does the panel offer the partnership
+              conversation — either a note to the loan officer or a request that the realtor
+              introduce you. Nothing sends on its own; you read and edit every one.
             </p>
           </Item>
 
