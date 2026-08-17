@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES } from "@/lib/config";
 import { getAccount, partnerCapacity, countPartners, isLenderType } from "@/lib/account";
+import { normalizeRequirements } from "@/lib/requirements";
 
 // Agent-only (protected by middleware): edit a partner's name / notification emails.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -54,19 +55,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("monthly_summary" in body) {
     patch.monthly_summary = Boolean(body.monthly_summary);
   }
-  // What this lender requires — entered once, checked against every EOI.
+  // What this lender requires. The partner owns this from their own portal —
+  // this path is the fallback for partners who never open it, and it writes
+  // through the same normalizer so both sides produce one predictable shape.
+  // (The old agent-only writer stored flood_required as a BOOLEAN while the
+  // sheet parser stored it as a STRING; whichever wrote last won.)
   if ("requirements" in body) {
-    const r = body.requirements ?? {};
-    const clean = {
-      mortgagee_clause: String(r.mortgagee_clause ?? "").trim().slice(0, 500) || null,
-      max_wind_deductible: String(r.max_wind_deductible ?? "").trim().slice(0, 60) || null,
-      min_liability: String(r.min_liability ?? "").trim().slice(0, 60) || null,
-      flood_required: Boolean(r.flood_required),
-      notes: String(r.notes ?? "").trim().slice(0, 500) || null,
-    };
-    const empty =
-      !clean.mortgagee_clause && !clean.max_wind_deductible && !clean.min_liability && !clean.flood_required && !clean.notes;
-    patch.requirements = empty ? null : clean;
+    patch.requirements = normalizeRequirements(body.requirements, { source: "agent" });
   }
   if ("thankyou_cadence" in body) {
     const cadence = String(body.thankyou_cadence ?? "off");

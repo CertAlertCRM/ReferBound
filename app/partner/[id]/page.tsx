@@ -72,7 +72,8 @@ export default function PartnerWorkspacePage() {
     mortgagee_clause: "",
     max_wind_deductible: "",
     min_liability: "",
-    flood_required: false,
+    max_aop_deductible: "",
+    flood_required: "",
     notes: "",
   });
   const [editRecap, setEditRecap] = useState(true);
@@ -222,7 +223,10 @@ export default function PartnerWorkspacePage() {
       mortgagee_clause: rq.mortgagee_clause ?? "",
       max_wind_deductible: rq.max_wind_deductible ?? "",
       min_liability: rq.min_liability ?? "",
-      flood_required: Boolean(rq.flood_required),
+      max_aop_deductible: rq.max_aop_deductible ?? "",
+      // Historically a checkbox; the value is a sentence now because "always"
+      // and "only in Zone A" are different rules.
+      flood_required: typeof rq.flood_required === "string" ? rq.flood_required : rq.flood_required ? "Required when the property is in a flood zone" : "",
       notes: rq.notes ?? "",
     });
     setReqOpen(false);
@@ -584,7 +588,9 @@ export default function PartnerWorkspacePage() {
                           <span className="badge bg-emerald-50 text-emerald-700 ml-2">on file</span>
                         )}
                         <span className="text-xs text-ink-muted block">
-                          Optional. Enter once — every EOI you send them gets checked against it.
+                          Theirs to keep current — they can set these from their own portal, which
+                          is where the caps and the flood rule actually change. Fill it in yourself
+                          only if they won&apos;t.
                         </span>
                       </span>
                       <span className="link !text-xs shrink-0">{reqOpen ? "Hide" : "Open"}</span>
@@ -615,16 +621,19 @@ export default function PartnerWorkspacePage() {
                             value={req.min_liability}
                             onChange={(e) => setReq({ ...req, min_liability: e.target.value })}
                           />
-                        </div>
-                        <label className="flex items-center gap-2 cursor-pointer text-xs text-ink-secondary">
                           <input
-                            type="checkbox"
-                            className="accent-brand"
-                            checked={req.flood_required}
-                            onChange={(e) => setReq({ ...req, flood_required: e.target.checked })}
+                            className="input !py-2 text-sm"
+                            placeholder="Max all-other-perils deductible"
+                            value={req.max_aop_deductible}
+                            onChange={(e) => setReq({ ...req, max_aop_deductible: e.target.value })}
                           />
-                          Requires flood coverage when the property is in a flood zone
-                        </label>
+                          <input
+                            className="input !py-2 text-sm"
+                            placeholder="Flood — when required? (e.g. Zone A or V)"
+                            value={req.flood_required}
+                            onChange={(e) => setReq({ ...req, flood_required: e.target.value })}
+                          />
+                        </div>
                         <input
                           className="input !py-2 text-sm"
                           placeholder="Anything else they always ask for"

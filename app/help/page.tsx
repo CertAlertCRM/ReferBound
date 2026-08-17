@@ -292,8 +292,15 @@ export default function HelpPage() {
             <p>
               Each deal then gets the right clause. Most of the time it&apos;s matched automatically
               from the loan type or investor named on the file; when it&apos;s a guess it says so,
-              and when a processor sets one by hand nothing overwrites it. They can upload their
-              insurance requirements the same way, and every EOI you send gets checked against them.
+              and when a processor sets one by hand nothing overwrites it.
+            </p>
+            <p>
+              Their portal also has a <strong className="text-ink">requirements</strong> panel —
+              deductible caps, liability minimum, the flood rule, anything that gets a file kicked
+              back. They can type it or upload the sheet they already publish and have it read,
+              reviewing every line before it saves. From then on the pre-delivery check measures
+              your EOI against what they actually require rather than against what anyone
+              remembered.
             </p>
           </Item>
 
@@ -330,11 +337,12 @@ export default function HelpPage() {
               don&apos;t service renewals here.
             </p>
             <p>
-              <strong className="text-ink">Their requirements, on file.</strong> In a partner&apos;s
-              Edit panel there&apos;s an optional &ldquo;Their requirements&rdquo; section — the
-              exact mortgagee clause, deductible caps, flood rule. Enter it once and every EOI you
-              ever send that partner gets checked against it, even on deals where they never sent
-              you a document.
+              <strong className="text-ink">Their requirements, in their words.</strong> Each
+              lender sets their own insurance requirements from their portal — the exact mortgagee
+              clause, deductible caps, liability minimum, flood rule. Every EOI you send them is
+              then checked against it, even on deals where they never sent you a document. You can
+              still fill it in yourself from their Edit panel for partners who won&apos;t, but the
+              caps and the flood rule change on their side, so it&apos;s better kept by them.
             </p>
             <p>
               <strong className="text-ink">Coverage records.</strong> Under Log a touch you can

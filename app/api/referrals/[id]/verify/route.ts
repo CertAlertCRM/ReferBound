@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { clauseForReferral } from "@/lib/clauses";
+import { normalizeRequirements, requirementLines } from "@/lib/requirements";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { DOC_KINDS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
@@ -42,16 +43,22 @@ Check these, and only these:
 - dwelling_coverage: if both an RCE replacement cost and a Coverage A limit are
   present, is Coverage A at least the replacement cost? Below it is a warning.
 
-When "lenderRequirements" is supplied, treat it as this lender's stated policy
-and check the agent's documents against it directly — it outranks anything
-inferred from a document:
-- mortgagee_clause: the EOI must carry this wording. Wrong company or wrong
-  address is a blocker; a missing ISAOA/ATIMA when the lender specifies it is a
-  blocker. Line breaks and comma placement are not.
-- max_wind_deductible: a wind/hurricane deductible ABOVE their cap is a blocker.
-- min_liability: liability below their minimum is a blocker.
-- flood_required: if the documents show the property in a flood zone (Zone A or
-  V, any SFHA reference) and no flood coverage appears, that's a blocker.
+When a LENDER'S STATED REQUIREMENTS block is supplied, it is the authority.
+The lender wrote it themselves and it outranks anything inferred from any
+document. Check the agent's documents against EVERY line of it:
+- the mortgagee clause must appear on the EOI as written. Wrong company or
+  wrong address is a blocker; a missing ISAOA/ATIMA when they specify it is a
+  blocker. Line breaks, comma placement and abbreviations are not.
+- a deductible ABOVE a stated cap is a blocker; liability BELOW a stated
+  minimum is a blocker.
+- a flood rule applies only when the documents show the stated trigger (a
+  zone, a determination, a property type). If the trigger is shown and no
+  flood coverage appears, that's a blocker. If the documents don't show
+  whether the trigger applies, that requirement is UNCHECKED, not a finding.
+- a stated condition that plainly doesn't apply to this file is not a finding.
+- if a requirement can't be evaluated because the documents don't show the
+  relevant value, list it under "unchecked" naming the requirement. Never
+  guess, and never treat an unverifiable requirement as satisfied.
 
 When "closingDate" is supplied and the EOI's effective date falls AFTER it,
 that's a blocker — the closing date may have moved after the policy was issued.
@@ -101,11 +108,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   // a partner's single saved clause was wrong the moment a shop had more than
   // one investor.
   const applicable = await clauseForReferral(referral.id);
-  const baseReq = (referral as any).partners?.requirements ?? null;
+  // The lender's own stated requirements, plus the clause that applies to THIS
+  // file — the processor's designation beats the partner's default, because a
+  // shop with more than one investor has more than one clause.
+  const baseReq = normalizeRequirements((referral as any).partners?.requirements);
   const requirements =
     applicable.text || baseReq
-      ? { ...(baseReq ?? {}), mortgagee_clause: applicable.text ?? baseReq?.mortgagee_clause ?? null }
+      ? normalizeRequirements({
+          ...(baseReq ?? {}),
+          mortgagee_clause: applicable.text ?? baseReq?.mortgagee_clause ?? null,
+        })
       : null;
+  const reqLines = requirementLines(requirements);
 
   const { data: docs } = await db()
     .from("documents")
@@ -130,7 +144,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json(
       {
         error:
-          "Nothing to check against yet. Either upload what your partner sent (loan application, insurance request, mortgagee clause), or save their requirements once in the partner's Edit panel and every future EOI gets checked automatically.",
+          "Nothing to check against yet. Either upload what your partner sent (loan application, insurance request, mortgagee clause), or ask them to set their requirements in their portal — once they have, every future EOI is checked against them automatically.",
       },
       { status: 400 }
     );
@@ -155,6 +169,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "Couldn't read those files (too large or unsupported)." }, { status: 400 });
   }
 
+  // The lender's requirements get their own block, in the lender's own words.
+  // Burying them inside a JSON blob alongside client details made them read as
+  // one more field rather than as the standard the documents are judged by.
+  if (reqLines.length > 0) {
+    content.push({
+      type: "text",
+      text:
+        `--- LENDER'S STATED REQUIREMENTS (written by ${(referral as any).partners?.name ?? "the lender"}) ---\n` +
+        reqLines.join("\n"),
+    });
+  }
+
   // What ReferBound already knows — helps catch a co-borrower the agent
   // recorded but the policy omits.
   content.push({
@@ -164,7 +190,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       coborrower_name: referral.coborrower_name,
       property_address: referral.property_address,
       closingDate: referral.closing_date,
-      lenderRequirements: requirements,
     })}`,
   });
 
@@ -186,7 +211,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     warnings: findings.length - blockers,
     comparedAgainst: [
       ...lenderDocs.map((d) => DOC_KINDS[d.kind] ?? d.kind),
-      ...(requirements ? [`${(referral as any).partners?.name ?? "the partner"}'s saved requirements`] : []),
+      ...(reqLines.length
+        ? [
+            `${(referral as any).partners?.name ?? "the partner"}'s requirements (${reqLines.length} rule${reqLines.length === 1 ? "" : "s"}${
+              requirements?._source === "partner" ? ", set by them" : ""
+            })`,
+          ]
+        : []),
     ],
     checkedDocs: agentDocs.map((d) => DOC_KINDS[d.kind] ?? d.kind),
     at: new Date().toISOString(),

@@ -9,6 +9,7 @@ import { themeStyle } from "@/lib/themes";
 import { ShareCard } from "./share-card";
 import { HubCard } from "./hub-card";
 import { DocDesk } from "./doc-desk";
+import { RequirementsPanel } from "./requirements";
 import { ClosingDateEdit } from "./closing-date";
 import { FeedbackWidget } from "../../feedback-widget";
 import { PartnerSubmitForm } from "./submit-form";
@@ -527,6 +528,11 @@ export default async function PartnerPortal({ params }: { params: { token: strin
           })()}
         </div>
       )}
+
+      {/* The lender's own requirements, maintained by the lender. The agent
+          used to type these from memory; the people who enforce them for a
+          living keep them now. */}
+      {fullTrack && <RequirementsPanel token={partner.token} agentName={agentName} />}
 
       {/* Processors live here — it jumps to the top for them, and sits below
           the pipeline for everyone else. */}

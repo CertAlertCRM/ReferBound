@@ -35,9 +35,7 @@ type Candidate = {
 export function ClauseLibrary({ token }: { token: string }) {
   const [open, setOpen] = useState(false);
   const [clauses, setClauses] = useState<Clause[]>([]);
-  const [reqs, setReqs] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"clauses" | "requirements">("clauses");
   const [paste, setPaste] = useState("");
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState("");
@@ -48,8 +46,6 @@ export function ClauseLibrary({ token }: { token: string }) {
     if (!r.ok) return;
     const j = await r.json();
     setClauses(j.clauses ?? []);
-    const latestReq = (j.files ?? []).find((f: any) => f.kind === "requirements");
-    setReqs(latestReq?.parsed ?? null);
   }
   useEffect(() => {
     load();
@@ -62,7 +58,7 @@ export function ClauseLibrary({ token }: { token: string }) {
     const fd = new FormData();
     if (file) fd.append("file", file);
     if (paste.trim()) fd.append("text", paste);
-    fd.append("kind", mode === "requirements" ? "requirements" : "clause_list");
+    fd.append("kind", "clause_list");
 
     const res = await fetch(`/api/p/${token}/clauses`, { method: "PUT", body: fd });
     setBusy(false);
@@ -70,14 +66,7 @@ export function ClauseLibrary({ token }: { token: string }) {
       setError((await res.json()).error ?? "Couldn't read that");
       return;
     }
-    const j = await res.json();
-    if (mode === "requirements") {
-      setReqs(j.requirements);
-      setPaste("");
-      load();
-    } else {
-      setCandidates(j.candidates ?? []);
-    }
+    setCandidates((await res.json()).candidates ?? []);
   }
 
   async function saveCandidates() {
@@ -123,7 +112,7 @@ export function ClauseLibrary({ token }: { token: string }) {
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">Your clauses &amp; requirements</p>
+          <p className="text-sm font-semibold">Your mortgagee clauses</p>
           <p className="text-[11px] text-ink-secondary mt-0.5 max-w-lg">
             Upload the sheet you already keep — spreadsheet, PDF, or a photo of the printed one.
             We&apos;ll read it, and from then on the right clause lands on each file on its own.
@@ -134,27 +123,8 @@ export function ClauseLibrary({ token }: { token: string }) {
         </button>
       </div>
 
-      <div className="flex gap-1">
-        {(["clauses", "requirements"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => {
-              setMode(m);
-              setCandidates(null);
-              setError("");
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              mode === m ? "bg-brand text-white" : "text-ink-secondary hover:bg-white"
-            }`}
-          >
-            {m === "clauses" ? "Mortgagee clauses" : "Insurance requirements"}
-          </button>
-        ))}
-      </div>
-
       {/* Existing library */}
-      {mode === "clauses" && clauses.length > 0 && !candidates && (
+      {clauses.length > 0 && !candidates && (
         <ul className="space-y-1.5">
           {clauses.map((c) => (
             <li key={c.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
@@ -257,32 +227,12 @@ export function ClauseLibrary({ token }: { token: string }) {
         </div>
       )}
 
-      {/* Requirements summary */}
-      {mode === "requirements" && reqs && (
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-          <p className="text-xs font-semibold">On file</p>
-          <p className="text-[11px] text-ink-secondary mt-1">{reqs.summary ?? "Saved."}</p>
-          <ul className="text-[11px] text-ink-secondary mt-1.5 space-y-0.5">
-            {reqs.min_liability && <li>Minimum liability: {reqs.min_liability}</li>}
-            {reqs.max_wind_deductible && <li>Max wind/hail deductible: {reqs.max_wind_deductible}</li>}
-            {reqs.max_aop_deductible && <li>Max all-other-perils deductible: {reqs.max_aop_deductible}</li>}
-            {reqs.flood_required && <li>Flood: {reqs.flood_required}</li>}
-            {(reqs.conditions ?? []).map((c: string, i: number) => (
-              <li key={i}>{c}</li>
-            ))}
-          </ul>
-          <p className="text-[10px] text-ink-muted mt-2">
-            Every policy is checked against these before documents go out.
-          </p>
-        </div>
-      )}
-
       {/* Import */}
       {!candidates && (
         <div className="space-y-2">
           <label className="btn-ghost !py-2 text-xs cursor-pointer inline-flex">
             <IconUpload size={13} />
-            {busy ? "Reading…" : mode === "clauses" ? "Upload your clause sheet" : "Upload your requirements"}
+            {busy ? "Reading…" : "Upload your clause sheet"}
             <input
               type="file"
               className="hidden"
@@ -298,11 +248,7 @@ export function ClauseLibrary({ token }: { token: string }) {
           <p className="text-[11px] text-ink-muted">or paste it:</p>
           <textarea
             className="input !py-2 !text-xs min-h-[80px] font-sans"
-            placeholder={
-              mode === "clauses"
-                ? "Paste your clause list — any format, we'll sort it out"
-                : "Paste your insurance requirements"
-            }
+            placeholder="Paste your clause list — any format, we'll sort it out"
             value={paste}
             onChange={(e) => setPaste(e.target.value)}
           />
