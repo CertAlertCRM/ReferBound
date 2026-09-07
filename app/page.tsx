@@ -86,6 +86,7 @@ export default function Dashboard() {
   const [inboxPending, setInboxPending] = useState(0);
 
   const formOpenedAt = useRef<number>(0);
+  const addFormRef = useRef<HTMLFormElement>(null);
   const EMPTY_LEAD = {
     client_name: "",
     coborrower_name: "",
@@ -172,6 +173,20 @@ export default function Dashboard() {
     formOpenedAt.current = Date.now();
     setShowAdd(true);
   }
+
+  // The form opens below the stat tiles, which on a laptop puts it under the
+  // fold — a producer clicks "Log lead" and the page appears not to react.
+  // Scrolling to it beats adding a control that tells them to scroll.
+  useEffect(() => {
+    if (!showAdd) return;
+    const el = addFormRef.current;
+    if (!el) return;
+    const t = setTimeout(
+      () => el.scrollIntoView({ behavior: "smooth", block: "start" }),
+      50
+    );
+    return () => clearTimeout(t);
+  }, [showAdd]);
 
   async function saveLead(e: React.FormEvent) {
     e.preventDefault();
@@ -416,7 +431,7 @@ export default function Dashboard() {
         </div>
 
         {showAdd && (
-          <form onSubmit={saveLead} className="card p-5 space-y-4">
+          <form ref={addFormRef} onSubmit={saveLead} className="card p-5 space-y-4 scroll-mt-20">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold">New referral</h2>
               <button type="button" className="text-sm text-ink-muted hover:text-ink" onClick={() => setShowAdd(false)}>
@@ -481,7 +496,11 @@ export default function Dashboard() {
                   </optgroup>
                 )}
                 {pastClients.length > 0 && (
-                  <option value="__client">A past client sent them…</option>
+                  // Its own group on purpose. As a bare option it sat flush
+                  // under the partner list and read as one more partner.
+                  <optgroup label="Word of mouth">
+                    <option value="__client">A past client sent them…</option>
+                  </optgroup>
                 )}
               </select>
               {clientMode && (

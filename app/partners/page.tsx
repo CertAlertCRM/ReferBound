@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
@@ -34,6 +34,7 @@ type Partner = {
   monthly_summary: boolean;
   thankyou_cadence: string;
   short_code: string | null;
+  created_at?: string | null;
   referrals: { count: number }[];
   stats?: PartnerStats;
 };
@@ -135,6 +136,31 @@ export default function PartnersPage() {
     const res = await fetch("/api/partners");
     if (res.ok) setPartners((await res.json()).partners ?? []);
   }
+
+  // Lead sources first.
+  //
+  // For an agency buying twenty leads a day, the vendor is the row they look
+  // at most and the one carrying the money. Relationships are the long game
+  // and they keep their order underneath. Within each group, whatever has
+  // produced the most sits highest — a card with nothing behind it has
+  // nothing to say.
+  const ordered = useMemo(() => {
+    const rank = (p: Partner) => ((p.source_kind ?? "partner") === "paid" ? 0 : 1);
+    return [...partners].sort((a, b) => {
+      if (rank(a) !== rank(b)) return rank(a) - rank(b);
+      const at = a.stats?.total ?? 0;
+      const bt = b.stats?.total ?? 0;
+      if (at !== bt) return bt - at;
+      return (a.created_at ?? "").localeCompare(b.created_at ?? "");
+    });
+  }, [partners]);
+
+  const mixed = useMemo(
+    () =>
+      partners.some((p) => (p.source_kind ?? "partner") === "paid") &&
+      partners.some((p) => (p.source_kind ?? "partner") !== "paid"),
+    [partners]
+  );
 
   // Close the action menu on any click outside it, or on Escape. A fixed
   // backdrop can't be used here: an ancestor with a blur filter becomes the
@@ -559,16 +585,28 @@ export default function PartnersPage() {
         )}
 
         <div className="space-y-3">
-          {partners.map((p) => {
+          {ordered.map((p, i) => {
             const s = p.stats ?? EMPTY_STATS;
             const since = sinceLabel(s.lastAt);
             // A lead vendor has nothing to look at and no reason to log in.
             // Offering one a magic link would be absurd, so the whole portal
             // surface disappears for them.
             const isPaid = (p.source_kind ?? "partner") === "paid";
+            // Section heading on the first card of each kind. Only when both
+            // kinds exist — a single unlabelled list needs no labels.
+            const prev = i > 0 ? (ordered[i - 1].source_kind ?? "partner") === "paid" : null;
+            const heading =
+              mixed && (i === 0 || prev !== isPaid)
+                ? isPaid
+                  ? "Lead sources"
+                  : "Referral partners"
+                : null;
             return (
+            <div key={p.id}>
+              {heading && (
+                <p className="section-label mb-2 mt-1 first:mt-0">{heading}</p>
+              )}
             <div
-              key={p.id}
               className={`card p-5 transition-shadow ${
                 editingId === p.id ? "" : "hover:shadow-lift"
               }`}
@@ -956,6 +994,7 @@ export default function PartnersPage() {
                   )}
                 </div>
               )}
+            </div>
             </div>
             );
           })}
