@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     db()
       .from("referrals")
       .select(
-        "id, client_name, closing_date, status, account_id, partners(name, token, emails), partner_contacts(email)"
+        "id, client_name, closing_date, status, account_id, partners!referrals_partner_id_fkey(name, token, emails), partner_contacts(email)"
       )
       .not("closing_date", "is", null)
       .gte("closing_date", iso(today))
@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
     const closingRead = await fetchAll<any>((from, to) =>
       db()
         .from("referrals")
-        .select("id, client_name, closing_date, status, partner_id, partners(name, token, emails)")
+        .select("id, client_name, closing_date, status, partner_id, partners!referrals_partner_id_fkey(name, token, emails)")
         .not("closing_date", "is", null)
         .gte("closing_date", iso(today))
         .lte("closing_date", iso(horizon14))

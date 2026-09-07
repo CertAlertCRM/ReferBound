@@ -326,7 +326,7 @@ export async function POST(req: NextRequest) {
   // have to learn which door a lead came through.
   const { data: full } = await db()
     .from("referrals")
-    .select("*, partners(name, token, emails)")
+    .select("*, partners!referrals_partner_id_fkey(name, token, emails)")
     .eq("id", referral.id)
     .maybeSingle();
   if (full) await fireWebhook(account.id, "referral.created", full, (full as any).partners);

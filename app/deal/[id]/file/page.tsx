@@ -29,7 +29,7 @@ export default async function DealFilePage({ params }: { params: { id: string } 
 
   const { data: referral } = await db()
     .from("referrals")
-    .select("*, partners(name), partner_contacts(name, email), documents(kind, file_name, created_at, uploaded_by, purged_at, carrier_name, effective_start, effective_end)")
+    .select("*, partners!referrals_partner_id_fkey(name), partner_contacts(name, email), documents(kind, file_name, created_at, uploaded_by, purged_at, carrier_name, effective_start, effective_end)")
     .eq("id", params.id)
     .maybeSingle();
   if (!referral) notFound();

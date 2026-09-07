@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   let query = db()
     .from("referrals")
-    .select("*, partners(name, partner_type)")
+    .select("*, partners!referrals_partner_id_fkey(name, partner_type)")
     .eq("account_id", account.id)
     .order("created_at", { ascending: false });
   if (scope === "new") query = query.is("exported_at", null);

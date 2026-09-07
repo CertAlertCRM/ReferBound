@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: referral } = await db()
     .from("referrals")
-    .select("id, client_name, status, partners(name, emails), partner_contacts(name, email)")
+    .select("id, client_name, status, partners!referrals_partner_id_fkey(name, emails), partner_contacts(name, email)")
     .eq("id", params.id)
     .eq("account_id", account.id)
     .maybeSingle();

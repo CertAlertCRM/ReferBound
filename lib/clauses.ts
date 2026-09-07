@@ -216,7 +216,7 @@ export async function clauseForReferral(referralId: string): Promise<{
 }> {
   const { data: r } = await db()
     .from("referrals")
-    .select("mortgagee_clause_id, clause_source, partner_id, partners(requirements)")
+    .select("mortgagee_clause_id, clause_source, partner_id, partners!referrals_partner_id_fkey(requirements)")
     .eq("id", referralId)
     .maybeSingle();
   if (!r) return { text: null, label: null, source: null };

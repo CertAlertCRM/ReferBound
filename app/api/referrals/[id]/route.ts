@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(patch)
     .eq("id", params.id)
     .eq("account_id", account.id)
-    .select("*, partners(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in, notify_channel), documents(id, kind, file_name, purged_at)")
+    .select("*, partners!referrals_partner_id_fkey(name, partner_type, token, emails), partner_contacts(name, email, phone, sms_opt_in, notify_channel), documents(id, kind, file_name, purged_at)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

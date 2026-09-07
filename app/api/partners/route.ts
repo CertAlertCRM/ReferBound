@@ -12,9 +12,9 @@ export async function GET() {
   // feature, and a feature must not be able to take the partners list down.
   // Try the full select, fall back to the set that has always existed.
   const BASE =
-    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, created_at, referrals(count)";
+    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, created_at, referrals!referrals_partner_id_fkey(count)";
   const WITH_SOURCES =
-    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, source_kind, monthly_spend_cents, created_at, referrals(count)";
+    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, source_kind, monthly_spend_cents, created_at, referrals!referrals_partner_id_fkey(count)";
 
   let { data, error } = await db()
     .from("partners")

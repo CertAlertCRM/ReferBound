@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const { data: referral } = await db()
     .from("referrals")
-    .select("id, partner_id, partners(partner_type)")
+    .select("id, partner_id, partners!referrals_partner_id_fkey(partner_type)")
     .eq("id", params.id)
     .eq("account_id", account.id)
     .maybeSingle();
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data: referral } = await db()
     .from("referrals")
     .select(
-      "id, client_name, property_address, closing_date, status, deal_lender, partners(id, name, partner_type)"
+      "id, client_name, property_address, closing_date, status, deal_lender, partners!referrals_partner_id_fkey(id, name, partner_type)"
     )
     .eq("id", params.id)
     .eq("account_id", account.id)

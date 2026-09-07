@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const { data: referrals } = await s
     .from("referrals")
-    .select("id, status, source, log_seconds, created_at, premium, partner_id, backfilled, partners(name)")
+    .select("id, status, source, log_seconds, created_at, premium, partner_id, backfilled, partners!referrals_partner_id_fkey(name)")
     .eq("account_id", account.id);
   const allRefs = referrals ?? [];
   const liveCount = allRefs.filter((r) => !(r as any).backfilled).length;

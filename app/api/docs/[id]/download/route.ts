@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: doc, error } = await db()
     .from("documents")
-    .select("id, storage_path, file_name, referrals(account_id, partners(token))")
+    .select("id, storage_path, file_name, referrals(account_id, partners!referrals_partner_id_fkey(token))")
     .eq("id", params.id)
     .single();
   if (error || !doc) return NextResponse.json({ error: "not found" }, { status: 404 });

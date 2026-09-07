@@ -29,7 +29,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const [{ data: referral }, { data: msgs }, { data: activity }, { data: prof }] = await Promise.all([
     db()
       .from("referrals")
-      .select("client_name, status, closing_date, property_address, notes, partners(name)")
+      .select("client_name, status, closing_date, property_address, notes, partners!referrals_partner_id_fkey(name)")
       .eq("id", params.id)
       .single(),
     db()

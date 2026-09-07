@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: referral } = await db()
     .from("referrals")
-    .select("id, client_name, partners(name, token, emails), partner_contacts(name, email)")
+    .select("id, client_name, partners!referrals_partner_id_fkey(name, token, emails), partner_contacts(name, email)")
     .eq("id", params.id)
     .single();
   if (!referral) return NextResponse.json({ error: "not found" }, { status: 404 });
