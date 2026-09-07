@@ -28,8 +28,40 @@ export type Account = {
 // Accounts created before this instant keep the old, wider free tier forever.
 export const LEGACY_BEFORE = "2026-09-08T00:00:00.000Z";
 
+// Fails OPEN. If we cannot tell when an account was created, it is treated as
+// legacy and nothing is gated. A pricing flag must never be the reason someone
+// loses access to their own book — being unable to charge is a smaller problem
+// than being unable to sign in.
 function isLegacy(createdAt: string | null | undefined): boolean {
-  return !!createdAt && createdAt < LEGACY_BEFORE;
+  if (!createdAt) return true;
+  return createdAt < LEGACY_BEFORE;
+}
+
+const ACCOUNT_COLS =
+  "id, email, display_name, plan, stripe_customer_id, subscription_status, team_owner_id, pro_until";
+
+// Read an account, tolerating a database that does not have created_at.
+//
+// The hard lesson behind this: adding one column to this select put it on the
+// authentication path for every request in the product. If the column is not
+// there, the select fails, this returns null, and every API in the app answers
+// 401 — which looks exactly like all of a user's data disappearing. Nothing
+// needed for a plan gate is worth that, so the gating column is optional and
+// its absence costs only the gate.
+async function readAccount(id: string): Promise<any | null> {
+  const { data, error } = await db()
+    .from("accounts")
+    .select(`${ACCOUNT_COLS}, created_at`)
+    .eq("id", id)
+    .maybeSingle();
+  if (!error) return data;
+  console.error("accounts select with created_at failed, retrying without:", error.message);
+  const { data: fallback } = await db()
+    .from("accounts")
+    .select(ACCOUNT_COLS)
+    .eq("id", id)
+    .maybeSingle();
+  return fallback ? { ...fallback, created_at: null } : null;
 }
 
 // Pro earned through referrals (or a welcome window) still counts as Pro for
@@ -46,19 +78,11 @@ function effectivePlan(plan: string, proUntil: string | null): string {
 export async function getAccount(): Promise<Account | null> {
   const id = currentAccountId();
   if (!id) return null;
-  const { data: self } = await db()
-    .from("accounts")
-    .select("id, email, display_name, plan, stripe_customer_id, subscription_status, team_owner_id, pro_until, created_at")
-    .eq("id", id)
-    .maybeSingle();
+  const self = await readAccount(id);
   if (!self) return null;
 
   if (self.team_owner_id) {
-    const { data: owner } = await db()
-      .from("accounts")
-      .select("id, email, plan, stripe_customer_id, subscription_status, pro_until, created_at")
-      .eq("id", self.team_owner_id)
-      .maybeSingle();
+    const owner = await readAccount(self.team_owner_id);
     if (owner) {
       return {
         id: owner.id,
