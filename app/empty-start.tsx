@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { DemoCard } from "./demo-card";
-import { IconArrowRight, IconUsers } from "./icons";
+import { IconArrowRight, IconUsers, IconZap } from "./icons";
 
 // The first screen of an agent with no partners.
 //
-// Two honest paths, because there are two honest situations. Someone has sent
-// them a client before — in which case the fastest route to a product that
-// means anything is to get that history in. Or nobody has, in which case the
-// problem isn't tracking, it's the conversation they haven't had yet, and what
-// they need is something to bring to it.
+// Three honest paths, because there are three honest situations — and the one
+// added last is the one most new producers are actually in. They have no
+// partners and nobody has ever sent them a client; they buy leads and work
+// them. The old version opened by describing a product for somebody else,
+// which is the worst possible first sentence.
+//
+// It matters mechanically too, not just tonally: "Referred by" is a required
+// field and it only lists sources that exist, so a producer with no sources
+// cannot log their first deal at all until they add one.
 //
 // Deliberately not a checklist. A new agent staring at six setup tasks closes
 // the tab.
@@ -23,8 +27,8 @@ export function EmptyStart({ agentFirstName }: { agentFirstName?: string | null 
           {agentFirstName ? `Let's get you started, ${agentFirstName}` : "Let's get you started"}
         </h2>
         <p className="text-sm text-ink-secondary mt-1 max-w-xl">
-          ReferBound organizes the clients your referral partners send you. Two ways in, depending
-          on where you are.
+          ReferBound tracks where your business comes from — and turns the clients you write into
+          the next ones. Start wherever you actually are.
         </p>
       </div>
 
@@ -42,6 +46,26 @@ export function EmptyStart({ agentFirstName }: { agentFirstName?: string | null 
           </span>
           <span className="link !text-xs mt-2 inline-flex">
             Start here <IconArrowRight size={12} />
+          </span>
+        </span>
+      </Link>
+
+      <Link
+        href="/partners?source=paid"
+        className="card card-hover p-5 sm:p-6 flex items-start gap-3 block"
+      >
+        <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 grid place-items-center shrink-0">
+          <IconZap size={17} />
+        </span>
+        <span className="min-w-0">
+          <span className="font-semibold block">I&apos;m working leads I pay for</span>
+          <span className="text-sm text-ink-secondary block mt-1 max-w-xl">
+            Add the vendor you buy from, then log the ones you win. Every client you write is
+            somebody who can send you the next one, and this is where you&apos;ll see who
+            you&apos;ve asked and who you haven&apos;t.
+          </span>
+          <span className="link !text-xs mt-2 inline-flex">
+            Add my lead source <IconArrowRight size={12} />
           </span>
         </span>
       </Link>

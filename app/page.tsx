@@ -95,16 +95,8 @@ export default function Dashboard() {
     partner_id: "",
     closing_date: "",
     notes: "",
-    // Where the deal already stands. Almost always "new" — but a producer
-    // recording a data lead they already sold should not have to replay the
-    // pipeline to get it on the board, because walking the status is what
-    // fires partner notifications about business that closed weeks ago.
-    status: "new",
-    premium: "",
   };
   const [form, setForm] = useState({ ...EMPTY_LEAD });
-  // Hidden until asked for. The default form is unchanged for the daily case.
-  const [alreadyWorked, setAlreadyWorked] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -177,7 +169,6 @@ export default function Dashboard() {
     }
     setSaving(false);
     setForm({ ...EMPTY_LEAD, partner_id: form.partner_id });
-    setAlreadyWorked(false);
     setPendingFile(null);
     setShowAdd(false);
     load();
@@ -385,7 +376,7 @@ export default function Dashboard() {
                 setForm((prev) => {
                   const next = { ...prev };
                   for (const k of Object.keys(next) as (keyof typeof next)[]) {
-                    if (k === "partner_id" || k === "status" || k === "premium") continue;
+                    if (k === "partner_id") continue;
                     if (f[k] && !next[k]) next[k] = k === "client_phone" ? formatPhoneInput(f[k]) : f[k];
                   }
                   return next;
@@ -412,9 +403,9 @@ export default function Dashboard() {
                 onChange={(e) => setForm({ ...form, partner_id: e.target.value })}
                 required
               >
-                <option value="">Referred by… *</option>
+                <option value="">Where did this come from? *</option>
                 {partners.length > 0 && (
-                  <optgroup label="Referral sources">
+                  <optgroup label="Partners &amp; lead sources">
                     {partners.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
@@ -479,59 +470,6 @@ export default function Dashboard() {
                 />
               </label>
             </div>
-
-            {/* Already-worked business.
-                Collapsed by default so the everyday form is untouched. This
-                exists because the alternative — log it, then click it up the
-                pipeline — sends the partner a live update about a deal that
-                closed last month. */}
-            {!alreadyWorked ? (
-              <button
-                type="button"
-                onClick={() => setAlreadyWorked(true)}
-                className="text-xs text-ink-secondary hover:text-ink underline underline-offset-2"
-              >
-                Already worked this one? Set where it stands
-              </button>
-            ) : (
-              <div className="rounded-xl bg-slate-50 p-3.5 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="section-label">Where it stands</span>
-                    <select
-                      className="input mt-1.5"
-                      value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    >
-                      {[...STATUSES, "lost"].map((st) => (
-                        <option key={st} value={st}>
-                          {STATUS_LABELS[st] ?? st}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {["bound", "docs_delivered"].includes(form.status) && (
-                    <label className="block">
-                      <span className="section-label">Premium written</span>
-                      <input
-                        className="input mt-1.5"
-                        inputMode="decimal"
-                        placeholder="Optional"
-                        value={form.premium}
-                        onChange={(e) =>
-                          setForm({ ...form, premium: e.target.value.replace(/[^0-9.]/g, "") })
-                        }
-                      />
-                    </label>
-                  )}
-                </div>
-                <p className="text-[11px] text-ink-muted">
-                  Saved exactly where you put it, and nothing is sent — not to the client, not to{" "}
-                  {partners.find((p) => p.id === form.partner_id)?.name ?? "the partner"}. Use this
-                  for business you already wrote.
-                </p>
-              </div>
-            )}
             <button className="btn-primary w-full" disabled={saving}>
               {saving ? "Saving…" : "Save lead"}
             </button>

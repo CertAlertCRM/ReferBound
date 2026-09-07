@@ -120,6 +120,17 @@ export default function PartnersPage() {
   const [skind, setSkind] = useState<"partner" | "paid">("partner");
   const [spend, setSpend] = useState("");
 
+  // Arriving from the new-producer path on the dashboard: open straight onto
+  // the lead-source form. Read off location rather than useSearchParams so
+  // this needs no Suspense boundary.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("source") === "paid") {
+      setSkind("paid");
+      setAddOpen(true);
+    }
+  }, []);
+
   async function load() {
     const res = await fetch("/api/partners");
     if (res.ok) setPartners((await res.json()).partners ?? []);
