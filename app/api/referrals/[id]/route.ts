@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { getAccount } from "@/lib/account";
 import { fireWebhook } from "@/lib/webhook";
 import { sendSms } from "@/lib/sms";
+import { cleanLines } from "@/lib/lines";
 
 // Partner email cadence is deliberately sparse to avoid notification fatigue:
 // one email at "quoted" (we're on it), then ONE combined email at
@@ -24,6 +25,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  // Structured lines and the round-out date come through as their own shapes
+  // rather than raw strings, so they're handled after this scalar loop.
+  if (Array.isArray((body as any).lines)) patch.lines = cleanLines((body as any).lines);
+  if ("xsell_target_date" in (body as any)) {
+    const d = String((body as any).xsell_target_date ?? "").trim();
+    patch.xsell_target_date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+  }
   for (const f of ["client_name", "client_phone", "client_email", "closing_date", "notes", "lost_reason", "policy_lines"]) {
     if (f in body) patch[f] = body[f] === "" ? null : body[f];
   }

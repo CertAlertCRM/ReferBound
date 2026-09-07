@@ -12,6 +12,7 @@ import { InstallPrompt } from "./install-prompt";
 import { EmptyStart } from "./empty-start";
 import { GrowCard } from "./grow-card";
 import { useUI } from "./ui";
+import { LINE_ORDER, LINE_KINDS, type LineKind } from "@/lib/lines";
 
 type Referral = {
   id: string;
@@ -95,8 +96,19 @@ export default function Dashboard() {
     partner_id: "",
     closing_date: "",
     notes: "",
+    // Where the deal already stands. Almost always "new" — but a producer
+    // recording a data lead they already sold should not have to replay the
+    // pipeline to get it on the board, because walking the status is what
+    // fires partner notifications about business that closed weeks ago.
+    status: "new",
+    premium: "",
   };
   const [form, setForm] = useState({ ...EMPTY_LEAD });
+  // Lines written. Held outside EMPTY_LEAD because it's an array and the
+  // prefill loop copies scalar fields across by key.
+  const [written, setWritten] = useState<LineKind[]>([]);
+  // Hidden until asked for. The default form is unchanged for the daily case.
+  const [alreadyWorked, setAlreadyWorked] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -147,8 +159,14 @@ export default function Dashboard() {
     // a client-kind source and the parent link that credits it.
     const sentClient = form.partner_id.startsWith("client:");
     const payload = sentClient
-      ? { ...form, partner_id: "", from_referral_id: form.partner_id.slice(7), log_seconds }
-      : { ...form, log_seconds };
+      ? {
+          ...form,
+          partner_id: "",
+          from_referral_id: form.partner_id.slice(7),
+          lines: written,
+          log_seconds,
+        }
+      : { ...form, lines: written, log_seconds };
     const res = await fetch("/api/referrals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -169,6 +187,8 @@ export default function Dashboard() {
     }
     setSaving(false);
     setForm({ ...EMPTY_LEAD, partner_id: form.partner_id });
+    setAlreadyWorked(false);
+    setWritten([]);
     setPendingFile(null);
     setShowAdd(false);
     load();
@@ -376,7 +396,7 @@ export default function Dashboard() {
                 setForm((prev) => {
                   const next = { ...prev };
                   for (const k of Object.keys(next) as (keyof typeof next)[]) {
-                    if (k === "partner_id") continue;
+                    if (k === "partner_id" || k === "status" || k === "premium") continue;
                     if (f[k] && !next[k]) next[k] = k === "client_phone" ? formatPhoneInput(f[k]) : f[k];
                   }
                   return next;
@@ -470,6 +490,90 @@ export default function Dashboard() {
                 />
               </label>
             </div>
+
+            {/* Already-worked business.
+                Collapsed by default so the everyday form is untouched. This
+                exists because the alternative — log it, then click it up the
+                pipeline — sends the partner a live update about a deal that
+                closed last month. */}
+            {!alreadyWorked ? (
+              <button
+                type="button"
+                onClick={() => setAlreadyWorked(true)}
+                className="text-xs text-ink-secondary hover:text-ink underline underline-offset-2"
+              >
+                Already worked this one? Set where it stands
+              </button>
+            ) : (
+              <div className="rounded-xl bg-slate-50 p-3.5 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="section-label">Where it stands</span>
+                    <select
+                      className="input mt-1.5"
+                      value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    >
+                      {[...STATUSES, "lost"].map((st) => (
+                        <option key={st} value={st}>
+                          {STATUS_LABELS[st] ?? st}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {["bound", "docs_delivered"].includes(form.status) && (
+                    <label className="block">
+                      <span className="section-label">Premium written</span>
+                      <input
+                        className="input mt-1.5"
+                        inputMode="decimal"
+                        placeholder="Optional"
+                        value={form.premium}
+                        onChange={(e) =>
+                          setForm({ ...form, premium: e.target.value.replace(/[^0-9.]/g, "") })
+                        }
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {["bound", "docs_delivered"].includes(form.status) && (
+                  <div>
+                    <span className="section-label">What was written</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {LINE_ORDER.map((k) => {
+                        const on = written.includes(k);
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() =>
+                              setWritten((w) => (on ? w.filter((x) => x !== k) : [...w, k]))
+                            }
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                              on
+                                ? "bg-brand text-white border-brand"
+                                : "bg-white text-ink-secondary border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            {LINE_KINDS[k]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-ink-muted mt-1.5">
+                      One line means a household worth going back to.
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-ink-muted">
+                  Saved exactly where you put it, and nothing is sent — not to the client, not to{" "}
+                  {partners.find((p) => p.id === form.partner_id)?.name ?? "the partner"}. Use this
+                  for business you already wrote.
+                </p>
+              </div>
+            )}
             <button className="btn-primary w-full" disabled={saving}>
               {saving ? "Saving…" : "Save lead"}
             </button>

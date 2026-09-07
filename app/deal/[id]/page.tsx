@@ -22,6 +22,7 @@ import {
   IconCheck,
 } from "../../icons";
 import { useUI } from "../../ui";
+import { LINE_ORDER, LINE_KINDS, cleanLines, roundOutSuggestions, type LineKind } from "@/lib/lines";
 import { SkeletonPanels } from "../../skeleton";
 import { ClientTrack } from "./client-track";
 import { LenderLink } from "./lender-link";
@@ -69,9 +70,16 @@ export default function DealPage() {
   const [replySending, setReplySending] = useState(false);
   const [premium, setPremium] = useState("");
   const [lines, setLines] = useState("");
-  const [dealBaseline, setDealBaseline] = useState({ premium: "", lines: "" });
+  const [dealBaseline, setDealBaseline] = useState({ premium: "", lines: "", written: "", renew: "" });
+  // Structured lines, and when a competing policy comes up for renewal.
+  const [written, setWritten] = useState<LineKind[]>([]);
+  const [renew, setRenew] = useState("");
   const [dealSaving, setDealSaving] = useState(false);
-  const dealDirty = premium !== dealBaseline.premium || lines !== dealBaseline.lines;
+  const dealDirty =
+    premium !== dealBaseline.premium ||
+    lines !== dealBaseline.lines ||
+    written.join(",") !== dealBaseline.written ||
+    renew !== dealBaseline.renew;
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [showAllMsgs, setShowAllMsgs] = useState(false);
   const [extracting, setExtracting] = useState<string | null>(null);
@@ -160,9 +168,13 @@ export default function DealPage() {
       if (found) {
         const p = found.premium != null ? String(found.premium) : "";
         const l = found.policy_lines ?? "";
+        const w = cleanLines((found as any).lines);
+        const rn = (found as any).xsell_target_date ?? "";
         setPremium(p);
         setLines(l);
-        setDealBaseline({ premium: p, lines: l });
+        setWritten(w);
+        setRenew(rn);
+        setDealBaseline({ premium: p, lines: l, written: w.join(","), renew: rn });
         if ((found as any).doc_check) setCheck((found as any).doc_check);
         setCovEntries(Array.isArray((found as any).coverage_notes) ? (found as any).coverage_notes : []);
       }
@@ -177,7 +189,7 @@ export default function DealPage() {
     await fetch(`/api/referrals/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ premium, policy_lines: lines }),
+      body: JSON.stringify({ premium, policy_lines: lines, lines: written, xsell_target_date: renew }),
     });
     setDealSaving(false);
     load();
@@ -703,6 +715,10 @@ export default function DealPage() {
           nudgedAt={r.client_nudged_at ?? null}
           askedAt={r.asked_at ?? null}
           reviewAskedAt={r.review_asked_at ?? null}
+          monoline={written.length === 1}
+          linesLabel={written.map((k) => LINE_KINDS[k]).join(" + ")}
+          missing={roundOutSuggestions(written)}
+          xsellAskedAt={(r as any).xsell_asked_at ?? null}
           onDone={load}
         />
 
@@ -1118,6 +1134,54 @@ export default function DealPage() {
                 {dealSaving ? "Saving…" : dealDirty ? "Save" : "Saved ✓"}
               </button>
             </div>
+
+            {/* Structured lines.
+                The free-text field above stays because it carries what the
+                document extractor pulls and how agents already write it. These
+                boxes exist because a monoline count has to be countable, and
+                that count is the whole reason this section earns its place. */}
+            <div className="sm:col-span-3 pt-1">
+              <span className="text-xs text-ink-muted">What was written</span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {LINE_ORDER.map((k) => {
+                  const on = written.includes(k);
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() =>
+                        setWritten((w) => (on ? w.filter((x) => x !== k) : [...w, k]))
+                      }
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        on
+                          ? "bg-brand text-white border-brand"
+                          : "bg-white text-ink-secondary border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {LINE_KINDS[k]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {written.length === 1 && (
+              <label className="block sm:col-span-3">
+                <span className="text-xs text-ink-muted">
+                  When does their other policy renew? (optional)
+                </span>
+                <input
+                  type="date"
+                  className="input mt-1 sm:max-w-xs"
+                  value={renew}
+                  onChange={(e) => setRenew(e.target.value)}
+                />
+                <span className="block text-[11px] text-ink-muted mt-1">
+                  One line written. If you know when the policy they have elsewhere comes up,
+                  this client surfaces again about six weeks out — while it can still be moved.
+                </span>
+              </label>
+            )}
           </form>
           <p className="text-xs text-ink-muted">
             Feeds your Stats page — premium sourced per partner is the number that proves what each

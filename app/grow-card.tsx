@@ -24,6 +24,11 @@ type Queue = {
   boundDays: number | null;
   askReferral: boolean;
   askReview: boolean;
+  roundOut: boolean;
+  linesLabel: string;
+  missing: string[];
+  renewLabel: string | null;
+  renewSoon: boolean;
 };
 
 type Data = {
@@ -33,6 +38,7 @@ type Data = {
   warming: number;
   promote: { id: string; name: string; count: number }[];
   askedCount: number;
+  multiline?: { recorded: number; multiline: number; monoline: number; percent: number | null };
   coldStart: boolean;
   // Set when the server could not read. Distinct from an empty book: the card
   // says nothing at all rather than guessing.
@@ -180,13 +186,23 @@ export function GrowCard() {
               {d.earned.paid > 0 ? `, ${d.earned.paid} from leads you paid for` : ""}.
             </p>
           </div>
-          {d.askedCount > 0 && (
-            <p className="text-xs text-ink-muted shrink-0 text-right">
-              {d.askedCount} asked
-              <br />
-              so far
-            </p>
-          )}
+          <div className="shrink-0 text-right space-y-1">
+            {d.multiline && d.multiline.percent !== null && (
+              <p className="text-xs text-ink-muted">
+                <span className="tabnum text-base font-semibold text-ink">
+                  {d.multiline.percent}%
+                </span>{" "}
+                multiline
+                <br />
+                <span className="text-[11px]">
+                  {d.multiline.monoline} household{d.multiline.monoline === 1 ? "" : "s"} on one line
+                </span>
+              </p>
+            )}
+            {d.askedCount > 0 && (
+              <p className="text-xs text-ink-muted">{d.askedCount} asked so far</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -194,7 +210,7 @@ export function GrowCard() {
         <>
           <div className="px-4 sm:px-5 py-2.5 border-y border-slate-200 bg-slate-50/70">
             <p className="text-xs font-semibold text-ink-secondary">
-              {d.queueTotal} {d.queueTotal === 1 ? "client you haven't asked" : "clients you haven't asked"}
+              {d.queueTotal} {d.queueTotal === 1 ? "client worth a call" : "clients worth a call"}
             </p>
           </div>
           <ul className="divide-y divide-slate-100">
@@ -206,13 +222,29 @@ export function GrowCard() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{q.clientName}</p>
-                    <p className="text-xs text-ink-muted mt-0.5">
-                      {ago(q.boundDays)}
-                      {q.sourceKind === "paid" ? " · from a paid lead" : ""}
+                    {/* Why this person is on the list. One call, and this is
+                        what to cover on it. */}
+                    <p className="text-xs text-ink-muted mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                      {q.askReferral && <span>hasn&apos;t been asked</span>}
+                      {q.roundOut && (
+                        <span
+                          className={
+                            q.renewSoon ? "text-amber-700 font-medium" : "text-ink-muted"
+                          }
+                        >
+                          {q.askReferral ? "· " : ""}
+                          {q.linesLabel ? `${q.linesLabel} only` : "one line only"}
+                          {q.missing.length > 0 ? ` — try ${q.missing.join(" or ")}` : ""}
+                          {q.renewLabel ? ` · ${q.renewLabel}` : ""}
+                        </span>
+                      )}
+                      {!q.askReferral && !q.roundOut && <span>ready for a review ask</span>}
+                      <span>· {ago(q.boundDays)}</span>
+                      {q.sourceKind === "paid" && <span>· paid lead</span>}
                     </p>
                   </div>
                   <span className="text-xs font-medium text-brand-700 shrink-0">
-                    {q.askReferral ? "Ask" : "Ask for a review"}
+                    {q.askReferral ? "Ask" : q.roundOut ? "Round out" : "Review"}
                   </span>
                   <IconArrowRight size={14} className="text-ink-muted shrink-0" />
                 </Link>

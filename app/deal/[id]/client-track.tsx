@@ -31,6 +31,10 @@ type Props = {
   nudgedAt: string | null;
   askedAt: string | null;
   reviewAskedAt: string | null;
+  monoline: boolean;
+  linesLabel: string;
+  missing: string[];
+  xsellAskedAt: string | null;
   onDone: () => void;
 };
 
@@ -73,7 +77,7 @@ export function ClientTrack(p: Props) {
 
   // The ask that happened out loud. No email, no recipient — just the record,
   // which is the only thing the queue and the earned-share number ever wanted.
-  async function mark(kind: "referral" | "review", clear = false) {
+  async function mark(kind: "referral" | "review" | "crosssell", clear = false) {
     const key = `mark-${kind}`;
     setBusy(key);
     const res = await fetch(`/api/referrals/${p.referralId}/asked`, {
@@ -86,7 +90,9 @@ export function ClientTrack(p: Props) {
       toast(
         clear
           ? "Unmarked"
-          : kind === "review"
+          : kind === "crosssell"
+            ? "Marked — you pitched the round-out"
+            : kind === "review"
             ? "Marked — you asked for the review"
             : `Marked — you asked ${p.clientName.split(" ")[0]}`
       );
@@ -336,6 +342,43 @@ export function ClientTrack(p: Props) {
               )}
             </div>
           </div>
+
+          {/* The round-out. Only shows when one line was actually recorded —
+              an empty lines list means nobody ticked the boxes, and guessing a
+              household is monoline puts a false prompt in front of an agent
+              who knows better than the software does. */}
+          {p.monoline && (
+            <div className="flex items-start justify-between gap-3 flex-wrap border-t border-brand-100 pt-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {p.xsellAskedAt ? (
+                    <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                      <IconCheck size={14} /> Round-out brought up
+                    </span>
+                  ) : (
+                    `${first} is ${p.linesLabel || "one line"} only`
+                  )}
+                </p>
+                <p className="text-[11px] text-ink-secondary">
+                  {p.xsellAskedAt
+                    ? "Logged — nothing was sent."
+                    : p.missing.length > 0
+                      ? `You already paid for this household. Worth quoting ${p.missing.join(" or ")}.`
+                      : "You already paid for this household — the rest of it is the cheapest business you can write."}
+                </p>
+              </div>
+              {!p.xsellAskedAt && (
+                <button
+                  type="button"
+                  className="btn-ghost !py-1.5 !px-3 text-xs shrink-0"
+                  disabled={busy !== null}
+                  onClick={() => mark("crosssell")}
+                >
+                  {busy === "mark-crosssell" ? "Saving…" : "I brought it up"}
+                </button>
+              )}
+            </div>
+          )}
 
           <p className="text-[11px] text-ink-muted">
             Anything sent from here is drafted in your words and goes out when you press the

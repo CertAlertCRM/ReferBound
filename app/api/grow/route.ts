@@ -3,6 +3,16 @@ import { db } from "@/lib/db";
 import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
 import { SAFE_STATUSES } from "@/lib/config";
 import { earnedShare, readyToPromote, type SourceKind } from "@/lib/sources";
+import {
+  cleanLines,
+  isMonoline,
+  linesRecorded,
+  linesSummary,
+  multilineRate,
+  renewalDue,
+  renewalLabel,
+  roundOutSuggestions,
+} from "@/lib/lines";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +83,14 @@ export type QueueItem = {
   boundDays: number | null; // days since the policy bound, null if unknown
   askReferral: boolean;
   askReview: boolean;
+  // The round-out. A producer doesn't make an "ask call" and a separate
+  // "cross-sell call" — they call the client once. So this rides on the same
+  // row rather than in a second queue, and the row says what to cover.
+  roundOut: boolean;
+  linesLabel: string;
+  missing: string[];
+  renewLabel: string | null;
+  renewSoon: boolean;
 };
 
 export async function GET(_req: NextRequest) {
@@ -85,7 +103,7 @@ export async function GET(_req: NextRequest) {
     [referrals, partners] = await Promise.all([
       fetchAllRows(
         "referrals",
-        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, updated_at, created_at",
+        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, updated_at, created_at",
         account.id
       ),
       fetchAllRows("partners", "id, name, source_kind", account.id),
@@ -137,6 +155,11 @@ export async function GET(_req: NextRequest) {
     const when = boundAt.get(r.id) ?? r.updated_at ?? r.created_at;
     const days = daysSince(when);
 
+    // Monoline, never pitched. Only counts once lines were actually recorded —
+    // an empty lines array means nobody ticked the boxes, not that the
+    // household is monoline, and guessing there would be a lie.
+    const roundOut = !r.xsell_asked_at && linesRecorded(r.lines) && isMonoline(r.lines);
+
     // Never ask a paid lead's "source" for a referral — there is nobody there.
     // But the CLIENT from a paid lead is exactly who this is for: that's the
     // conversion the whole thesis turns on.
@@ -144,9 +167,12 @@ export async function GET(_req: NextRequest) {
     const askedRev =
       !r.review_asked_at && (r.asked_at ? (daysSince(r.asked_at) ?? 0) >= REVIEW_GAP_DAYS : false);
 
-    if (!askedRef && !askedRev) continue;
+    if (!askedRef && !askedRev && !roundOut) continue;
 
-    if (days !== null && days < WARM_DAYS) {
+    // A round-out whose renewal window is open beats the warming rule: if
+    // their other policy comes up in three weeks, waiting is how you miss it.
+    const renewSoon = roundOut && renewalDue(r.xsell_target_date);
+    if (days !== null && days < WARM_DAYS && !renewSoon) {
       warming++;
       continue;
     }
@@ -159,12 +185,20 @@ export async function GET(_req: NextRequest) {
       boundDays: days,
       askReferral: askedRef,
       askReview: askedRev,
+      roundOut,
+      linesLabel: linesSummary(r.lines),
+      missing: roundOut ? roundOutSuggestions(r.lines) : [],
+      renewLabel: roundOut ? renewalLabel(r.xsell_target_date) : null,
+      renewSoon,
     });
   }
 
   // Oldest first. A client you bound in March and never asked is the one
   // getting colder, and it is the one the agent has genuinely forgotten.
-  queue.sort((a, b) => (b.boundDays ?? 0) - (a.boundDays ?? 0));
+  queue.sort((a, b) => {
+    if (a.renewSoon !== b.renewSoon) return a.renewSoon ? -1 : 1;
+    return (b.boundDays ?? 0) - (a.boundDays ?? 0);
+  });
 
   // ── 3. Promotions ─────────────────────────────────────────────────────────
   const countBySource = new Map<string, number>();
@@ -188,6 +222,9 @@ export async function GET(_req: NextRequest) {
     warming,
     promote,
     askedCount,
+    // The producer's second number. Households carrying more than one line,
+    // out of the households where lines were recorded at all.
+    multiline: multilineRate(won.map((r) => ({ lines: cleanLines(r.lines) }))),
     // Nothing bound yet: the card should say so rather than showing three
     // zeroes and implying the agent is failing at something.
     // Only ever true because the data arrived and was empty.

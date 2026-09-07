@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
 import { getAccount } from "@/lib/account";
 import { STATUSES } from "@/lib/config";
+import { cleanLines } from "@/lib/lines";
 import { maybeRewardReferrer } from "@/lib/referral";
 import { fireWebhook } from "@/lib/webhook";
 
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
     // status is set once, here, and nothing is sent.
     status: STATUSES.includes(body.status) || body.status === "lost" ? body.status : "new",
     premium: premiumValue,
+    lines: cleanLines(body.lines),
     source: "agent",
     log_seconds: typeof body.log_seconds === "number" ? body.log_seconds : null,
   };
