@@ -34,6 +34,9 @@ type Data = {
   promote: { id: string; name: string; count: number }[];
   askedCount: number;
   coldStart: boolean;
+  // Set when the server could not read. Distinct from an empty book: the card
+  // says nothing at all rather than guessing.
+  unavailable?: boolean;
 };
 
 function ago(days: number | null): string {
@@ -57,9 +60,15 @@ export function GrowCard() {
   const [wall, setWall] = useState<{ name: string; count: number } | null>(null);
 
   async function load() {
-    const res = await fetch("/api/grow");
-    if (!res.ok) return;
-    setD(await res.json());
+    try {
+      const res = await fetch("/api/grow");
+      if (!res.ok) return;
+      const j = await res.json();
+      if (j?.unavailable) return;
+      setD(j);
+    } catch {
+      // Stay silent. A growth prompt is never worth breaking the dashboard for.
+    }
   }
 
   useEffect(() => {

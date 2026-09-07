@@ -74,6 +74,12 @@ export default function Dashboard() {
   const [profileName, setProfileName] = useState<string | null>(null);
   const [headshotUrl, setHeadshotUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Did the partners request actually SUCCEED? An empty list and a failed
+  // request are not the same fact, and conflating them is how an agent with a
+  // full book gets told they are brand new. Never infer a cold start from the
+  // absence of data — only from data that arrived and was empty.
+  const [partnersOk, setPartnersOk] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [inboxPending, setInboxPending] = useState(0);
@@ -95,6 +101,7 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
+    setLoadError(false);
     const [rRes, pRes, profRes, aRes] = await Promise.all([
       fetch("/api/referrals"),
       fetch("/api/partners"),
@@ -102,8 +109,12 @@ export default function Dashboard() {
       fetch("/api/activity"),
     ]);
     if (rRes.ok) setReferrals((await rRes.json()).referrals ?? []);
-    if (pRes.ok) setPartners((await pRes.json()).partners ?? []);
+    if (pRes.ok) {
+      setPartners((await pRes.json()).partners ?? []);
+      setPartnersOk(true);
+    }
     if (aRes.ok) setFeed((await aRes.json()).activity ?? []);
+    setLoadError(!rRes.ok || !pRes.ok);
     if (profRes.ok) {
       const { profile, headshotUrl } = await profRes.json();
       setProfileName(profile?.display_name ?? null);
@@ -235,8 +246,21 @@ export default function Dashboard() {
         <InstallPrompt />
         {/* No partners yet — the cold start. Give them something to hand a
             lender instead of an empty board and a description. */}
-        {!loading && partners.length === 0 && (
+        {!loading && partnersOk && partners.length === 0 && (
           <EmptyStart agentFirstName={profileName?.split(" ")[0]} />
+        )}
+        {!loading && loadError && (
+          <div className="card p-4 border-amber-200 bg-amber-50">
+            <p className="text-sm font-medium text-amber-900">
+              We couldn&apos;t load your book just now
+            </p>
+            <p className="text-xs text-amber-800 mt-1">
+              Nothing has been lost — this is a loading problem, not your data.{" "}
+              <button className="underline underline-offset-2 font-medium" onClick={() => load()}>
+                Try again
+              </button>
+            </p>
+          </div>
         )}
         {/* Greeting */}
         {(profileName || headshotUrl) && (

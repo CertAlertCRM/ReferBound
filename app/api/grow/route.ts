@@ -91,7 +91,11 @@ export async function GET(_req: NextRequest) {
       fetchAllRows("partners", "id, name, source_kind", account.id),
     ]);
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Could not load" }, { status: 500 });
+    // A failed read is not a cold start. If this ever throws — a missing
+    // column, a bad deploy — the card must go quiet, never tell an agent with
+    // a full book that they have written nothing.
+    console.error("grow: read failed", e?.message);
+    return NextResponse.json({ unavailable: true });
   }
 
   const partnerById = new Map<string, any>(partners.map((p) => [p.id, p] as [string, any]));
@@ -186,6 +190,7 @@ export async function GET(_req: NextRequest) {
     askedCount,
     // Nothing bound yet: the card should say so rather than showing three
     // zeroes and implying the agent is failing at something.
+    // Only ever true because the data arrived and was empty.
     coldStart: won.length === 0,
   });
 }
