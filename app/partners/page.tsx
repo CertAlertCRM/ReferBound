@@ -129,6 +129,15 @@ export default function PartnersPage() {
     if (new URLSearchParams(window.location.search).get("source") === "paid") {
       setSkind("paid");
       setAddOpen(true);
+      // Same reason as the deal page: a link that opens a form should land on
+      // the form, not near it.
+      setTimeout(
+        () =>
+          document
+            .getElementById("add-source")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        120
+      );
     }
   }, []);
 
@@ -460,7 +469,7 @@ export default function PartnersPage() {
         <PartnerGaps onConvert={fromProspect} />
 
         {addOpen && (
-        <form onSubmit={add} className="card p-5 space-y-3 border-brand-200">
+        <form id="add-source" onSubmit={add} className="card p-5 space-y-3 border-brand-200 scroll-mt-24">
           <div className="flex items-center justify-between gap-2">
             <h2 className="section-label">Add a partner</h2>
             <button

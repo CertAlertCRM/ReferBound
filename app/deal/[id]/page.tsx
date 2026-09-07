@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { STATUSES, STATUS_LABELS, DOC_KINDS, SENSITIVE_DOC_KINDS, statusesFor, statusLabel, isFullTrack } from "@/lib/config";
@@ -135,6 +135,25 @@ export default function DealPage() {
       load();
     } else toast((await res.json()).error ?? "Couldn't save", "error");
   }
+
+  // Deep links.
+  //
+  // A producer who clicks "Ask" on the dashboard queue has already decided what
+  // they came to do. Dropping them at the top of a long file and making them
+  // hunt for the block is the software asking them to repeat a decision they
+  // already made. ?focus=<section> scrolls there once the data has painted — a
+  // bare #hash cannot, because the target does not exist on first render.
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!r || focused.current || typeof window === "undefined") return;
+    const target = new URLSearchParams(window.location.search).get("focus");
+    if (!target) return;
+    focused.current = true;
+    const t = setTimeout(() => {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [r]);
 
   useEffect(() => {
     const pid = (r as any)?.partner_id;
@@ -702,6 +721,7 @@ export default function DealPage() {
         )}
 
         {/* The client half of the deal — quote out, check-in, welcome */}
+        <div id="reps" className="scroll-mt-24">
         <ClientTrack
           referralId={r.id}
           clientName={r.client_name}
@@ -722,9 +742,10 @@ export default function DealPage() {
           promisedNote={(r as any).promised_note ?? null}
           onDone={load}
         />
+        </div>
 
         {/* Quick touch log — one tap, lands on the timeline AND the partner's portal */}
-        <section className="card p-6 space-y-2.5">
+        <section id="touch" className="card p-6 space-y-2.5 scroll-mt-24">
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <h2 className="section-label">Log a touch</h2>
             <p className="text-[11px] text-ink-muted">
@@ -1108,7 +1129,7 @@ export default function DealPage() {
         </section>
 
         {/* Deal value */}
-        <section className="card p-6 space-y-3.5">
+        <section id="value" className="card p-6 space-y-3.5 scroll-mt-24">
           <h2 className="section-label">Deal value</h2>
           <form onSubmit={saveDealValue} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="block">

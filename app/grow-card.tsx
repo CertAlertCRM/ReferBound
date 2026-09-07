@@ -262,7 +262,10 @@ export function GrowCard() {
                 </li>
               ) : (
               <li key={q.id}>
-                <Link href={`/deal/${q.id}`} className="row-link">
+                {/* Straight to the block they clicked for. Landing at the top
+                    of a long file makes them re-decide something they already
+                    decided on the dashboard. */}
+                <Link href={`/deal/${q.id}?focus=reps`} className="row-link">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2 min-w-0">
                       <p className="text-sm font-semibold truncate">{q.clientName}</p>
