@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
 import { getAccount } from "@/lib/account";
+import { STATUSES } from "@/lib/config";
 import { maybeRewardReferrer } from "@/lib/referral";
 import { fireWebhook } from "@/lib/webhook";
 
@@ -103,6 +104,9 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!partnerOwned) return NextResponse.json({ error: "partner not found" }, { status: 404 });
 
+  const premiumRaw = Number(String(body.premium ?? "").replace(/[^0-9.]/g, ""));
+  const premiumValue = Number.isFinite(premiumRaw) && premiumRaw > 0 ? premiumRaw : null;
+
   const row = {
     account_id: account.id,
     partner_id: partnerId,
@@ -120,12 +124,25 @@ export async function POST(req: NextRequest) {
     property_address: String(body.property_address ?? "").trim() || null,
     closing_date: body.closing_date || null,
     notes: body.notes || null,
+    // Where the deal already stands.
+    //
+    // The alternative — always create as "new" and make the agent click the
+    // lead up the pipeline — is not neutral: every one of those status changes
+    // notifies the partner. A producer recording the data lead they closed
+    // last month would spray live updates about finished business. So the
+    // status is set once, here, and nothing is sent.
+    status: STATUSES.includes(body.status) || body.status === "lost" ? body.status : "new",
+    premium: premiumValue,
     source: "agent",
     log_seconds: typeof body.log_seconds === "number" ? body.log_seconds : null,
   };
   const { data, error } = await db().from("referrals").insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  await db().from("status_events").insert({ referral_id: data.id, status: "new" });
+  // Only the status it was actually created at. Writing a "new" event as well
+  // would give every pre-worked deal a zero-hour close and quietly flatter the
+  // time-to-bound average on the Stats page, which reads the gap between the
+  // first "new" and the first "bound".
+  await db().from("status_events").insert({ referral_id: data.id, status: data.status });
   await logActivity(data.id, "lead_logged", `Lead logged for ${data.client_name}`, "agent");
   if (parentReferralId) {
     await logActivity(
