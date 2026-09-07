@@ -10,6 +10,7 @@ import { BackfillButton } from "./backfill";
 import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
 import { EmptyStart } from "./empty-start";
+import { GrowCard } from "./grow-card";
 import { useUI } from "./ui";
 
 type Referral = {
@@ -242,6 +243,11 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Growth — the ask queue and earned share.
+            Placed above the pipeline deliberately: everything below this line
+            is work already in flight, and this is the next piece of work. */}
+        <GrowCard />
 
         {/* Stat tiles */}
         <div className="flex items-start justify-between gap-3">
