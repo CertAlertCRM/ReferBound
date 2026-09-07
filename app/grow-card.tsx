@@ -161,7 +161,7 @@ export function GrowCard() {
       {promos.map((p) => (
         <div
           key={p.id}
-          className="flex items-center gap-3 px-4 sm:px-5 py-3 bg-brand-light/50 border-b border-slate-200"
+          className="flex items-center gap-3 px-4 sm:px-5 py-3.5 bg-brand-light/60 border-l-[3px] border-brand-400 border-b border-slate-200"
         >
           <IconUsers size={16} className="text-brand shrink-0" />
           <p className="text-sm min-w-0 flex-1">
@@ -189,32 +189,30 @@ export function GrowCard() {
         <div className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
-              <p className="tabnum text-3xl font-bold tracking-tight leading-none">
+              <p className="stat stat-xl">
                 {d.earned.percent === null ? "—" : `${d.earned.percent}%`}
               </p>
-              <p className="text-sm font-semibold">earned</p>
+              <p className="text-sm font-semibold text-ink-secondary">earned</p>
             </div>
-            <p className="text-xs text-ink-muted mt-1.5">
+            <p className="text-xs text-ink-muted mt-2 leading-relaxed">
               {d.earned.earned} of your {d.earned.total} written{" "}
               {d.earned.total === 1 ? "policy" : "policies"} came from someone who sent it to you
               {d.earned.paid > 0 ? `, ${d.earned.paid} from leads you paid for` : ""}.
             </p>
           </div>
-          <div className="shrink-0 text-right space-y-1">
+          <div className="shrink-0 text-right space-y-2 pl-3">
             {d.multiline && d.multiline.percent !== null && (
-              <p className="text-xs text-ink-muted">
-                <span className="tabnum text-base font-semibold text-ink">
-                  {d.multiline.percent}%
-                </span>{" "}
-                multiline
-                <br />
-                <span className="text-[11px]">
-                  {d.multiline.monoline} household{d.multiline.monoline === 1 ? "" : "s"} on one line
-                </span>
-              </p>
+              <div>
+                <p className="stat stat-lg">{d.multiline.percent}%</p>
+                <p className="stat-label mt-1">
+                  multiline
+                  <br />
+                  {d.multiline.monoline} on one line
+                </p>
+              </div>
             )}
             {d.askedCount > 0 && (
-              <p className="text-xs text-ink-muted">{d.askedCount} asked so far</p>
+              <p className="stat-label">{d.askedCount} asked so far</p>
             )}
           </div>
         </div>
@@ -222,8 +220,8 @@ export function GrowCard() {
 
       {d.queueTotal > 0 ? (
         <>
-          <div className="px-4 sm:px-5 py-2.5 border-y border-slate-200 bg-slate-50/70">
-            <p className="text-xs font-semibold text-ink-secondary">
+          <div className="px-4 sm:px-5 py-2.5 border-y border-slate-200 bg-slate-50/80">
+            <p className="section-label !text-[11px] !tracking-[0.06em] text-ink-secondary">
               {d.queueTotal} {d.queueTotal === 1 ? "client worth a call" : "clients worth a call"}
             </p>
           </div>
@@ -232,16 +230,17 @@ export function GrowCard() {
               q.promise ? (
                 <li
                   key={q.id}
-                  className="flex items-start gap-3 px-4 sm:px-5 py-3 bg-amber-50/60"
+                  className="flex items-start gap-3 px-4 sm:px-5 py-3.5 bg-amber-50/70 border-l-[3px] border-amber-400"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm">
+                    <p className="text-sm leading-snug">
                       <span className="font-semibold">{q.clientName}</span> said they&apos;d tell{" "}
-                      <span className="font-medium">{q.promise}</span>
+                      <span className="font-semibold text-amber-900">{q.promise}</span>
                     </p>
-                    <p className="text-xs text-ink-muted mt-0.5">
-                      {ago(q.boundDays)} · nobody has logged them yet
-                    </p>
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      <span className="chip chip-warn">nobody has logged them</span>
+                      <span className="chip chip-neutral">{ago(q.boundDays)}</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Link
@@ -263,34 +262,38 @@ export function GrowCard() {
                 </li>
               ) : (
               <li key={q.id}>
-                <Link
-                  href={`/deal/${q.id}`}
-                  className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-slate-50 transition-colors"
-                >
+                <Link href={`/deal/${q.id}`} className="row-link">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{q.clientName}</p>
-                    {/* Why this person is on the list. One call, and this is
-                        what to cover on it. */}
-                    <p className="text-xs text-ink-muted mt-0.5 flex flex-wrap items-center gap-x-1.5">
-                      {q.askReferral && <span>hasn&apos;t been asked</span>}
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <p className="text-sm font-semibold truncate">{q.clientName}</p>
+                      <span className="text-[11px] text-ink-muted shrink-0">
+                        {ago(q.boundDays)}
+                      </span>
+                    </div>
+                    {/* Why this person is on the list. One call, and these are
+                        the things to cover on it. */}
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      {q.askReferral && <span className="chip chip-brand">not asked yet</span>}
                       {q.roundOut && (
-                        <span
-                          className={
-                            q.renewSoon ? "text-amber-700 font-medium" : "text-ink-muted"
-                          }
-                        >
-                          {q.askReferral ? "· " : ""}
+                        <span className={`chip ${q.renewSoon ? "chip-warn" : "chip-neutral"}`}>
                           {q.linesLabel ? `${q.linesLabel} only` : "one line only"}
                           {q.missing.length > 0 ? ` — try ${q.missing.join(" or ")}` : ""}
-                          {q.renewLabel ? ` · ${q.renewLabel}` : ""}
                         </span>
                       )}
-                      {!q.askReferral && !q.roundOut && <span>ready for a review ask</span>}
-                      <span>· {ago(q.boundDays)}</span>
-                      {q.sourceKind === "paid" && <span>· paid lead</span>}
-                    </p>
+                      {q.renewLabel && (
+                        <span className={`chip ${q.renewSoon ? "chip-warn" : "chip-neutral"}`}>
+                          {q.renewLabel}
+                        </span>
+                      )}
+                      {!q.askReferral && !q.roundOut && (
+                        <span className="chip chip-neutral">ready for a review ask</span>
+                      )}
+                      {q.sourceKind === "paid" && (
+                        <span className="chip chip-neutral">paid lead</span>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs font-medium text-brand-700 shrink-0">
+                  <span className="text-xs font-semibold text-brand-700 shrink-0">
                     {q.askReferral ? "Ask" : q.roundOut ? "Round out" : "Review"}
                   </span>
                   <IconArrowRight size={14} className="text-ink-muted shrink-0" />
@@ -313,7 +316,7 @@ export function GrowCard() {
           )}
         </>
       ) : (
-        <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3 border-t border-slate-200 bg-slate-50/70">
+        <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 border-t border-slate-200 bg-emerald-50/40">
           <IconCheck size={15} className="text-emerald-600 shrink-0" />
           <p className="text-xs text-ink-secondary">
             Everyone you&apos;ve bound has been asked.

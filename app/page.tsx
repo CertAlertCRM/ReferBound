@@ -387,14 +387,14 @@ export default function Dashboard() {
             ].map((t: any) => {
               const inner = (
                 <>
-                  <p className={`tabnum text-xl font-semibold tracking-tight leading-6 ${t.alert ? "text-red-600" : ""}`}>
-                    {t.v}
-                  </p>
-                  <p className="text-[11px] text-ink-muted mt-0.5">{t.l}</p>
-                  {t.hint && <p className="text-[10px] text-ink-muted">{t.hint}</p>}
+                  <p className={`stat stat-lg ${t.alert ? "!text-red-600" : ""}`}>{t.v}</p>
+                  <p className="stat-label mt-1.5">{t.l}</p>
+                  {t.hint && <p className="stat-label !text-[10px] mt-0.5">{t.hint}</p>}
                 </>
               );
-              const cls = `card card-hover px-4 py-3 block ${t.alert ? "border-red-200" : ""}`;
+              const cls = `card card-hover px-4 py-3.5 block ${
+                t.alert ? "border-red-200 bg-red-50/30" : ""
+              }`;
               return t.href ? (
                 <Link key={t.l} href={t.href} className={cls}>
                   {inner}
@@ -627,11 +627,7 @@ export default function Dashboard() {
                             onClick={() =>
                               setWritten((w) => (on ? w.filter((x) => x !== k) : [...w, k]))
                             }
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                              on
-                                ? "bg-brand text-white border-brand"
-                                : "bg-white text-ink-secondary border-slate-200 hover:border-slate-300"
-                            }`}
+                            className={`toggle ${on ? "toggle-on" : "toggle-off"}`}
                           >
                             {LINE_KINDS[k]}
                           </button>

@@ -127,6 +127,77 @@ body {
   .meta-item {
     @apply inline-flex items-center gap-1.5;
   }
+
+  /* ── Numbers ─────────────────────────────────────────────────────────────
+     One scale for every figure that matters. Before this each surface picked
+     its own size, so the dashboard's four stat tiles, the earned-share number
+     and the ledger totals were three different typographic ideas sitting on
+     the same screen. A dashboard reads as engineered when its numbers agree. */
+  .stat {
+    @apply font-semibold tracking-tight leading-none text-ink;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "kern" 1, "tnum" 1;
+    letter-spacing: -0.025em;
+  }
+  .stat-xl { @apply text-[34px] leading-[1.02]; }
+  .stat-lg { @apply text-2xl; }
+  .stat-md { @apply text-xl; }
+  .stat-label {
+    @apply text-[11px] font-medium text-ink-muted leading-tight;
+  }
+
+  /* ── Chips ───────────────────────────────────────────────────────────────
+     Small facts that need separating from each other. Middots between four
+     phrases make a row look like a sentence that lost an argument; chips let
+     the eye skip to the one that matters. */
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md px-1.5 py-[3px] text-[11px] font-medium leading-none whitespace-nowrap;
+  }
+  .chip-neutral { @apply bg-slate-100 text-ink-secondary; }
+  .chip-brand { @apply bg-brand-50 text-brand-800; }
+  .chip-warn { @apply bg-amber-100 text-amber-900; }
+  .chip-good { @apply bg-emerald-50 text-emerald-700; }
+
+  /* ── Toggles ─────────────────────────────────────────────────────────────
+     A set of small on/off choices — the lines written on a household. Written
+     twice by hand the day they were built (deal page and log form), which is
+     exactly how two pickers that should be identical start to drift. */
+  .toggle {
+    @apply px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:ring-offset-1;
+  }
+  .toggle-off {
+    @apply bg-white text-ink-secondary border-slate-200 hover:border-slate-300 hover:text-ink;
+  }
+  .toggle-on {
+    @apply bg-brand text-white border-brand shadow-btn;
+  }
+
+  /* A list row that behaves like a target. Keyboard focus is visible without
+     a ring fighting the row edges. */
+  .row-link {
+    @apply flex items-center gap-3 px-4 sm:px-5 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:bg-brand-50/70;
+  }
+}
+
+/* Hairline dividers that fade at both ends rather than butting into the card
+   edge. The difference is small and it is the whole difference. */
+.rule {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgb(15 23 42 / 0.10) 10%,
+    rgb(15 23 42 / 0.10) 90%,
+    transparent
+  );
+}
+
+/* Buttons had focus rings; links did not, so keyboard users fell back to the
+   browser's default outline halfway through a flow. */
+.link:focus-visible,
+.link-back:focus-visible,
+.link-muted:focus-visible {
+  @apply outline-none ring-2 ring-brand/30 ring-offset-2 rounded-sm;
 }
 
 /* ── Motion ────────────────────────────────────────────────────────────────

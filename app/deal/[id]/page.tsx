@@ -446,7 +446,7 @@ export default function DealPage() {
         <header className="card p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-xl font-bold tracking-tight">{r.client_name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{r.client_name}</h1>
               <p className="text-sm text-ink-secondary mt-0.5">
                 Referred by{" "}
                 {teamContacts.length > 0 ? (
@@ -724,7 +724,7 @@ export default function DealPage() {
         />
 
         {/* Quick touch log — one tap, lands on the timeline AND the partner's portal */}
-        <section className="card p-5 space-y-2.5">
+        <section className="card p-6 space-y-2.5">
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <h2 className="section-label">Log a touch</h2>
             <p className="text-[11px] text-ink-muted">
@@ -816,7 +816,7 @@ export default function DealPage() {
             number on a referral a realtor sent. */}
         {fullTrack && r.documents.length > 0 && (
           <section
-            className={`card p-5 space-y-3 ${
+            className={`card p-6 space-y-3 ${
               check?.blockers > 0
                 ? "border-red-300"
                 : check && check.findings?.length === 0
@@ -1153,11 +1153,7 @@ export default function DealPage() {
                       onClick={() =>
                         setWritten((w) => (on ? w.filter((x) => x !== k) : [...w, k]))
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        on
-                          ? "bg-brand text-white border-brand"
-                          : "bg-white text-ink-secondary border-slate-200 hover:border-slate-300"
-                      }`}
+                      className={`toggle ${on ? "toggle-on" : "toggle-off"}`}
                     >
                       {LINE_KINDS[k]}
                     </button>
