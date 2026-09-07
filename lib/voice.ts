@@ -11,6 +11,8 @@ export type NotifyTemplates = {
   email_quote_client?: string;
   email_welcome_client?: string;
   email_nudge_client?: string;
+  email_referral_ask?: string;
+  email_review_ask?: string;
   email_recap_intro?: string;
   email_thankyou?: string;
 };
@@ -67,6 +69,18 @@ export const TEMPLATE_META: Record<
     sms: false,
     required: ["{{client}}"],
   },
+  email_referral_ask: {
+    label: "Email — asking a client for a referral",
+    hint: "The ask, once the policy is bound and their documents are out. Offered as a button at that moment and never sent on a schedule — this is the single highest-value thing a producer forgets to do.",
+    sms: false,
+    required: ["{{client}}"],
+  },
+  email_review_ask: {
+    label: "Email — asking a client for a review",
+    hint: "A review is a referral to strangers. Needs your Google review link saved in Profile.",
+    sms: false,
+    required: ["{{client}}", "{{link}}"],
+  },
   email_recap_intro: {
     label: "Monthly recap — your opening line",
     hint: "The personal line above the stats in the monthly partner summary (for partners who have the recap on).",
@@ -99,6 +113,10 @@ export const STOCK_TEMPLATES: Required<NotifyTemplates> = {
     "Hi {{client}},\n\nYou're covered — congratulations on the new home. Your proof of insurance is attached, and I've already sent a copy to {{partner}} for your loan file, so there's nothing you need to forward.\n\nKeep this handy for closing. If anything about the home or your coverage changes, just reply here and I'll take care of it.",
   email_nudge_client:
     "Hi {{client}},\n\nJust checking in on the quote I sent over — no rush at all, but I want to make sure you have everything you need before closing gets close. Happy to walk through it or adjust anything.\n\nJust reply here and I'll take it from there.",
+  email_referral_ask:
+    "Hi {{client}},\n\nYou're all set — the policy is active and your documents are on file.\n\nOne quick thing before I get out of your way. Most of my clients come from someone telling a friend rather than from advertising. If anyone comes to mind — somebody shopping right now, or someone whose renewal just jumped — send me their name and number and I'll take it from there.\n\nNo pressure either way. Glad to have you.",
+  email_review_ask:
+    "Hi {{client}},\n\nEverything's in place on your policy. If the experience was a good one, a quick Google review genuinely helps — it's how most people find us.\n\n{{link}}\n\nTakes about a minute, and thank you either way.",
   email_recap_intro:
     "Thank you for the clients you sent our way in {{month}} — here's what they turned into.",
   email_thankyou:

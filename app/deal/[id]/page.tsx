@@ -54,6 +54,8 @@ type Referral = {
   quote_sent_at?: string | null;
   welcome_sent_at?: string | null;
   client_nudged_at?: string | null;
+  asked_at?: string | null;
+  review_asked_at?: string | null;
 };
 
 export default function DealPage() {
@@ -699,6 +701,8 @@ export default function DealPage() {
           quoteSentAt={r.quote_sent_at ?? null}
           welcomeSentAt={r.welcome_sent_at ?? null}
           nudgedAt={r.client_nudged_at ?? null}
+          askedAt={r.asked_at ?? null}
+          reviewAskedAt={r.review_asked_at ?? null}
           onDone={load}
         />
 

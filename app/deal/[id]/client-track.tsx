@@ -13,6 +13,10 @@ import { useUI } from "../../ui";
 //
 // Deliberately not a wall of controls: one line of state, one button, and the
 // rest stays out of the way until it's the right moment for it.
+//
+// The reps live here too, and only after the welcome has gone out. Asking a
+// client for a favour before you've handed them their documents is the wrong
+// order, and the product should not make that easy.
 
 type Props = {
   referralId: string;
@@ -25,6 +29,8 @@ type Props = {
   quoteSentAt: string | null;
   welcomeSentAt: string | null;
   nudgedAt: string | null;
+  askedAt: string | null;
+  reviewAskedAt: string | null;
   onDone: () => void;
 };
 
@@ -38,7 +44,7 @@ export function ClientTrack(p: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [ccPartner, setCcPartner] = useState(true);
 
-  async function send(action: "quote" | "welcome" | "nudge") {
+  async function send(action: "quote" | "welcome" | "nudge" | "ask" | "review") {
     setBusy(action);
     const res = await fetch(`/api/referrals/${p.referralId}/client-email`, {
       method: "POST",
@@ -55,7 +61,11 @@ export function ClientTrack(p: Props) {
             : `Quote sent to ${p.clientName.split(" ")[0]}`
           : action === "welcome"
             ? "Welcome email sent"
-            : "Check-in sent"
+            : action === "ask"
+              ? `Asked ${p.clientName.split(" ")[0]} for a referral`
+              : action === "review"
+                ? "Review request sent"
+                : "Check-in sent"
       );
       p.onDone();
     } else toast((await res.json()).error ?? "Couldn't send", "error");
@@ -185,6 +195,69 @@ export function ClientTrack(p: Props) {
               >
                 {busy === "welcome" ? "Sending…" : p.welcomeSentAt ? "Resend" : "Send welcome"}
               </button>
+            </div>
+          )}
+
+          {/* The reps. Only once they've been taken care of — the ask comes
+              after the delivery, never before it. */}
+          {bound && p.welcomeSentAt && (
+            <div className="rounded-xl border border-brand-200 bg-brand-light/40 p-3.5 space-y-3">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {p.askedAt ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <IconCheck size={14} /> Referral asked
+                      </span>
+                    ) : (
+                      `Ask ${first} for a referral`
+                    )}
+                  </p>
+                  <p className="text-[11px] text-ink-secondary">
+                    {p.askedAt
+                      ? `${daysSince(p.askedAt) === 0 ? "today" : `${daysSince(p.askedAt)}d ago`} — anything they send comes back credited to you`
+                      : "Right now is the moment — they have their documents and nothing has gone wrong yet."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={p.askedAt ? "btn-ghost !py-1.5 !px-3 text-xs" : "btn-primary !py-1.5 !px-3 text-xs"}
+                  disabled={busy !== null}
+                  onClick={() => send("ask")}
+                >
+                  {busy === "ask" ? "Sending…" : p.askedAt ? "Ask again" : "Send the ask"}
+                </button>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 flex-wrap border-t border-brand-100 pt-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {p.reviewAskedAt ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <IconCheck size={14} /> Review asked
+                      </span>
+                    ) : (
+                      "Ask for a review"
+                    )}
+                  </p>
+                  <p className="text-[11px] text-ink-secondary">
+                    A review is a referral to people who haven&apos;t met you yet.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost !py-1.5 !px-3 text-xs"
+                  disabled={busy !== null}
+                  onClick={() => send("review")}
+                >
+                  {busy === "review" ? "Sending…" : p.reviewAskedAt ? "Ask again" : "Send"}
+                </button>
+              </div>
+
+              <p className="text-[11px] text-ink-muted">
+                Both are drafted in your words and sent when you press the button. Nothing here goes
+                out on its own.
+              </p>
             </div>
           )}
         </>

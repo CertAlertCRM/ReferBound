@@ -21,19 +21,28 @@ export const dynamic = "force-dynamic";
 // The quote email deliberately copies the partner rather than triggering a
 // separate notice to them. One message, everyone on the same thread, exactly
 // the way the agent already does it.
+//
+// Two more were added when the product changed shape: the referral ask and the
+// review ask. Those are the reps — the two-minute actions a producer skips, not
+// for lack of time but because they don't have words that avoid sounding like
+// begging. Supplying the words is the feature; the queue is just a reminder.
 
-type Action = "quote" | "welcome" | "nudge";
+type Action = "quote" | "welcome" | "nudge" | "ask" | "review";
 
 const SUBJECTS: Record<Action, (client: string) => string> = {
   quote: (c) => `Your home insurance quote — ${c}`,
   welcome: (c) => `You're covered — ${c}`,
   nudge: (c) => `Checking in on your insurance quote — ${c}`,
+  ask: () => `One quick favor`,
+  review: () => `Would you mind?`,
 };
 
 const TEMPLATE_KEY: Record<Action, keyof NotifyTemplates> = {
   quote: "email_quote_client",
   welcome: "email_welcome_client",
   nudge: "email_nudge_client",
+  ask: "email_referral_ask",
+  review: "email_review_ask",
 };
 
 // Which documents ride along with each email. The client gets their quote and
@@ -42,6 +51,8 @@ const DOC_KINDS_FOR: Record<Action, string[]> = {
   quote: ["quote"],
   welcome: ["eoi", "dec"],
   nudge: [],
+  ask: [],
+  review: [],
 };
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -50,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.json().catch(() => null);
   const action = String(body?.action ?? "") as Action;
-  if (!["quote", "welcome", "nudge"].includes(action)) {
+  if (!["quote", "welcome", "nudge", "ask", "review"].includes(action)) {
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   }
 
@@ -69,7 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: prof } = await db()
     .from("agent_profile")
-    .select("notify_templates, display_name, agency_name, phone, email")
+    .select("notify_templates, display_name, agency_name, phone, email, google_review_url")
     .eq("account_id", account.id)
     .maybeSingle();
   const voice = (prof?.notify_templates ?? {}) as NotifyTemplates;
@@ -87,13 +98,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
   }
 
+  if (action === "review" && !prof?.google_review_url) {
+    return NextResponse.json(
+      { error: "Add your Google review link in Profile first — the ask needs somewhere to send them." },
+      { status: 400 }
+    );
+  }
+
   const partnerName = referral.partners?.name ?? "your lender";
   const firstName = String(referral.client_name).split(" ")[0];
   const vars = {
     client: firstName,
     partner: partnerName,
     first: firstName,
-    link: "",
+    link: action === "review" ? (prof?.google_review_url ?? "") : "",
     docs: docs.map((d: any) => DOC_KINDS[d.kind] ?? d.file_name).join(", "),
   };
 
@@ -124,7 +142,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const result = await sendEmail({
     referralId: referral.id,
-    kind: action === "welcome" ? "docs_ready" : "status_update",
+    kind:
+      action === "welcome" ? "docs_ready" : action === "review" ? "review_request" : "status_update",
     to: [referral.client_email, ...cc],
     subject: SUBJECTS[action](referral.client_name),
     html: plainBodyEmail(lines.join("\n\n")),
@@ -134,7 +153,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const stampField =
-    action === "quote" ? "quote_sent_at" : action === "welcome" ? "welcome_sent_at" : "client_nudged_at";
+    action === "quote"
+      ? "quote_sent_at"
+      : action === "welcome"
+        ? "welcome_sent_at"
+        : action === "ask"
+          ? "asked_at"
+          : action === "review"
+            ? "review_asked_at"
+            : "client_nudged_at";
   const patch: Record<string, unknown> = { [stampField]: new Date().toISOString() };
 
   // Sending the quote IS marking it quoted. Nobody should have to do both.
@@ -157,7 +184,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ? `Quote emailed to ${referral.client_name}${cc.length > 0 ? ` (${partnerName} copied)` : ""}`
       : action === "welcome"
         ? `Welcome email with proof of insurance sent to ${referral.client_name}`
-        : `Checked in with ${referral.client_name}`,
+        : action === "ask"
+          ? `Asked ${referral.client_name} for a referral`
+          : action === "review"
+            ? `Asked ${referral.client_name} for a review`
+            : `Checked in with ${referral.client_name}`,
     "agent"
   );
 
