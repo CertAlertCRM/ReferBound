@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const d = String((body as any).xsell_target_date ?? "").trim();
     patch.xsell_target_date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
   }
-  for (const f of ["client_name", "client_phone", "client_email", "closing_date", "notes", "lost_reason", "policy_lines"]) {
+  for (const f of ["client_name", "client_phone", "client_email", "closing_date", "notes", "lost_reason", "policy_lines", "promised_note"]) {
     if (f in body) patch[f] = body[f] === "" ? null : body[f];
   }
   if ("premium" in body) {

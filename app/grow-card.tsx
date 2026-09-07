@@ -29,6 +29,7 @@ type Queue = {
   missing: string[];
   renewLabel: string | null;
   renewSoon: boolean;
+  promise: string | null;
 };
 
 type Data = {
@@ -80,6 +81,19 @@ export function GrowCard() {
   useEffect(() => {
     load();
   }, []);
+
+  // Clear a promise that came to nothing. The queue only keeps trust if the
+  // producer can take something off it.
+  async function clearPromise(id: string) {
+    setBusy(`p-${id}`);
+    await fetch(`/api/referrals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ promised_note: "" }),
+    });
+    setBusy(null);
+    load();
+  }
 
   async function promote(id: string) {
     setBusy(id);
@@ -214,7 +228,40 @@ export function GrowCard() {
             </p>
           </div>
           <ul className="divide-y divide-slate-100">
-            {shown.map((q) => (
+            {shown.map((q) =>
+              q.promise ? (
+                <li
+                  key={q.id}
+                  className="flex items-start gap-3 px-4 sm:px-5 py-3 bg-amber-50/60"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm">
+                      <span className="font-semibold">{q.clientName}</span> said they&apos;d tell{" "}
+                      <span className="font-medium">{q.promise}</span>
+                    </p>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      {ago(q.boundDays)} · nobody has logged them yet
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Link
+                      href={`/?from=${q.id}&name=${encodeURIComponent(q.promise)}`}
+                      className="btn-primary text-xs px-3 py-1.5"
+                    >
+                      Log them
+                    </Link>
+                    <button
+                      onClick={() => clearPromise(q.id)}
+                      disabled={busy === `p-${q.id}`}
+                      className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors"
+                      aria-label="Nothing came of it"
+                      title="Nothing came of it"
+                    >
+                      <IconX size={14} />
+                    </button>
+                  </div>
+                </li>
+              ) : (
               <li key={q.id}>
                 <Link
                   href={`/deal/${q.id}`}
@@ -249,7 +296,8 @@ export function GrowCard() {
                   <IconArrowRight size={14} className="text-ink-muted shrink-0" />
                 </Link>
               </li>
-            ))}
+              )
+            )}
           </ul>
           {d.queueTotal > 3 && (
             <button

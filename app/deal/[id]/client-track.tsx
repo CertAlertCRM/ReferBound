@@ -35,6 +35,7 @@ type Props = {
   linesLabel: string;
   missing: string[];
   xsellAskedAt: string | null;
+  promisedNote: string | null;
   onDone: () => void;
 };
 
@@ -47,6 +48,21 @@ export function ClientTrack(p: Props) {
   const { toast } = useUI();
   const [busy, setBusy] = useState<string | null>(null);
   const [ccPartner, setCcPartner] = useState(true);
+  // Who they said they'd tell. Captured only after the ask, because a name
+  // without the conversation that produced it is wishful thinking.
+  const [promise, setPromise] = useState(p.promisedNote ?? "");
+  const [promiseSaving, setPromiseSaving] = useState(false);
+
+  async function savePromise(value: string) {
+    setPromiseSaving(true);
+    await fetch(`/api/referrals/${p.referralId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ promised_note: value.trim() }),
+    });
+    setPromiseSaving(false);
+    p.onDone();
+  }
 
   async function send(action: "quote" | "welcome" | "nudge" | "ask" | "review") {
     setBusy(action);
@@ -261,10 +277,43 @@ export function ClientTrack(p: Props) {
             </div>
 
             {p.askedAt ? (
-              <p className="text-[11px] text-ink-secondary">
-                {daysSince(p.askedAt) === 0 ? "Today" : `${daysSince(p.askedAt)} days ago`} —
-                anything they send comes back credited to you.
-              </p>
+              <>
+                <p className="text-[11px] text-ink-secondary">
+                  {daysSince(p.askedAt) === 0 ? "Today" : `${daysSince(p.askedAt)} days ago`} —
+                  anything they send comes back credited to you.
+                </p>
+                {/* The promise. This is the moment the loop turns on: a client
+                    who names somebody is a warm lead with a name and a two-day
+                    half-life, and nothing else in the product catches it. */}
+                <div className="pt-1">
+                  <span className="text-[11px] font-medium text-ink-secondary">
+                    Did they name anyone?
+                  </span>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      className="input !py-1.5 text-xs flex-1"
+                      placeholder="Megan, her sister — rate just went up"
+                      value={promise}
+                      onChange={(e) => setPromise(e.target.value)}
+                    />
+                    {promise.trim() !== (p.promisedNote ?? "") && (
+                      <button
+                        type="button"
+                        className="btn-ghost !py-1.5 !px-3 text-xs shrink-0"
+                        disabled={promiseSaving}
+                        onClick={() => savePromise(promise)}
+                      >
+                        {promiseSaving ? "…" : "Save"}
+                      </button>
+                    )}
+                  </div>
+                  {p.promisedNote && (
+                    <p className="text-[11px] text-ink-muted mt-1">
+                      Stays on your dashboard until they turn up or you clear it.
+                    </p>
+                  )}
+                </div>
+              </>
             ) : (
               <>
                 <p className="text-[11px] text-ink-secondary">

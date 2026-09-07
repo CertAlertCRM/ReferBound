@@ -719,6 +719,7 @@ export default function DealPage() {
           linesLabel={written.map((k) => LINE_KINDS[k]).join(" + ")}
           missing={roundOutSuggestions(written)}
           xsellAskedAt={(r as any).xsell_asked_at ?? null}
+          promisedNote={(r as any).promised_note ?? null}
           onDone={load}
         />
 

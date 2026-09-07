@@ -31,7 +31,7 @@ type Referral = {
   documents: { id: string; kind: string }[];
 };
 
-type Partner = { id: string; name: string };
+type Partner = { id: string; name: string; source_kind?: string | null };
 
 type ActivityItem = {
   id: number;
@@ -107,6 +107,11 @@ export default function Dashboard() {
   // Lines written. Held outside EMPTY_LEAD because it's an array and the
   // prefill loop copies scalar fields across by key.
   const [written, setWritten] = useState<LineKind[]>([]);
+  // Past clients are the fastest-growing list in the product — a producer
+  // writing fifteen a month has forty inside a quarter. Keeping them out of
+  // the main dropdown is the difference between a two-second choice and a
+  // scroll. They get their own control, only when they're the answer.
+  const [clientMode, setClientMode] = useState(false);
   // Hidden until asked for. The default form is unchanged for the daily case.
   const [alreadyWorked, setAlreadyWorked] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -143,6 +148,24 @@ export default function Dashboard() {
   }
   useEffect(() => {
     load();
+  }, []);
+
+  // Landing here from a promise on the dashboard ("Sarah said she'd tell
+  // Megan"). The name and the credit come with it so nobody has to remember
+  // who sent whom three weeks later.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    const from = q.get("from");
+    if (!from) return;
+    formOpenedAt.current = Date.now();
+    setShowAdd(true);
+    setClientMode(true);
+    setForm((f) => ({
+      ...f,
+      partner_id: `client:${from}`,
+      client_name: q.get("name") ?? f.client_name,
+    }));
   }, []);
 
   function openAdd() {
@@ -189,6 +212,7 @@ export default function Dashboard() {
     setForm({ ...EMPTY_LEAD, partner_id: form.partner_id });
     setAlreadyWorked(false);
     setWritten([]);
+    setClientMode(false);
     setPendingFile(null);
     setShowAdd(false);
     load();
@@ -247,6 +271,15 @@ export default function Dashboard() {
   // Clients you already wrote. Picking one here is what closes the loop:
   // the referral gets credited to them, they climb the ladder, and whatever
   // source produced them in the first place gets the downstream credit.
+  const paidSources = useMemo(
+    () => partners.filter((p) => (p.source_kind ?? "partner") === "paid"),
+    [partners]
+  );
+  const referralPartners = useMemo(
+    () => partners.filter((p) => (p.source_kind ?? "partner") !== "paid"),
+    [partners]
+  );
+
   const pastClients = useMemo(
     () =>
       referrals
@@ -419,28 +452,53 @@ export default function Dashboard() {
               />
               <select
                 className="input"
-                value={form.partner_id}
-                onChange={(e) => setForm({ ...form, partner_id: e.target.value })}
-                required
+                value={clientMode ? "__client" : form.partner_id}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__client") {
+                    setClientMode(true);
+                    setForm({ ...form, partner_id: "" });
+                  } else {
+                    setClientMode(false);
+                    setForm({ ...form, partner_id: v });
+                  }
+                }}
+                required={!clientMode}
               >
                 <option value="">Where did this come from? *</option>
-                {partners.length > 0 && (
-                  <optgroup label="Partners &amp; lead sources">
-                    {partners.map((p) => (
+                {paidSources.length > 0 && (
+                  <optgroup label="Lead sources">
+                    {paidSources.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {referralPartners.length > 0 && (
+                  <optgroup label="Referral partners">
+                    {referralPartners.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </optgroup>
                 )}
                 {pastClients.length > 0 && (
-                  <optgroup label="A client who sent them">
-                    {pastClients.map((r) => (
-                      <option key={r.id} value={`client:${r.id}`}>
-                        {r.client_name}
-                      </option>
-                    ))}
-                  </optgroup>
+                  <option value="__client">A past client sent them…</option>
                 )}
               </select>
+              {clientMode && (
+                <select
+                  className="input"
+                  value={form.partner_id}
+                  onChange={(e) => setForm({ ...form, partner_id: e.target.value })}
+                  required
+                >
+                  <option value="">Which client? *</option>
+                  {pastClients.map((r) => (
+                    <option key={r.id} value={`client:${r.id}`}>
+                      {r.client_name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <input
                 className="input"
                 type="tel"

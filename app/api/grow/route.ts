@@ -91,6 +91,9 @@ export type QueueItem = {
   missing: string[];
   renewLabel: string | null;
   renewSoon: boolean;
+  // Somebody they named and nobody has called. Highest intent in the product
+  // and the shortest fuse, so it outranks everything else in the list.
+  promise: string | null;
 };
 
 export async function GET(_req: NextRequest) {
@@ -103,7 +106,7 @@ export async function GET(_req: NextRequest) {
     [referrals, partners] = await Promise.all([
       fetchAllRows(
         "referrals",
-        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, updated_at, created_at",
+        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, updated_at, created_at",
         account.id
       ),
       fetchAllRows("partners", "id, name, source_kind", account.id),
@@ -148,6 +151,13 @@ export async function GET(_req: NextRequest) {
     }
   }
 
+  // Which clients have already produced a referral. An open promise closes the
+  // moment the person they named actually turns up — asking a producer to tick
+  // something off that the data already knows is how a queue loses trust.
+  const producedFrom = new Set<string>(
+    referrals.filter((r) => r.parent_referral_id).map((r) => r.parent_referral_id as string)
+  );
+
   const queue: QueueItem[] = [];
   let warming = 0;
 
@@ -163,16 +173,22 @@ export async function GET(_req: NextRequest) {
     // Never ask a paid lead's "source" for a referral — there is nobody there.
     // But the CLIENT from a paid lead is exactly who this is for: that's the
     // conversion the whole thesis turns on.
+    const promise =
+      typeof r.promised_note === "string" && r.promised_note.trim() && !producedFrom.has(r.id)
+        ? r.promised_note.trim()
+        : null;
+
     const askedRef = !r.asked_at;
     const askedRev =
       !r.review_asked_at && (r.asked_at ? (daysSince(r.asked_at) ?? 0) >= REVIEW_GAP_DAYS : false);
 
-    if (!askedRef && !askedRev && !roundOut) continue;
+    if (!askedRef && !askedRev && !roundOut && !promise) continue;
 
     // A round-out whose renewal window is open beats the warming rule: if
     // their other policy comes up in three weeks, waiting is how you miss it.
+    // A named person waiting on a call is never "too fresh" to act on.
     const renewSoon = roundOut && renewalDue(r.xsell_target_date);
-    if (days !== null && days < WARM_DAYS && !renewSoon) {
+    if (days !== null && days < WARM_DAYS && !renewSoon && !promise) {
       warming++;
       continue;
     }
@@ -190,12 +206,17 @@ export async function GET(_req: NextRequest) {
       missing: roundOut ? roundOutSuggestions(r.lines) : [],
       renewLabel: roundOut ? renewalLabel(r.xsell_target_date) : null,
       renewSoon,
+      promise,
     });
   }
 
   // Oldest first. A client you bound in March and never asked is the one
   // getting colder, and it is the one the agent has genuinely forgotten.
   queue.sort((a, b) => {
+    // Named person first, then a renewal window closing, then oldest.
+    const ap = a.promise ? 1 : 0;
+    const bp = b.promise ? 1 : 0;
+    if (ap !== bp) return bp - ap;
     if (a.renewSoon !== b.renewSoon) return a.renewSoon ? -1 : 1;
     return (b.boundDays ?? 0) - (a.boundDays ?? 0);
   });
