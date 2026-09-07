@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { IconArrowRight, IconCheck, IconUsers, IconX } from "./icons";
+import { UpgradeModal } from "./upgrade";
+import { useUI } from "./ui";
 
 // The growth card.
 //
@@ -44,10 +46,15 @@ function ago(days: number | null): string {
 }
 
 export function GrowCard() {
+  const { toast } = useUI();
   const [d, setD] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
+  // The best upgrade moment in the product: a client has sent two, and the
+  // portal that makes them a standing partner is the thing behind the wall.
+  // They are not being asked to imagine a benefit — it already happened.
+  const [wall, setWall] = useState<{ name: string; count: number } | null>(null);
 
   async function load() {
     const res = await fetch("/api/grow");
@@ -67,16 +74,44 @@ export function GrowCard() {
       body: JSON.stringify({ partnerId: id }),
     });
     setBusy(null);
-    if (res.ok) load();
+    if (res.ok) {
+      load();
+      return;
+    }
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 402) {
+      const p = d?.promote.find((x) => x.id === id);
+      setWall({ name: p?.name ?? "They", count: p?.count ?? 2 });
+    } else {
+      // Silence on a failed click is worse than a blunt message.
+      toast(err?.error ?? "Couldn't do that just now.", "error");
+    }
   }
 
-  if (!d) return null;
+  const wallModal = wall ? (
+    <UpgradeModal
+      kicker="They earned this"
+      title={`${wall.name} has sent you ${wall.count}`}
+      footnote="Your deals, partners and documents stay exactly where they are."
+      onClose={() => setWall(null)}
+    >
+      <p>
+        That is not a client any more — that is a referral partner, and the people who send you two
+        usually send you a fourth. A partner portal gives {wall.name.split(" ")[0]} a private page
+        to send the next one through and to watch it land, alongside everything you already do by
+        phone.
+      </p>
+    </UpgradeModal>
+  ) : null;
+
+  if (!d) return wallModal;
 
   // Nothing written yet. One line, no zeroes — a brand-new producer staring at
   // "0% earned" learns only that the product thinks they're behind.
   if (d.coldStart) {
     return (
       <div className="card p-4 sm:p-5">
+        {wallModal}
         <p className="text-sm font-semibold">Where your business comes from</p>
         <p className="text-sm text-ink-secondary mt-1">
           Once you bind your first policy, this is where you&apos;ll see how much of your book came
@@ -91,6 +126,7 @@ export function GrowCard() {
 
   return (
     <div className="card overflow-hidden">
+      {wallModal}
       {/* Promotions ride on top: they are time-sensitive in a way the queue
           isn't, and there are almost never more than one or two. */}
       {promos.map((p) => (

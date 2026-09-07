@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { money, sourceLabel, type LedgerRow } from "@/lib/sources";
+import { UpgradeLinks } from "./upgrade";
 
 // Where the business came from.
 //
@@ -12,10 +13,16 @@ import { money, sourceLabel, type LedgerRow } from "@/lib/sources";
 
 export function SourceLedger() {
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [teaser, setTeaser] = useState(0);
 
   useEffect(() => {
     fetch("/api/ledger").then(async (r) => {
-      if (r.ok) setRows((await r.json()).rows ?? []);
+      if (!r.ok) return;
+      const j = await r.json();
+      setRows(j.rows ?? []);
+      setLocked(!!j.locked);
+      setTeaser(j.downstream ?? 0);
     });
   }, []);
 
@@ -58,7 +65,9 @@ export function SourceLedger() {
                   <p className="text-[11px] text-ink-muted">{sourceLabel(r.kind)}</p>
                 </td>
                 <td className="py-2.5 text-right tabnum">
-                  {r.spendMonthlyCents != null ? (
+                  {locked ? (
+                    <span className="text-ink-muted">···</span>
+                  ) : r.spendMonthlyCents != null ? (
                     <>
                       <span>{money(r.spendToDateCents)}</span>
                       <span className="block text-[11px] text-ink-muted">
@@ -71,14 +80,22 @@ export function SourceLedger() {
                 </td>
                 <td className="py-2.5 text-right tabnum">{r.policies}</td>
                 <td className="py-2.5 text-right tabnum">
-                  {r.downstream > 0 ? (
+                  {locked ? (
+                    <span className="text-ink-muted">···</span>
+                  ) : r.downstream > 0 ? (
                     <span className="text-emerald-700 font-medium">+{r.downstream}</span>
                   ) : (
                     <span className="text-ink-muted">—</span>
                   )}
                 </td>
                 <td className="py-2.5 text-right tabnum">
-                  {r.costPerPolicyCents != null ? money(r.costPerPolicyCents) : <span className="text-ink-muted">—</span>}
+                  {locked ? (
+                    <span className="text-ink-muted">···</span>
+                  ) : r.costPerPolicyCents != null ? (
+                    money(r.costPerPolicyCents)
+                  ) : (
+                    <span className="text-ink-muted">—</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -86,25 +103,52 @@ export function SourceLedger() {
         </table>
       </div>
 
-      {withRefs != null && withoutRefs != null && paidDown > 0 && (
+      {locked ? (
+        <div className="mt-4 rounded-xl border border-brand-200 bg-brand-light/40 p-4">
+          <p className="text-sm font-semibold">What each source actually costs you</p>
+          <p className="text-xs text-ink-secondary mt-1.5 leading-relaxed">
+            {teaser > 0 ? (
+              <>
+                <span className="font-semibold text-ink">
+                  {teaser} of your policies came from clients another source produced.
+                </span>{" "}
+                Pro credits them back, so you can see what a lead vendor really costs per policy
+                once the referrals are counted — usually a good deal less than the invoice says.
+              </>
+            ) : (
+              <>
+                Pro adds spend, the referrals each source&apos;s clients went on to send you, and
+                the real cost per policy once those are counted. Everything else here stays free.
+              </>
+            )}
+          </p>
+          <div className="mt-3">
+            <UpgradeLinks compact />
+          </div>
+        </div>
+      ) : null}
+
+      {!locked && withRefs != null && withoutRefs != null && paidDown > 0 && (
         <p className="text-xs text-ink-secondary mt-4 rounded-lg bg-emerald-50 px-3 py-2.5">
           Counting the {paidDown} {paidDown === 1 ? "policy" : "policies"} those clients went on to
           send you, your paid leads cost <span className="font-semibold">{money(withRefs)}</span> a
           policy rather than {money(withoutRefs)}.
         </p>
       )}
-      {paidDirect > 0 && paidDown === 0 && (
+      {!locked && paidDirect > 0 && paidDown === 0 && (
         <p className="text-xs text-ink-secondary mt-4 rounded-lg bg-slate-50 px-3 py-2.5">
           None of your paid-lead clients have sent anyone yet. That is the cheapest business
           available to you and it is currently costing you nothing to ignore.
         </p>
       )}
 
+      {!locked && (
       <p className="text-[11px] text-ink-muted mt-3">
         A policy can appear in two rows: once under the source that wrote it, and once in the
         &ldquo;they sent&rdquo; column of whoever produced the client who referred it. Credit only
         travels one hop.
       </p>
+      )}
     </section>
   );
 }

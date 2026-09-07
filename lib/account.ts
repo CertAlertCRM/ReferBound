@@ -19,7 +19,18 @@ export type Account = {
   // untouched, so when the window lapses they land exactly where they were.
   proUntil: string | null;
   earnedPro: boolean;
+  // Signed up before the paid-source and ledger gates existed. The first
+  // people to trust an unfinished product do not get their tools taken away
+  // to make a pricing page work.
+  legacy: boolean;
 };
+
+// Accounts created before this instant keep the old, wider free tier forever.
+export const LEGACY_BEFORE = "2026-09-08T00:00:00.000Z";
+
+function isLegacy(createdAt: string | null | undefined): boolean {
+  return !!createdAt && createdAt < LEGACY_BEFORE;
+}
 
 // Pro earned through referrals (or a welcome window) still counts as Pro for
 // every feature gate — partner limits, team seats stay Agency-only.
@@ -37,7 +48,7 @@ export async function getAccount(): Promise<Account | null> {
   if (!id) return null;
   const { data: self } = await db()
     .from("accounts")
-    .select("id, email, display_name, plan, stripe_customer_id, subscription_status, team_owner_id, pro_until")
+    .select("id, email, display_name, plan, stripe_customer_id, subscription_status, team_owner_id, pro_until, created_at")
     .eq("id", id)
     .maybeSingle();
   if (!self) return null;
@@ -45,7 +56,7 @@ export async function getAccount(): Promise<Account | null> {
   if (self.team_owner_id) {
     const { data: owner } = await db()
       .from("accounts")
-      .select("id, email, plan, stripe_customer_id, subscription_status, pro_until")
+      .select("id, email, plan, stripe_customer_id, subscription_status, pro_until, created_at")
       .eq("id", self.team_owner_id)
       .maybeSingle();
     if (owner) {
@@ -61,6 +72,7 @@ export async function getAccount(): Promise<Account | null> {
         ownerEmail: owner.email,
         proUntil: owner.pro_until ?? null,
         earnedPro: owner.plan === "free" && effectivePlan(owner.plan, owner.pro_until) === "pro",
+        legacy: isLegacy(owner.created_at),
       };
     }
     // Owner row missing shouldn't happen (FK cascade) — fall through as solo.
@@ -79,6 +91,7 @@ export async function getAccount(): Promise<Account | null> {
     ownerEmail: null,
     proUntil: self.pro_until ?? null,
     earnedPro: self.plan === "free" && plan === "pro",
+    legacy: isLegacy(self.created_at),
   };
 }
 
@@ -107,6 +120,31 @@ export const PLAN_LABELS: Record<string, string> = {
 // that out, so free leaves room for a few of those.
 export const FREE_LENDER_LIMIT = 1;
 export const FREE_OTHER_LIMIT = 2;
+
+// One lead vendor on free. An agency running EverQuote and Quote Wizard and
+// SmartFinancial at the same time is spending thousands a month; the second
+// vendor is an honest signal that the money is there. Nothing is taken away —
+// a single source still gets the queue, the asks, and earned share.
+export const FREE_PAID_LIMIT = 1;
+
+export async function paidSourceCapacity(
+  accountId: string,
+  plan: string,
+  legacy: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (plan !== "free" || legacy) return { ok: true };
+  const { count } = await db()
+    .from("partners")
+    .select("id", { count: "exact", head: true })
+    .eq("account_id", accountId)
+    .eq("source_kind", "paid");
+  if ((count ?? 0) < FREE_PAID_LIMIT) return { ok: true };
+  return {
+    ok: false,
+    error:
+      "Free tracks one lead source. Pro adds the rest — and the ledger that tells you what each one actually costs per policy.",
+  };
+}
 
 export function partnerLimits(plan: string): { lender: number | null; other: number | null } {
   return plan === "free"

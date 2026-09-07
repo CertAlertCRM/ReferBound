@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES, SAFE_STATUSES } from "@/lib/config";
-import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners, paidSourceCapacity } from "@/lib/account";
 import { SOURCE_KINDS, type SourceKind } from "@/lib/sources";
 
 export async function GET() {
@@ -92,7 +92,12 @@ export async function POST(req: NextRequest) {
   // product actually gives away — and a lead vendor never gets one. Counting
   // three lead vendors against an agent's two relationship seats would block
   // them from adding the realtor who is the entire point of the tier.
-  if (source_kind !== "paid") {
+  if (source_kind === "paid") {
+    const paidCap = await paidSourceCapacity(account.id, account.plan, account.legacy);
+    if (!paidCap.ok) {
+      return NextResponse.json({ error: paidCap.error, upgrade: true }, { status: 402 });
+    }
+  } else {
     const capacity = await partnerCapacity(account.id, account.plan, wantType, countPartners(account.id));
     if (!capacity.ok) {
       return NextResponse.json({ error: capacity.error, upgrade: true }, { status: 402 });

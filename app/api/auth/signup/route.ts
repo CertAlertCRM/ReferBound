@@ -6,7 +6,7 @@ import { sendEmail, welcomeEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
 import { TEAM_SEAT_LIMIT } from "@/lib/account";
 import { rateLimit, clientIp, RATE_LIMITED } from "@/lib/ratelimit";
-import { grantProMonths, WELCOME_MONTHS } from "@/lib/referral";
+import { grantProMonths, WELCOME_MONTHS, grantProDays, TRIAL_DAYS } from "@/lib/referral";
 
 export async function POST(req: NextRequest) {
   if (!(await rateLimit(`signup-ip:${clientIp(req)}`, 6, 3600))) {
@@ -110,7 +110,10 @@ export async function POST(req: NextRequest) {
 
   // Referred agents start with a Pro window so they can stand up three or four
   // partners immediately instead of one — the referral doubles as activation.
+  // Everyone else opens on the two-week trial. Team members inherit the
+  // owner's plan and need neither.
   if (referredBy) await grantProMonths(account.id, WELCOME_MONTHS);
+  else if (!teamOwnerId) await grantProDays(account.id, TRIAL_DAYS);
 
   if (!teamOwnerId) {
     // Pilot-data claim: rows created before accounts existed have no owner.

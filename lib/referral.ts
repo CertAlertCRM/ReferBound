@@ -8,6 +8,16 @@ import { db } from "@/lib/db";
 export const REFERRER_MONTHS = 3;
 export const WELCOME_MONTHS = 1;
 
+// Every new account opens on Pro for two weeks.
+//
+// A feature wall makes somebody evaluate; an expiry makes them decide. Two
+// weeks also lands on the right moment — a new producer spends week one
+// backfilling the clients they already wrote, which is exactly when the ask
+// queue is longest and the product is at its most obviously useful. Nothing is
+// charged and nothing is lost at the end: the account falls back to free with
+// every deal, partner and document still in it.
+export const TRIAL_DAYS = 14;
+
 // Extend from whichever is later: now, or an existing unexpired window. Two
 // rewards in the same month stack instead of overwriting each other.
 export async function grantProMonths(accountId: string, months: number): Promise<string | null> {
@@ -19,6 +29,20 @@ export async function grantProMonths(accountId: string, months: number): Promise
       : new Date();
   const until = new Date(base);
   until.setMonth(until.getMonth() + months);
+  const iso = until.toISOString();
+  await db().from("accounts").update({ pro_until: iso }).eq("id", accountId);
+  return iso;
+}
+
+// Same as grantProMonths, in days — the signup trial.
+export async function grantProDays(accountId: string, days: number): Promise<string | null> {
+  const { data: acct } = await db().from("accounts").select("pro_until").eq("id", accountId).maybeSingle();
+  if (!acct) return null;
+  const base =
+    acct.pro_until && new Date(acct.pro_until).getTime() > Date.now()
+      ? new Date(acct.pro_until)
+      : new Date();
+  const until = new Date(base.getTime() + days * 86_400_000);
   const iso = until.toISOString();
   await db().from("accounts").update({ pro_until: iso }).eq("id", accountId);
   return iso;
