@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopNav } from "../components";
 import { PARTNER_TYPES } from "@/lib/config";
+import { money } from "@/lib/sources";
 import { IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
 import { PartnerGaps } from "../partner-gaps";
@@ -28,6 +29,8 @@ type Partner = {
   logoUrl: string | null;
   partner_type: string;
   type_label: string | null;
+  source_kind?: string | null;
+  monthly_spend_cents?: number | null;
   monthly_summary: boolean;
   thankyou_cadence: string;
   short_code: string | null;
@@ -111,6 +114,11 @@ export default function PartnersPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   // The add form is a task, not the point of the page — collapsed until wanted.
   const [addOpen, setAddOpen] = useState(false);
+  // What kind of source this is. A lead vendor is not a "partner type" — it is
+  // a different thing, with no portal, no notifications and nobody to read
+  // them — so it branches the form instead of adding a second dropdown to it.
+  const [skind, setSkind] = useState<"partner" | "paid">("partner");
+  const [spend, setSpend] = useState("");
 
   async function load() {
     const res = await fetch("/api/partners");
@@ -215,7 +223,16 @@ export default function PartnersPage() {
     const res = await fetch("/api/partners", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, emails, partner_type: ptype, type_label: typeLabel }),
+      body: JSON.stringify({
+        name,
+        // A lead vendor rides the simple track: its referrals are clients, not
+        // loan files, and should never demand the closing-document flow.
+        partner_type: skind === "paid" ? "other" : ptype,
+        type_label: skind === "paid" ? "Lead source" : typeLabel,
+        emails: skind === "paid" ? "" : emails,
+        source_kind: skind,
+        monthly_spend: skind === "paid" ? spend : "",
+      }),
     });
     setSaving(false);
     if (res.ok) {
@@ -232,6 +249,7 @@ export default function PartnersPage() {
       setName("");
       setEmails("");
       setTypeLabel("");
+      setSpend("");
       setPasteText("");
       setParsed(null);
       setPasteOpen(false);
@@ -441,45 +459,88 @@ export default function PartnersPage() {
               )}
             </div>
           )}
+          <div className="flex gap-1.5 p-1 rounded-xl bg-slate-100">
+            {([
+              ["partner", "Referral partner"],
+              ["paid", "Lead source I pay for"],
+            ] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setSkind(k)}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                  skind === k ? "bg-white shadow-sm text-ink" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <input
             className="input"
-            placeholder="Partner / team name (e.g., Cowart Home Loans)"
+            placeholder={
+              skind === "paid"
+                ? "Lead source name (e.g., EverQuote)"
+                : "Partner / team name (e.g., Cowart Home Loans)"
+            }
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="section-label">Partner type</span>
-              <select className="input mt-1.5" value={ptype} onChange={(e) => setPtype(e.target.value)}>
-                {Object.entries(PARTNER_TYPES).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-              {ptype === "other" && (
+          {skind === "partner" ? (
+            <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="section-label">Partner type</span>
+                <select className="input mt-1.5" value={ptype} onChange={(e) => setPtype(e.target.value)}>
+                  {Object.entries(PARTNER_TYPES).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+                {ptype === "other" && (
+                  <input
+                    className="input mt-1.5"
+                    placeholder="Call it anything — e.g., Networking group"
+                    maxLength={40}
+                    value={typeLabel}
+                    onChange={(e) => setTypeLabel(e.target.value)}
+                  />
+                )}
+              </label>
+              <label className="block">
+                <span className="section-label">Notification emails</span>
                 <input
                   className="input mt-1.5"
-                  placeholder="Call it anything — e.g., Networking group"
-                  maxLength={40}
-                  value={typeLabel}
-                  onChange={(e) => setTypeLabel(e.target.value)}
+                  placeholder="Comma-separated"
+                  value={emails}
+                  onChange={(e) => setEmails(e.target.value)}
                 />
-              )}
-            </label>
-            <label className="block">
-              <span className="section-label">Notification emails</span>
-              <input
-                className="input mt-1.5"
-                placeholder="Comma-separated"
-                value={emails}
-                onChange={(e) => setEmails(e.target.value)}
-              />
-            </label>
-          </div>
-          <p className="text-xs text-ink-muted">
-            The type shapes their portal: lenders get the closing-date and document flow; everyone
-            else gets a simple client-details form.
-          </p>
+              </label>
+            </div>
+            <p className="text-xs text-ink-muted">
+              The type shapes their portal: lenders get the closing-date and document flow; everyone
+              else gets a simple client-details form.
+            </p>
+            </>
+          ) : (
+            <>
+              <label className="block">
+                <span className="section-label">What you spend a month</span>
+                <input
+                  className="input mt-1.5"
+                  inputMode="decimal"
+                  placeholder="e.g. 1200 — optional"
+                  value={spend}
+                  onChange={(e) => setSpend(e.target.value.replace(/[^0-9.]/g, ""))}
+                />
+              </label>
+              <p className="text-xs text-ink-muted">
+                A lead source gets no portal and no notifications — there is nobody there to read
+                one. Spend is what turns the wins you log into a real cost per policy, and you can
+                add it later.
+              </p>
+            </>
+          )}
           <button className="btn-primary" disabled={saving}>
             {saving ? "Adding…" : "Add partner"}
           </button>
@@ -490,6 +551,10 @@ export default function PartnersPage() {
           {partners.map((p) => {
             const s = p.stats ?? EMPTY_STATS;
             const since = sinceLabel(s.lastAt);
+            // A lead vendor has nothing to look at and no reason to log in.
+            // Offering one a magic link would be absurd, so the whole portal
+            // surface disappears for them.
+            const isPaid = (p.source_kind ?? "partner") === "paid";
             return (
             <div
               key={p.id}
@@ -677,30 +742,41 @@ export default function PartnersPage() {
                         </p>
                       </Link>
                       <p className="text-[11px] text-ink-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="badge bg-slate-100 text-slate-700">
-                          {p.type_label || (PARTNER_TYPES[p.partner_type] ?? "Lender")}
+                        <span
+                          className={`badge ${
+                            isPaid ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {isPaid
+                            ? "Paid leads"
+                            : p.type_label || (PARTNER_TYPES[p.partner_type] ?? "Lender")}
                         </span>
+                        {isPaid && p.monthly_spend_cents != null && (
+                          <span>{money(p.monthly_spend_cents)}/mo</span>
+                        )}
                         {since && <span>{since}</span>}
                       </p>
                     </div>
 
                     {/* One repeated action, one menu for the rest. */}
                     <div className="flex items-center gap-1.5 shrink-0" data-partner-menu>
-                      <button
-                        className="btn-primary !px-3 !py-1.5 text-xs"
-                        onClick={() => copy(p)}
-                        title="Copy this partner's private portal link"
-                      >
-                        {copied === p.id ? (
-                          <>
-                            <IconCheck size={12} /> Copied
-                          </>
-                        ) : (
-                          <>
-                            <IconCopy size={12} /> Copy link
-                          </>
-                        )}
-                      </button>
+                      {!isPaid && (
+                        <button
+                          className="btn-primary !px-3 !py-1.5 text-xs"
+                          onClick={() => copy(p)}
+                          title="Copy this partner's private portal link"
+                        >
+                          {copied === p.id ? (
+                            <>
+                              <IconCheck size={12} /> Copied
+                            </>
+                          ) : (
+                            <>
+                              <IconCopy size={12} /> Copy link
+                            </>
+                          )}
+                        </button>
+                      )}
                       <div className="relative">
                         <button
                           className="w-8 h-8 rounded-lg text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors flex items-center justify-center"
@@ -731,33 +807,37 @@ export default function PartnersPage() {
                             >
                               Edit details
                             </button>
-                            <Link
-                              href={`/p/${p.short_code || p.token}`}
-                              className="block rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
-                            >
-                              View their portal
-                            </Link>
-                            <button
-                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
-                              onClick={() => {
-                                setMenuFor(null);
-                                showQr(p);
-                              }}
-                            >
-                              Show QR code
-                            </button>
-                            <button
-                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
-                              onClick={() => openTx(p)}
-                              disabled={txBusy === p.id}
-                            >
-                              {txSent === p.id ? "Texted ✓" : txBusy === p.id ? "Sending…" : "Text the link"}
-                            </button>
-                            <PartnerInviteButton
-                              partnerId={p.id}
-                              partnerName={p.name}
-                              className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors flex items-center gap-1.5"
-                            />
+                            {!isPaid && (
+                              <>
+                                <Link
+                                  href={`/p/${p.short_code || p.token}`}
+                                  className="block rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                                >
+                                  View their portal
+                                </Link>
+                                <button
+                                  className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                                  onClick={() => {
+                                    setMenuFor(null);
+                                    showQr(p);
+                                  }}
+                                >
+                                  Show QR code
+                                </button>
+                                <button
+                                  className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors"
+                                  onClick={() => openTx(p)}
+                                  disabled={txBusy === p.id}
+                                >
+                                  {txSent === p.id ? "Texted ✓" : txBusy === p.id ? "Sending…" : "Text the link"}
+                                </button>
+                                <PartnerInviteButton
+                                  partnerId={p.id}
+                                  partnerName={p.name}
+                                  className="w-full text-left rounded-lg px-2.5 py-2 text-xs hover:bg-brand-light/60 transition-colors flex items-center gap-1.5"
+                                />
+                              </>
+                            )}
                           </div>
                         )}
 

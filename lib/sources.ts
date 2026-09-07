@@ -1,5 +1,10 @@
-import { db } from "@/lib/db";
 import { SAFE_STATUSES } from "@/lib/config";
+
+// NOTE: this module is imported by client components (the partners page, the
+// stats ledger), so it must stay free of anything server-only. The query that
+// actually builds the ledger lives in lib/ledger.ts for exactly that reason —
+// importing lib/db from here would drag the service-role client into the
+// browser bundle.
 
 // Where business comes from, and what it produced.
 //
@@ -100,58 +105,14 @@ export type LedgerRow = {
   id: string;
   name: string;
   kind: SourceKind;
-  spendCents: number | null;
+  spendMonthlyCents: number | null;
+  monthsActive: number;
+  spendToDateCents: number | null;
   policies: number; // bound, direct from this source
-  downstream: number; // bound policies whose parent came from this source
-  costPerPolicyCents: number | null;
+  downstream: number; // bound policies whose parent client came from this source
+  costPerPolicyCents: number | null; // spend to date over direct + downstream
+  costDirectOnlyCents: number | null; // the same number before the referrals count
 };
-
-export async function sourceLedger(accountId: string): Promise<LedgerRow[]> {
-  const [{ data: partners }, { data: refs }] = await Promise.all([
-    db()
-      .from("partners")
-      .select("id, name, source_kind, monthly_spend_cents")
-      .eq("account_id", accountId),
-    db()
-      .from("referrals")
-      .select("id, partner_id, status, parent_referral_id")
-      .eq("account_id", accountId),
-  ]);
-
-  const rows = (refs ?? []) as any[];
-  const won = rows.filter((r) => SAFE_STATUSES.includes(r.status));
-  const sourceOf = new Map<string, string>(rows.map((r) => [r.id, r.partner_id]));
-
-  const direct = new Map<string, number>();
-  const downstream = new Map<string, number>();
-  for (const r of won) {
-    direct.set(r.partner_id, (direct.get(r.partner_id) ?? 0) + 1);
-    // Credit the ORIGINAL source with what its client went on to produce.
-    // One hop is deliberate: a second-generation referral belongs to the person
-    // who made it, not to the lead vendor three steps back. Crediting the whole
-    // chain to the vendor would flatter the number and nobody would believe it.
-    const parentSource = r.parent_referral_id ? sourceOf.get(r.parent_referral_id) : null;
-    if (parentSource) downstream.set(parentSource, (downstream.get(parentSource) ?? 0) + 1);
-  }
-
-  return ((partners ?? []) as any[])
-    .map((p) => {
-      const policies = direct.get(p.id) ?? 0;
-      const down = downstream.get(p.id) ?? 0;
-      const spend = p.monthly_spend_cents ?? null;
-      const all = policies + down;
-      return {
-        id: p.id,
-        name: p.name,
-        kind: (p.source_kind ?? "partner") as SourceKind,
-        spendCents: spend,
-        policies,
-        downstream: down,
-        costPerPolicyCents: spend && all > 0 ? Math.round(spend / all) : null,
-      };
-    })
-    .sort((a, b) => b.policies + b.downstream - (a.policies + a.downstream));
-}
 
 export function money(cents: number | null | undefined): string {
   if (cents == null) return "—";

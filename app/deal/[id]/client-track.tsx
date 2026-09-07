@@ -71,6 +71,29 @@ export function ClientTrack(p: Props) {
     } else toast((await res.json()).error ?? "Couldn't send", "error");
   }
 
+  // The ask that happened out loud. No email, no recipient — just the record,
+  // which is the only thing the queue and the earned-share number ever wanted.
+  async function mark(kind: "referral" | "review", clear = false) {
+    const key = `mark-${kind}`;
+    setBusy(key);
+    const res = await fetch(`/api/referrals/${p.referralId}/asked`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, how: "in_person", clear }),
+    });
+    setBusy(null);
+    if (res.ok) {
+      toast(
+        clear
+          ? "Unmarked"
+          : kind === "review"
+            ? "Marked — you asked for the review"
+            : `Marked — you asked ${p.clientName.split(" ")[0]}`
+      );
+      p.onDone();
+    } else toast((await res.json()).error ?? "Couldn't save", "error");
+  }
+
   const first = p.clientName.split(" ")[0];
   const sinceQuote = daysSince(p.quoteSentAt);
   const bound = ["bound", "docs_delivered"].includes(p.status);
@@ -198,52 +221,110 @@ export function ClientTrack(p: Props) {
             </div>
           )}
 
-          {/* The reps. Only once they've been taken care of — the ask comes
-              after the delivery, never before it. */}
-          {bound && p.welcomeSentAt && (
-            <div className="rounded-xl border border-brand-200 bg-brand-light/40 p-3.5 space-y-3">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {p.askedAt ? (
-                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                        <IconCheck size={14} /> Referral asked
-                      </span>
-                    ) : (
-                      `Ask ${first} for a referral`
-                    )}
-                  </p>
-                  <p className="text-[11px] text-ink-secondary">
-                    {p.askedAt
-                      ? `${daysSince(p.askedAt) === 0 ? "today" : `${daysSince(p.askedAt)}d ago`} — anything they send comes back credited to you`
-                      : "Right now is the moment — they have their documents and nothing has gone wrong yet."}
-                  </p>
-                </div>
+        </>
+      )}
+      {/* The reps.
+          Outside the email branch on purpose. The ask that works in this
+          business happens out loud — at the desk when they sign, or on the
+          phone when you tell them they're covered. Gating it behind "has an
+          email address" and "sent the welcome" meant a producer doing it the
+          right way looked, to this product, like somebody who never asks. */}
+      {bound && (
+        <div className="rounded-xl border border-brand-200 bg-brand-light/40 p-3.5 space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <p className="text-sm font-medium">
+                {p.askedAt ? (
+                  <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                    <IconCheck size={14} /> Asked {first} for a referral
+                  </span>
+                ) : (
+                  `Ask ${first} for a referral`
+                )}
+              </p>
+              {p.askedAt && (
                 <button
                   type="button"
-                  className={p.askedAt ? "btn-ghost !py-1.5 !px-3 text-xs" : "btn-primary !py-1.5 !px-3 text-xs"}
+                  className="text-[11px] text-ink-muted hover:text-ink underline underline-offset-2"
                   disabled={busy !== null}
-                  onClick={() => send("ask")}
+                  onClick={() => mark("referral", true)}
                 >
-                  {busy === "ask" ? "Sending…" : p.askedAt ? "Ask again" : "Send the ask"}
+                  undo
                 </button>
-              </div>
+              )}
+            </div>
 
-              <div className="flex items-start justify-between gap-3 flex-wrap border-t border-brand-100 pt-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {p.reviewAskedAt ? (
-                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                        <IconCheck size={14} /> Review asked
-                      </span>
-                    ) : (
-                      "Ask for a review"
-                    )}
-                  </p>
-                  <p className="text-[11px] text-ink-secondary">
-                    A review is a referral to people who haven&apos;t met you yet.
-                  </p>
+            {p.askedAt ? (
+              <p className="text-[11px] text-ink-secondary">
+                {daysSince(p.askedAt) === 0 ? "Today" : `${daysSince(p.askedAt)} days ago`} —
+                anything they send comes back credited to you.
+              </p>
+            ) : (
+              <>
+                <p className="text-[11px] text-ink-secondary">
+                  Right now is the moment — they have their documents and nothing has gone wrong
+                  yet. Say it in your words; this is roughly the shape of it:
+                </p>
+                <p className="text-xs text-ink italic bg-white/70 rounded-lg px-3 py-2 border border-brand-100">
+                  &ldquo;Most of my business comes from people like you rather than from
+                  advertising. If somebody you know is closing on a house, or their renewal just
+                  jumped, would you mind giving them my name?&rdquo;
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    className="btn-primary !py-1.5 !px-3 text-xs"
+                    disabled={busy !== null}
+                    onClick={() => mark("referral")}
+                  >
+                    {busy === "mark-referral" ? "Saving…" : "I asked them"}
+                  </button>
+                  {p.clientEmail && p.welcomeSentAt && (
+                    <button
+                      type="button"
+                      className="btn-ghost !py-1.5 !px-3 text-xs"
+                      disabled={busy !== null}
+                      onClick={() => send("ask")}
+                    >
+                      {busy === "ask" ? "Sending…" : (
+                        <>
+                          <IconMail size={13} /> Send it instead
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-start justify-between gap-3 flex-wrap border-t border-brand-100 pt-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {p.reviewAskedAt ? (
+                  <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                    <IconCheck size={14} /> Review asked
+                  </span>
+                ) : (
+                  "Ask for a review"
+                )}
+              </p>
+              <p className="text-[11px] text-ink-secondary">
+                A review is a referral to people who haven&apos;t met you yet.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!p.reviewAskedAt && (
+                <button
+                  type="button"
+                  className="btn-ghost !py-1.5 !px-3 text-xs"
+                  disabled={busy !== null}
+                  onClick={() => mark("review")}
+                >
+                  {busy === "mark-review" ? "Saving…" : "I asked"}
+                </button>
+              )}
+              {p.clientEmail && p.welcomeSentAt && (
                 <button
                   type="button"
                   className="btn-ghost !py-1.5 !px-3 text-xs"
@@ -252,16 +333,17 @@ export function ClientTrack(p: Props) {
                 >
                   {busy === "review" ? "Sending…" : p.reviewAskedAt ? "Ask again" : "Send"}
                 </button>
-              </div>
-
-              <p className="text-[11px] text-ink-muted">
-                Both are drafted in your words and sent when you press the button. Nothing here goes
-                out on its own.
-              </p>
+              )}
             </div>
-          )}
-        </>
+          </div>
+
+          <p className="text-[11px] text-ink-muted">
+            Anything sent from here is drafted in your words and goes out when you press the
+            button. Nothing leaves on its own.
+          </p>
+        </div>
       )}
+
     </section>
   );
 }

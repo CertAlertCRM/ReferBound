@@ -16,6 +16,12 @@ export async function logActivity(
     | "email_sent"
     | "at_risk_flagged"
     | "closing_date_changed"
+    // The reps. "ask_recorded" is the one an agent can create without sending
+    // anything — the conversation that happened at the desk still belongs on
+    // the timeline, or the file reads as though nobody ever asked.
+    | "ask_recorded"
+    | "ask_cleared"
+    | "referral_received"
     | "note",
   detail: string,
   actor: ActivityActor = "agent"

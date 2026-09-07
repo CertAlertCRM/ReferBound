@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
 import { SAFE_STATUSES } from "@/lib/config";
 import { earnedShare, readyToPromote, type SourceKind } from "@/lib/sources";
 
@@ -204,11 +204,24 @@ export async function POST(req: NextRequest) {
 
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, source_kind")
+    .select("id, name, source_kind, partner_type")
     .eq("id", partnerId)
     .eq("account_id", account.id)
     .maybeSingle();
   if (!partner) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // The free wall lives HERE, not at logging. A client-kind source costs
+  // nothing to hold; a standing partner gets a portal, which is the thing the
+  // plan actually sells. Checked at the moment the portal is granted.
+  const capacity = await partnerCapacity(
+    account.id,
+    account.plan,
+    partner.partner_type ?? "other",
+    countPartners(account.id)
+  );
+  if (!capacity.ok) {
+    return NextResponse.json({ error: capacity.error, upgrade: true }, { status: 402 });
+  }
 
   const { error } = await db()
     .from("partners")

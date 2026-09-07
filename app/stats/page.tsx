@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { STATUS_LABELS } from "@/lib/config";
 import { TopNav } from "../components";
 import { SkeletonPage } from "../skeleton";
+import { SourceLedger } from "../source-ledger";
 
 type Stats = {
   scope: "live" | "history" | "all";
@@ -136,6 +137,8 @@ export default function StatsPage() {
             </div>
           ))}
         </div>
+
+        <SourceLedger />
 
         {stats.monthly.some((m) => m.referred > 0 || m.bound > 0) && (
           <section className="card p-5">

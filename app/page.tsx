@@ -131,10 +131,17 @@ export default function Dashboard() {
     e.preventDefault();
     setSaving(true);
     const log_seconds = Math.round((Date.now() - formOpenedAt.current) / 100) / 10;
+    // "A client sent them" rides in the same dropdown as the partners, because
+    // to the agent it is the same question. The server turns the sentinel into
+    // a client-kind source and the parent link that credits it.
+    const sentClient = form.partner_id.startsWith("client:");
+    const payload = sentClient
+      ? { ...form, partner_id: "", from_referral_id: form.partner_id.slice(7), log_seconds }
+      : { ...form, log_seconds };
     const res = await fetch("/api/referrals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, log_seconds }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       setSaving(false);
@@ -205,6 +212,17 @@ export default function Dashboard() {
     const lost = referrals.filter((r) => r.status === "lost");
     return { risk, active, done, lost };
   }, [referrals]);
+
+  // Clients you already wrote. Picking one here is what closes the loop:
+  // the referral gets credited to them, they climb the ladder, and whatever
+  // source produced them in the first place gets the downstream credit.
+  const pastClients = useMemo(
+    () =>
+      referrals
+        .filter((r) => ["bound", "docs_delivered"].includes(r.status))
+        .sort((a, b) => (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at)),
+    [referrals]
+  );
 
   const inProgress = groups.risk.length + groups.active.length;
 
@@ -362,9 +380,22 @@ export default function Dashboard() {
                 required
               >
                 <option value="">Referred by… *</option>
-                {partners.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {partners.length > 0 && (
+                  <optgroup label="Referral sources">
+                    {partners.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {pastClients.length > 0 && (
+                  <optgroup label="A client who sent them">
+                    {pastClients.map((r) => (
+                      <option key={r.id} value={`client:${r.id}`}>
+                        {r.client_name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <input
                 className="input"

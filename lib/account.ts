@@ -141,12 +141,19 @@ export function isLenderType(partnerType?: string | null): boolean {
 }
 
 // Count an account's partners on one side of the lender line.
+//
+// Only portal-bearing sources count. The cap is about portals — the thing the
+// plan actually sells — and a lead vendor or a referring client has none. If
+// client sources counted here, logging your third word-of-mouth deal would
+// quietly use up the seat meant for a realtor, which is the opposite of what
+// the free tier is for.
 export function countPartners(accountId: string) {
   return async (lender: boolean) => {
     const q = db()
       .from("partners")
       .select("id", { count: "exact", head: true })
-      .eq("account_id", accountId);
+      .eq("account_id", accountId)
+      .eq("source_kind", "partner");
     const { count } = await (lender ? q.eq("partner_type", "lender") : q.neq("partner_type", "lender"));
     return count ?? 0;
   };
