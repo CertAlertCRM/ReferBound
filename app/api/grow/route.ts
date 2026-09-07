@@ -47,13 +47,15 @@ function daysSince(iso: string | null | undefined): number | null {
 // PostgREST silently caps a response at 1,000 rows. An agency with three
 // producers and two years of history blows through that, and the failure mode
 // is a quietly wrong number rather than an error — so page explicitly.
-async function fetchAllRows(build: () => any, cols: string): Promise<any[]> {
+async function fetchAllRows(table: string, cols: string, accountId: string): Promise<any[]> {
   const PAGE = 1000;
   const MAX_PAGES = 25;
   const out: any[] = [];
   for (let p = 0; p < MAX_PAGES; p++) {
-    const { data, error } = await build()
+    const { data, error } = await (db() as any)
+      .from(table)
       .select(cols)
+      .eq("account_id", accountId)
       .range(p * PAGE, p * PAGE + PAGE - 1);
     if (error) throw new Error(error.message);
     const rows = (data ?? []) as any[];
@@ -82,19 +84,17 @@ export async function GET(_req: NextRequest) {
   try {
     [referrals, partners] = await Promise.all([
       fetchAllRows(
-        () => db().from("referrals").eq("account_id", account.id),
-        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, updated_at, created_at"
+        "referrals",
+        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, updated_at, created_at",
+        account.id
       ),
-      fetchAllRows(
-        () => db().from("partners").eq("account_id", account.id),
-        "id, name, source_kind"
-      ),
+      fetchAllRows("partners", "id, name, source_kind", account.id),
     ]);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Could not load" }, { status: 500 });
   }
 
-  const partnerById = new Map<string, any>(partners.map((p) => [p.id, p]));
+  const partnerById = new Map<string, any>(partners.map((p) => [p.id, p] as [string, any]));
   const kindOf = (partnerId: string | null): SourceKind =>
     ((partnerId && partnerById.get(partnerId)?.source_kind) || "partner") as SourceKind;
 
