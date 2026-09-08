@@ -108,7 +108,8 @@ export type LedgerRow = {
   spendMonthlyCents: number | null;
   monthsActive: number;
   spendToDateCents: number | null;
-  policies: number; // bound, direct from this source
+  policies: number; // bound and still on the books, direct from this source
+  lapsed: number; // written from this source and since cancelled
   downstream: number; // bound policies whose parent client came from this source
   costPerPolicyCents: number | null; // spend to date over direct + downstream
   costDirectOnlyCents: number | null; // the same number before the referrals count

@@ -202,6 +202,20 @@ export default function DealPage() {
     if (msgRes.ok) setMsgs((await msgRes.json()).messages ?? []);
   }
 
+  // Retention and claims. Both are things only the agent knows — no carrier
+  // data enters this product — so both are one deliberate click.
+  const [flagBusy, setFlagBusy] = useState<string | null>(null);
+  async function setFlag(key: string, value: boolean) {
+    setFlagBusy(key);
+    await fetch(`/api/referrals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: value }),
+    });
+    setFlagBusy(null);
+    load();
+  }
+
   async function saveDealValue(e: React.FormEvent) {
     e.preventDefault();
     setDealSaving(true);
@@ -1205,6 +1219,72 @@ export default function DealPage() {
             Feeds your Stats page — premium sourced per partner is the number that proves what each
             relationship is worth. Never shown to partners.
           </p>
+
+          {/* After the sale.
+              A written policy is not permanent, and a claim handled well is
+              the strongest moment there is for an ask. Neither is something
+              the software can find out on its own. */}
+          {["bound", "docs_delivered"].includes(r.status) && (
+            <div className="border-t border-slate-100 pt-3.5 space-y-3">
+              <span className="section-label">After the sale</span>
+
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {(r as any).lapsed_at ? "No longer on the books" : "Still on the books"}
+                  </p>
+                  <p className="text-[11px] text-ink-muted">
+                    {(r as any).lapsed_at
+                      ? "Left out of your live numbers and the cost per policy on Stats."
+                      : "Mark this if they cancel. It keeps your cost per policy honest."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost !py-1.5 !px-3 text-xs shrink-0"
+                  disabled={flagBusy === "lapsed"}
+                  onClick={() => setFlag("lapsed", !(r as any).lapsed_at)}
+                >
+                  {flagBusy === "lapsed"
+                    ? "Saving…"
+                    : (r as any).lapsed_at
+                      ? "They came back"
+                      : "They cancelled"}
+                </button>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 flex-wrap border-t border-slate-100 pt-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {(r as any).claim_went_well_at ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <IconCheck size={14} /> Claim went well
+                      </span>
+                    ) : (
+                      "Had a claim?"
+                    )}
+                  </p>
+                  <p className="text-[11px] text-ink-muted">
+                    {(r as any).claim_went_well_at
+                      ? "They move up your list. This is when people talk about their agent."
+                      : "If one was handled well, that is the best moment you will get to ask."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost !py-1.5 !px-3 text-xs shrink-0"
+                  disabled={flagBusy === "claim_went_well"}
+                  onClick={() => setFlag("claim_went_well", !(r as any).claim_went_well_at)}
+                >
+                  {flagBusy === "claim_went_well"
+                    ? "Saving…"
+                    : (r as any).claim_went_well_at
+                      ? "Undo"
+                      : "It went well"}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Activity timeline — latest entry up front, full history on demand */}

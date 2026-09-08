@@ -42,8 +42,9 @@ export function SourceLedger() {
     <section className="card p-5">
       <h2 className="section-label mb-1">Where the business came from</h2>
       <p className="text-xs text-ink-muted mb-4">
-        Policies written by source, plus what the clients from that source went on to send you.
-        Spend is estimated from the monthly figure over the time the source has existed.
+        Policies still on the books by source, plus what the clients from that source went on to
+        send you. Cancelled policies are shown but not counted. Spend is estimated from the
+        monthly figure over the time the source has existed.
       </p>
 
       <div className="overflow-x-auto -mx-1 px-1">
@@ -78,7 +79,14 @@ export function SourceLedger() {
                     <span className="text-ink-muted">—</span>
                   )}
                 </td>
-                <td className="py-2.5 text-right tabnum">{r.policies}</td>
+                <td className="py-2.5 text-right tabnum">
+                  {r.policies}
+                  {!locked && r.lapsed > 0 && (
+                    <span className="block text-[11px] text-ink-muted">
+                      {r.lapsed} lapsed
+                    </span>
+                  )}
+                </td>
                 <td className="py-2.5 text-right tabnum">
                   {locked ? (
                     <span className="text-ink-muted">···</span>

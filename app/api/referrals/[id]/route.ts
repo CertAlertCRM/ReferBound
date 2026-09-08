@@ -28,6 +28,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Structured lines and the round-out date come through as their own shapes
   // rather than raw strings, so they're handled after this scalar loop.
   if (Array.isArray((body as any).lines)) patch.lines = cleanLines((body as any).lines);
+
+  // Booleans in, timestamps out. The caller says what is true now; the column
+  // remembers when it became true, same as every other flag on this table.
+  const stamp = (key: string, col: string) => {
+    if (key in (body as any)) {
+      patch[col] = (body as any)[key] ? new Date().toISOString() : null;
+    }
+  };
+  stamp("lapsed", "lapsed_at");
+  stamp("claim_opened", "claim_opened_at");
+  stamp("claim_went_well", "claim_went_well_at");
   if ("xsell_target_date" in (body as any)) {
     const d = String((body as any).xsell_target_date ?? "").trim();
     patch.xsell_target_date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;

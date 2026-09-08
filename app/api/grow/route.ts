@@ -94,6 +94,12 @@ export type QueueItem = {
   // Somebody they named and nobody has called. Highest intent in the product
   // and the shortest fuse, so it outranks everything else in the list.
   promise: string | null;
+  // Somebody sent you this client and has never been told what happened.
+  // A referral you never acknowledge is a referral that doesn't repeat.
+  thankFor: string | null;
+  // A claim that went well is the moment people actually talk about their
+  // agent. Rare, and worth jumping the line for.
+  claimWentWell: boolean;
 };
 
 export async function GET(_req: NextRequest) {
@@ -106,7 +112,7 @@ export async function GET(_req: NextRequest) {
     [referrals, partners] = await Promise.all([
       fetchAllRows(
         "referrals",
-        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, updated_at, created_at",
+        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, thanked_at, lapsed_at, claim_went_well_at, updated_at, created_at",
         account.id
       ),
       fetchAllRows("partners", "id, name, source_kind", account.id),
@@ -128,7 +134,13 @@ export async function GET(_req: NextRequest) {
     referrals.map((r) => ({ status: r.status, source_kind: kindOf(r.partner_id) }))
   );
 
-  const won = referrals.filter((r) => SAFE_STATUSES.includes(r.status));
+  // A lapsed policy is not a win any more. It still happened, and the history
+  // keeps it, but nothing forward-looking should treat a client who left as a
+  // client you can go back to.
+  const won = referrals.filter((r) => SAFE_STATUSES.includes(r.status) && !r.lapsed_at);
+  const lapsedCount = referrals.filter(
+    (r) => SAFE_STATUSES.includes(r.status) && r.lapsed_at
+  ).length;
 
   // ── 2. The unasked queue ──────────────────────────────────────────────────
   //
@@ -158,6 +170,10 @@ export async function GET(_req: NextRequest) {
     referrals.filter((r) => r.parent_referral_id).map((r) => r.parent_referral_id as string)
   );
 
+  const nameOf = new Map<string, string>(
+    referrals.map((r) => [r.id, r.client_name] as [string, string])
+  );
+
   const queue: QueueItem[] = [];
   let warming = 0;
 
@@ -178,17 +194,25 @@ export async function GET(_req: NextRequest) {
         ? r.promised_note.trim()
         : null;
 
+    // Whoever sent this client, and whether they've heard anything back.
+    const parentName = r.parent_referral_id ? nameOf.get(r.parent_referral_id) ?? null : null;
+    const thankFor = !r.thanked_at && parentName ? parentName : null;
+
+    const claimWentWell = Boolean(r.claim_went_well_at) && !r.asked_at;
+
     const askedRef = !r.asked_at;
     const askedRev =
       !r.review_asked_at && (r.asked_at ? (daysSince(r.asked_at) ?? 0) >= REVIEW_GAP_DAYS : false);
 
-    if (!askedRef && !askedRev && !roundOut && !promise) continue;
+    if (!askedRef && !askedRev && !roundOut && !promise && !thankFor) continue;
 
     // A round-out whose renewal window is open beats the warming rule: if
     // their other policy comes up in three weeks, waiting is how you miss it.
     // A named person waiting on a call is never "too fresh" to act on.
+    // A thank-you and an open renewal window are both time-sensitive in a way
+    // the warming rule was never meant to hold back.
     const renewSoon = roundOut && renewalDue(r.xsell_target_date);
-    if (days !== null && days < WARM_DAYS && !renewSoon && !promise) {
+    if (days !== null && days < WARM_DAYS && !renewSoon && !promise && !thankFor) {
       warming++;
       continue;
     }
@@ -207,17 +231,20 @@ export async function GET(_req: NextRequest) {
       renewLabel: roundOut ? renewalLabel(r.xsell_target_date) : null,
       renewSoon,
       promise,
+      thankFor,
+      claimWentWell,
     });
   }
 
   // Oldest first. A client you bound in March and never asked is the one
   // getting colder, and it is the one the agent has genuinely forgotten.
+  // Owed a thank-you first, then a named person waiting, then a claim that
+  // went well, then a renewal window closing, then oldest. Everything above
+  // "oldest" is something with a clock on it.
+  const rank = (q: QueueItem) =>
+    q.thankFor ? 0 : q.promise ? 1 : q.claimWentWell ? 2 : q.renewSoon ? 3 : 4;
   queue.sort((a, b) => {
-    // Named person first, then a renewal window closing, then oldest.
-    const ap = a.promise ? 1 : 0;
-    const bp = b.promise ? 1 : 0;
-    if (ap !== bp) return bp - ap;
-    if (a.renewSoon !== b.renewSoon) return a.renewSoon ? -1 : 1;
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
     return (b.boundDays ?? 0) - (a.boundDays ?? 0);
   });
 
@@ -298,6 +325,7 @@ export async function GET(_req: NextRequest) {
     askedThisWeek,
     streakWeeks,
     firstEarned,
+    lapsedCount,
     // The producer's second number. Households carrying more than one line,
     // out of the households where lines were recorded at all.
     multiline: multilineRate(won.map((r) => ({ lines: cleanLines(r.lines) }))),

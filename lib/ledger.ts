@@ -16,13 +16,22 @@ export async function sourceLedger(accountId: string): Promise<LedgerRow[]> {
       .eq("account_id", accountId),
     db()
       .from("referrals")
-      .select("id, partner_id, status, parent_referral_id")
+      .select("id, partner_id, status, parent_referral_id, lapsed_at")
       .eq("account_id", accountId),
   ]);
 
   const rows = (refs ?? []) as any[];
-  const won = rows.filter((r) => SAFE_STATUSES.includes(r.status));
+  // Written, and still on the books. A policy that lapsed at six months cost
+  // the same to acquire and produced a fraction of the value, so a cost per
+  // policy that keeps counting it forever is a number an owner stops trusting.
+  const written = rows.filter((r) => SAFE_STATUSES.includes(r.status));
+  const won = written.filter((r) => !r.lapsed_at);
   const sourceOf = new Map<string, string>(rows.map((r) => [r.id, r.partner_id] as [string, string]));
+
+  const lapsedBySource = new Map<string, number>();
+  for (const r of written) {
+    if (r.lapsed_at) lapsedBySource.set(r.partner_id, (lapsedBySource.get(r.partner_id) ?? 0) + 1);
+  }
 
   const direct = new Map<string, number>();
   const downstream = new Map<string, number>();
@@ -39,6 +48,7 @@ export async function sourceLedger(accountId: string): Promise<LedgerRow[]> {
   return ((partners ?? []) as any[])
     .map((p) => {
       const policies = direct.get(p.id) ?? 0;
+      const lapsed = lapsedBySource.get(p.id) ?? 0;
       const down = downstream.get(p.id) ?? 0;
       const monthly = p.monthly_spend_cents ?? null;
 
@@ -60,6 +70,7 @@ export async function sourceLedger(accountId: string): Promise<LedgerRow[]> {
         monthsActive,
         spendToDateCents: toDate,
         policies,
+        lapsed,
         downstream: down,
         costPerPolicyCents:
           toDate != null && policies + down > 0 ? Math.round(toDate / (policies + down)) : null,

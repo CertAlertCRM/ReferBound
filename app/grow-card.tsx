@@ -30,6 +30,8 @@ type Queue = {
   renewLabel: string | null;
   renewSoon: boolean;
   promise: string | null;
+  thankFor: string | null;
+  claimWentWell: boolean;
 };
 
 type Data = {
@@ -42,6 +44,7 @@ type Data = {
   askedThisWeek: number;
   streakWeeks: number;
   firstEarned: { clientName: string; fromName: string | null } | null;
+  lapsedCount?: number;
   multiline?: { recorded: number; multiline: number; monoline: number; percent: number | null };
   coldStart: boolean;
   // Set when the server could not read. Distinct from an empty book: the card
@@ -96,6 +99,20 @@ export function GrowCard() {
     });
     setBusy(null);
     load();
+  }
+
+  // Closing the loop with whoever sent this client. Records that it happened;
+  // sends nothing, because most of these are a phone call or a text.
+  async function thank(id: string) {
+    setBusy(`t-${id}`);
+    const res = await fetch(`/api/referrals/${id}/asked`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "thanked", how: "in_person" }),
+    });
+    setBusy(null);
+    if (res.ok) load();
+    else toast("Couldn't save that just now.", "error");
   }
 
   async function promote(id: string) {
@@ -269,7 +286,32 @@ export function GrowCard() {
           </div>
           <ul className="divide-y divide-slate-100">
             {shown.map((q) =>
-              q.promise ? (
+              q.thankFor ? (
+                <li
+                  key={q.id}
+                  className="flex items-start gap-3 px-4 sm:px-5 py-3.5 bg-emerald-50/60 border-l-[3px] border-emerald-500"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm leading-snug">
+                      <span className="font-semibold">{q.thankFor}</span> sent you{" "}
+                      <span className="font-semibold">{q.clientName}</span>, and hasn&apos;t heard
+                      how it went.
+                    </p>
+                    <p className="text-xs text-ink-muted mt-1">
+                      People who get thanked properly send a second one.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => thank(q.id)}
+                      disabled={busy === `t-${q.id}`}
+                      className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
+                    >
+                      {busy === `t-${q.id}` ? "…" : "I told them"}
+                    </button>
+                  </div>
+                </li>
+              ) : q.promise ? (
                 <li
                   key={q.id}
                   className="flex items-start gap-3 px-4 sm:px-5 py-3.5 bg-amber-50/70 border-l-[3px] border-amber-400"
@@ -318,6 +360,9 @@ export function GrowCard() {
                     {/* Why this person is on the list. One call, and these are
                         the things to cover on it. */}
                     <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      {q.claimWentWell && (
+                        <span className="chip chip-good">claim went well</span>
+                      )}
                       {q.askReferral && <span className="chip chip-brand">not asked yet</span>}
                       {q.roundOut && (
                         <span className={`chip ${q.renewSoon ? "chip-warn" : "chip-neutral"}`}>

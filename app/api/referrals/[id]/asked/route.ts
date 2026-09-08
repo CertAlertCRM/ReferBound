@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 // So: no email, no template, no recipient. Just the record that it happened,
 // which is all the queue and the earned-share number ever needed.
 
-type Kind = "referral" | "review" | "crosssell";
+type Kind = "referral" | "review" | "crosssell" | "thanked";
 
 const COLUMN: Record<Kind, string> = {
   referral: "asked_at",
@@ -26,6 +26,9 @@ const COLUMN: Record<Kind, string> = {
   // on the phone, and a producer who does it the right way should not look to
   // this product like somebody who never did it.
   crosssell: "xsell_asked_at",
+  // Closing the loop. Stamped on the referral that was PRODUCED, because one
+  // source can send several people and each of them earns its own thank-you.
+  thanked: "thanked_at",
 };
 
 const HOW_LABEL: Record<string, string> = {
@@ -44,7 +47,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.json().catch(() => ({}));
   const kind: Kind =
-    body?.kind === "review" ? "review" : body?.kind === "crosssell" ? "crosssell" : "referral";
+    body?.kind === "review"
+      ? "review"
+      : body?.kind === "crosssell"
+        ? "crosssell"
+        : body?.kind === "thanked"
+          ? "thanked"
+          : "referral";
   const how = String(body?.how ?? "in_person");
   const clear = body?.clear === true;
 
@@ -56,7 +65,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq("account_id", account.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const what = kind === "review" ? "review" : kind === "crosssell" ? "round-out" : "referral";
+  const what =
+    kind === "review"
+      ? "review"
+      : kind === "crosssell"
+        ? "round-out"
+        : kind === "thanked"
+          ? "thank-you"
+          : "referral";
   const suffix = HOW_LABEL[how] ? ` ${HOW_LABEL[how]}` : "";
   await logActivity(
     params.id,
@@ -65,7 +81,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ? `Unmarked the ${what} ask`
       : kind === "crosssell"
         ? `Talked to ${owned.client_name} about rounding out the household${suffix}`
-        : `Asked ${owned.client_name} for a ${what}${suffix}`,
+        : kind === "thanked"
+          ? `Thanked whoever sent ${owned.client_name}${suffix}`
+          : `Asked ${owned.client_name} for a ${what}${suffix}`,
     "agent"
   );
 
