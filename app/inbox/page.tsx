@@ -25,6 +25,9 @@ type Row = {
   body: string | null;
   match_kind: string | null;
   extracted: any;
+  intent: string | null;
+  target_referral_id: string | null;
+  match_confidence: string | null;
   status: string;
   referral_id: string | null;
   error: string | null;
@@ -209,7 +212,23 @@ export default function InboxPage() {
                         ) : (
                           <span className="badge bg-brand-light text-brand">{r.partners?.name}</span>
                         )}
-                        {e.is_referral === false && (
+                        {/* What the intake thinks this is. Recorded only —
+                            nothing acts on it yet. Shown so the classification
+                            can be judged against a week of real mail before
+                            anything is built to apply it. */}
+                        {r.intent && r.intent !== "new_referral" && r.intent !== "none" && (
+                          <span className="badge bg-indigo-50 text-indigo-700">
+                            {r.intent === "policy_issued"
+                              ? "policy issued"
+                              : r.intent === "cancellation"
+                                ? "cancellation"
+                                : "claim"}
+                            {r.match_confidence && r.match_confidence !== "none"
+                              ? ` · ${r.match_confidence} match`
+                              : " · no match"}
+                          </span>
+                        )}
+                        {e.is_referral === false && !r.intent?.match(/policy_issued|cancellation|claim/) && (
                           <span className="badge bg-slate-100 text-ink-muted">not a referral?</span>
                         )}
                         {r.error && !r.extracted && (

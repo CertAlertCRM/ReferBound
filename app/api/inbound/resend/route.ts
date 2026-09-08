@@ -9,6 +9,9 @@ import {
   sendAcknowledgment,
   findForwardedSender,
   findForwardedName,
+  normalizeIntent,
+  matchExistingClient,
+  POST_SALE_INTENTS,
   INBOX_DOMAIN,
 } from "@/lib/inbound";
 import { sendEmail, newPartnerLeadEmail } from "@/lib/email";
@@ -256,6 +259,27 @@ export async function POST(req: NextRequest) {
     row.error = bodyNote || "Couldn't retrieve the message body from the mail provider.";
   }
 
+  // ── Phase one: what is this, and who is it about ──────────────────────────
+  //
+  // Recorded, not acted on. The forwarding address has only ever known how to
+  // create a new lead, so everything an agent actually receives AFTER the sale
+  // — a policy issued, a cancellation notice, a claim acknowledgement — lands
+  // here as "not a referral" and dies. Classifying it now, before anything is
+  // built to apply it, is what tells us whether the matching is good enough to
+  // be trusted with marking somebody's client cancelled.
+  const intent = normalizeIntent(extracted?.intent);
+  row.intent = intent;
+  if (POST_SALE_INTENTS.includes(intent) && extracted) {
+    try {
+      const m = await matchExistingClient(account.id, extracted);
+      row.target_referral_id = m.referralId;
+      row.match_confidence = m.confidence;
+    } catch {
+      // A matcher failure must never cost the agent the email itself.
+      row.match_confidence = "none";
+    }
+  }
+
   const looksLikeReferral = extracted?.is_referral !== false && Boolean(extracted?.client_name);
   const autoCreate =
     prof?.inbox_autocreate !== false &&
@@ -267,7 +291,11 @@ export async function POST(req: NextRequest) {
     !overQuota &&
     // A sealed message gives us a subject line and nothing else. That's worth
     // showing the agent, never worth logging behind their back.
-    !sealed;
+    !sealed &&
+    // A cancellation notice is not a new client, whatever else the extraction
+    // thought. The only direction this can be wrong in is holding an email
+    // that would have auto-created, which costs one click.
+    !POST_SALE_INTENTS.includes(intent);
 
   if (!autoCreate) {
     const saveErr = await saveInbound(row);

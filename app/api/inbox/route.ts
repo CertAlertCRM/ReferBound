@@ -31,7 +31,7 @@ export async function GET() {
 
   const { data, error } = await db()
     .from("inbound_emails")
-    .select("id, from_email, from_name, forwarded_from, subject, body, match_kind, extracted, status, referral_id, error, created_at, partners(id, name)")
+    .select("id, from_email, from_name, forwarded_from, subject, body, match_kind, extracted, status, referral_id, intent, target_referral_id, match_confidence, error, created_at, partners(id, name)")
     .eq("account_id", account.id)
     .order("created_at", { ascending: false })
     .limit(60);
