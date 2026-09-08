@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { linesFromText, cleanLines } from "@/lib/lines";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { logActivity } from "@/lib/activity";
@@ -148,6 +149,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Client name: never overwrite, but flag a real mismatch.
   if (extracted.client_name && norm(extracted.client_name) !== norm(referral.client_name)) {
     mismatches.push(`client name: referral has “${referral.client_name}”, document says “${extracted.client_name}”`);
+  }
+
+  // The lines the document just told us about, in the structured form the
+  // round-out queue reads. Only when nobody has ticked the boxes by hand —
+  // an agent's own answer always beats a parse of their paperwork.
+  if (cleanLines((referral as any).lines).length === 0) {
+    const derived = linesFromText(
+      (patch.policy_lines as string | undefined) ?? extracted.policy_lines ?? referral.policy_lines
+    );
+    if (derived.length > 0) {
+      patch.lines = derived;
+      filled.push("lines written");
+    }
   }
 
   if (Object.keys(patch).length > 0) {

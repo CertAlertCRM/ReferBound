@@ -39,6 +39,50 @@ export function cleanLines(input: unknown): LineKind[] {
   return LINE_ORDER.filter((k) => out.includes(k));
 }
 
+// Read the lines off whatever the agent or the extractor already wrote.
+//
+// This exists because the document extractor has always pulled policy_lines as
+// free text — "Home + Flood", "HO3", "auto/umb" — and writes it to the deal.
+// Asking a producer to then tick boxes for information the system already read
+// off their own dec page is exactly the kind of re-entry this product is
+// supposed to remove.
+//
+// Deliberately conservative: an unrecognised word contributes nothing rather
+// than guessing "other", because a wrong monoline flag puts a false prompt in
+// front of an agent who knows better.
+const LINE_PATTERNS: [LineKind, RegExp][] = [
+  ["renters", /\b(renters?|tenants?|ho-?4|h0-?4)\b/i],
+  ["home", /\b(home|homeowners?|dwelling|ho-?[36]|h0-?[36]|dp-?[13]|condo|fire)\b/i],
+  ["auto", /\b(auto|autos|car|vehicle|pap|personal auto)\b/i],
+  ["umbrella", /\b(umbrella|umb|pup|excess liability)\b/i],
+  ["life", /\b(life|term life|whole life|iul|final expense)\b/i],
+  ["other", /\b(flood|boat|watercraft|motorcycle|rv|atv|jewelry|scheduled|pet|cyber|earthquake|toy|camper|trailer)\b/i],
+];
+
+export function linesFromText(text: string | null | undefined): LineKind[] {
+  const t = String(text ?? "");
+  if (!t.trim()) return [];
+  const found: LineKind[] = [];
+  for (const [kind, re] of LINE_PATTERNS) {
+    if (re.test(t)) found.push(kind);
+  }
+  // Renters and home are alternatives, never both on one household.
+  const cleaned = found.includes("renters") ? found.filter((k) => k !== "home") : found;
+  return LINE_ORDER.filter((k) => cleaned.includes(k));
+}
+
+// What the deal actually has: the boxes if somebody ticked them, otherwise
+// whatever can be read off the free-text field. Lets every deal already in the
+// book light up the round-out queue without anyone backfilling anything.
+export function effectiveLines(
+  lines: string[] | null | undefined,
+  policyLines?: string | null
+): LineKind[] {
+  const ticked = cleanLines(lines);
+  if (ticked.length > 0) return ticked;
+  return linesFromText(policyLines);
+}
+
 // One line on the household. "Other" counts — an agent who wrote a boat policy
 // and nothing else still has a household worth rounding out.
 export function isMonoline(lines: string[] | null | undefined): boolean {

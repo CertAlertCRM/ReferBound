@@ -22,7 +22,7 @@ import {
   IconCheck,
 } from "../../icons";
 import { useUI } from "../../ui";
-import { LINE_ORDER, LINE_KINDS, cleanLines, roundOutSuggestions, type LineKind } from "@/lib/lines";
+import { LINE_ORDER, LINE_KINDS, cleanLines, effectiveLines, roundOutSuggestions, type LineKind } from "@/lib/lines";
 import { SkeletonPanels } from "../../skeleton";
 import { ClientTrack } from "./client-track";
 import { LenderLink } from "./lender-link";
@@ -73,6 +73,7 @@ export default function DealPage() {
   const [dealBaseline, setDealBaseline] = useState({ premium: "", lines: "", written: "", renew: "" });
   // Structured lines, and when a competing policy comes up for renewal.
   const [written, setWritten] = useState<LineKind[]>([]);
+  const [linesGuessed, setLinesGuessed] = useState(false);
   const [renew, setRenew] = useState("");
   const [dealSaving, setDealSaving] = useState(false);
   const dealDirty =
@@ -187,13 +188,26 @@ export default function DealPage() {
       if (found) {
         const p = found.premium != null ? String(found.premium) : "";
         const l = found.policy_lines ?? "";
-        const w = cleanLines((found as any).lines);
+        // Nothing ticked yet? Read the boxes off the free-text line the
+        // extractor filled from their own dec page, so the agent confirms
+        // rather than retypes. Marked as a guess until they save it.
+        const ticked = cleanLines((found as any).lines);
+        const w = ticked.length > 0 ? ticked : effectiveLines(null, (found as any).policy_lines);
+        const guessed = ticked.length === 0 && w.length > 0;
+        setLinesGuessed(guessed);
         const rn = (found as any).xsell_target_date ?? "";
         setPremium(p);
         setLines(l);
         setWritten(w);
         setRenew(rn);
-        setDealBaseline({ premium: p, lines: l, written: w.join(","), renew: rn });
+        setDealBaseline({
+          premium: p,
+          lines: l,
+          // A guess is not a saved value: leaving the baseline empty keeps the
+          // Save button live so one click confirms it.
+          written: guessed ? "" : w.join(","),
+          renew: rn,
+        });
         if ((found as any).doc_check) setCheck((found as any).doc_check);
         setCovEntries(Array.isArray((found as any).coverage_notes) ? (found as any).coverage_notes : []);
       }
@@ -1177,7 +1191,14 @@ export default function DealPage() {
                 boxes exist because a monoline count has to be countable, and
                 that count is the whole reason this section earns its place. */}
             <div className="sm:col-span-3 pt-1">
-              <span className="text-xs text-ink-muted">What was written</span>
+              <span className="text-xs text-ink-muted">
+                What was written
+                {linesGuessed && (
+                  <span className="text-brand-700 font-medium">
+                    {" "}· read off your documents, save to confirm
+                  </span>
+                )}
+              </span>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {LINE_ORDER.map((k) => {
                   const on = written.includes(k);

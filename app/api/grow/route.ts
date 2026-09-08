@@ -5,6 +5,7 @@ import { SAFE_STATUSES } from "@/lib/config";
 import { earnedShare, readyToPromote, type SourceKind } from "@/lib/sources";
 import {
   cleanLines,
+  effectiveLines,
   isMonoline,
   linesRecorded,
   linesSummary,
@@ -112,7 +113,7 @@ export async function GET(_req: NextRequest) {
     [referrals, partners] = await Promise.all([
       fetchAllRows(
         "referrals",
-        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, thanked_at, lapsed_at, claim_went_well_at, updated_at, created_at",
+        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, thanked_at, lapsed_at, claim_went_well_at, policy_lines, updated_at, created_at",
         account.id
       ),
       fetchAllRows("partners", "id, name, source_kind", account.id),
@@ -184,7 +185,11 @@ export async function GET(_req: NextRequest) {
     // Monoline, never pitched. Only counts once lines were actually recorded —
     // an empty lines array means nobody ticked the boxes, not that the
     // household is monoline, and guessing there would be a lie.
-    const roundOut = !r.xsell_asked_at && linesRecorded(r.lines) && isMonoline(r.lines);
+    // Read through to the free-text field the extractor has always filled, so
+    // a book full of already-uploaded dec pages produces a round-out queue
+    // without anyone re-entering what the documents already said.
+    const lines = effectiveLines(r.lines, r.policy_lines);
+    const roundOut = !r.xsell_asked_at && linesRecorded(lines) && isMonoline(lines);
 
     // Never ask a paid lead's "source" for a referral — there is nobody there.
     // But the CLIENT from a paid lead is exactly who this is for: that's the
@@ -226,8 +231,8 @@ export async function GET(_req: NextRequest) {
       askReferral: askedRef,
       askReview: askedRev,
       roundOut,
-      linesLabel: linesSummary(r.lines),
-      missing: roundOut ? roundOutSuggestions(r.lines) : [],
+      linesLabel: linesSummary(lines),
+      missing: roundOut ? roundOutSuggestions(lines) : [],
       renewLabel: roundOut ? renewalLabel(r.xsell_target_date) : null,
       renewSoon,
       promise,
@@ -328,7 +333,9 @@ export async function GET(_req: NextRequest) {
     lapsedCount,
     // The producer's second number. Households carrying more than one line,
     // out of the households where lines were recorded at all.
-    multiline: multilineRate(won.map((r) => ({ lines: cleanLines(r.lines) }))),
+    multiline: multilineRate(
+      won.map((r) => ({ lines: effectiveLines(r.lines, r.policy_lines) }))
+    ),
     // Nothing bound yet: the card should say so rather than showing three
     // zeroes and implying the agent is failing at something.
     // Only ever true because the data arrived and was empty.
