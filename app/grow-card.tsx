@@ -39,6 +39,9 @@ type Data = {
   warming: number;
   promote: { id: string; name: string; count: number }[];
   askedCount: number;
+  askedThisWeek: number;
+  streakWeeks: number;
+  firstEarned: { clientName: string; fromName: string | null } | null;
   multiline?: { recorded: number; multiline: number; monoline: number; percent: number | null };
   coldStart: boolean;
   // Set when the server could not read. Distinct from an empty book: the card
@@ -156,6 +159,31 @@ export function GrowCard() {
   return (
     <div className="card overflow-hidden">
       {wallModal}
+
+      {/* The first client who came from a client.
+          Not a badge and not a score. For a producer who has never had one,
+          this is the moment the idea stops being theoretical, and it can be
+          two months after they start. It shows once, for the first one, and
+          ages out on its own after a month. */}
+      {d.firstEarned && (
+        <div className="px-4 sm:px-5 py-4 bg-emerald-50 border-l-[3px] border-emerald-500 border-b border-slate-200">
+          <p className="text-sm">
+            <span className="font-semibold">{d.firstEarned.clientName}</span>
+            {d.firstEarned.fromName ? (
+              <>
+                {" "}came in from{" "}
+                <span className="font-semibold">{d.firstEarned.fromName}</span>.
+              </>
+            ) : (
+              " came in from a client you already wrote."
+            )}
+          </p>
+          <p className="text-xs text-ink-secondary mt-1 leading-relaxed">
+            That&apos;s your first client earned from an ask. Every client you write from here can
+            do the same thing.
+          </p>
+        </div>
+      )}
       {/* Promotions ride on top: they are time-sensitive in a way the queue
           isn't, and there are almost never more than one or two. */}
       {promos.map((p) => (
@@ -220,10 +248,24 @@ export function GrowCard() {
 
       {d.queueTotal > 0 ? (
         <>
-          <div className="px-4 sm:px-5 py-2.5 border-y border-slate-200 bg-slate-50/80">
+          <div className="px-4 sm:px-5 py-2.5 border-y border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3 flex-wrap">
             <p className="section-label !text-[11px] !tracking-[0.06em] text-ink-secondary">
               {d.queueTotal} {d.queueTotal === 1 ? "client worth a call" : "clients worth a call"}
             </p>
+            {/* What actually moved. Derived from the same timestamps the queue
+                runs on, so there is nothing here to game. */}
+            {(d.askedThisWeek > 0 || d.streakWeeks >= 2) && (
+              <p className="text-[11px] text-ink-muted flex items-center gap-1.5">
+                {d.askedThisWeek > 0 && (
+                  <span>
+                    <span className="font-semibold text-ink-secondary">{d.askedThisWeek}</span> asked
+                    this week
+                  </span>
+                )}
+                {d.askedThisWeek > 0 && d.streakWeeks >= 2 && <span>·</span>}
+                {d.streakWeeks >= 2 && <span>{d.streakWeeks} weeks running</span>}
+              </p>
+            )}
           </div>
           <ul className="divide-y divide-slate-100">
             {shown.map((q) =>
@@ -322,6 +364,7 @@ export function GrowCard() {
         <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 border-t border-slate-200 bg-emerald-50/40">
           <IconCheck size={15} className="text-emerald-600 shrink-0" />
           <p className="text-xs text-ink-secondary">
+            {d.askedThisWeek > 0 ? `${d.askedThisWeek} asked this week. ` : ""}
             Everyone you&apos;ve bound has been asked.
             {d.warming > 0
               ? ` ${d.warming} just bound — give them a few days with their documents first.`

@@ -236,6 +236,58 @@ export async function GET(_req: NextRequest) {
   // card has something to show an agent who has worked it down to zero.
   const askedCount = referrals.filter((r) => r.asked_at).length;
 
+  // ── Progress, not points ──────────────────────────────────────────────────
+  //
+  // Everything below is derived from work that actually happened. Nothing here
+  // can be clicked into existence for its own sake, because the only inputs
+  // are the same timestamps the queue already runs on. That's deliberate: the
+  // moment a number rewards an action, the action stops being evidence, and
+  // the ask rate is the one measurement this product cannot afford to lose.
+
+  // Asks of any kind, this week. Not "you're on a roll" — just what happened.
+  const askTimes: number[] = [];
+  for (const r of referrals) {
+    for (const t of [r.asked_at, r.review_asked_at, r.xsell_asked_at]) {
+      if (!t) continue;
+      const ms = new Date(t).getTime();
+      if (Number.isFinite(ms)) askTimes.push(ms);
+    }
+  }
+  const askedThisWeek = askTimes.filter((t) => Date.now() - t < 7 * DAY).length;
+
+  // Weeks in a row with at least one ask. Weeks, not days, on purpose — a
+  // daily streak punishes a producer for taking a holiday, and guilt is a
+  // terrible reason to open software.
+  const weeks = new Set(askTimes.map((t) => Math.floor((Date.now() - t) / (7 * DAY))));
+  let streakWeeks = 0;
+  // The current week can be empty without breaking anything; it isn't over.
+  let cursor = weeks.has(0) ? 0 : 1;
+  while (weeks.has(cursor)) {
+    streakWeeks++;
+    cursor++;
+  }
+
+  // ── The first one ─────────────────────────────────────────────────────────
+  //
+  // A client who came from a client. For a producer who has never had one,
+  // this is the moment the whole idea stops being theoretical, and it can be
+  // sixty days after they start. Shown once, for the first one only, and it
+  // ages out on its own rather than needing to be dismissed or stored.
+  const earnedChain = referrals
+    .filter((r) => r.parent_referral_id)
+    .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+  const nameById = new Map<string, string>(
+    referrals.map((r) => [r.id, r.client_name] as [string, string])
+  );
+  const firstOne = earnedChain[0];
+  const firstEarned =
+    earnedChain.length === 1 && firstOne && (daysSince(firstOne.created_at) ?? 99) <= 30
+      ? {
+          clientName: firstOne.client_name as string,
+          fromName: nameById.get(firstOne.parent_referral_id as string) ?? null,
+        }
+      : null;
+
   return NextResponse.json({
     earned,
     queue: queue.slice(0, 25),
@@ -243,6 +295,9 @@ export async function GET(_req: NextRequest) {
     warming,
     promote,
     askedCount,
+    askedThisWeek,
+    streakWeeks,
+    firstEarned,
     // The producer's second number. Households carrying more than one line,
     // out of the households where lines were recorded at all.
     multiline: multilineRate(won.map((r) => ({ lines: cleanLines(r.lines) }))),
