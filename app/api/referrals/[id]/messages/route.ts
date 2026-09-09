@@ -4,6 +4,7 @@ import { sendEmail, messageEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 import { appUrl } from "@/lib/helpers";
 import { getAccount, visibleReferral } from "@/lib/account";
+import { agentProfile } from "@/lib/profile";
 
 // Agent-only (protected by middleware): read the thread / reply to the partner.
 
@@ -45,11 +46,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .insert({ referral_id: referral.id, sender: "agent", body: text });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: prof } = await db()
-    .from("agent_profile")
-    .select("display_name")
-    .eq("account_id", account.id)
-    .maybeSingle();
+  // The name on a message to a partner is the person who typed it.
+  const prof = await agentProfile(account);
   const agentName = prof?.display_name || "Your agent";
 
   await logActivity(referral.id, "email_sent", `Reply from ${agentName}: “${text.slice(0, 120)}”`, "agent");

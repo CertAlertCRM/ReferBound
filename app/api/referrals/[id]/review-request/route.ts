@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccount, visibleReferral } from "@/lib/account";
+import { agentProfile } from "@/lib/profile";
 import { sendEmail, reviewRequestEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 
@@ -18,11 +19,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "This client has no email on file — add one first." }, { status: 400 });
   }
 
-  const { data: prof } = await db()
-    .from("agent_profile")
-    .select("display_name, agency_name, google_review_url")
-    .eq("account_id", account.id)
-    .maybeSingle();
+  // The review link stays the agency's — a producer must not be able to point
+  // it somewhere else — but the ask comes from them by name.
+  const prof = await agentProfile(account);
   const reviewUrl = prof?.google_review_url?.trim();
   if (!reviewUrl) {
     return NextResponse.json(

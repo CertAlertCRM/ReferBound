@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { getAccount } from "@/lib/account";
+import { ownProfileRow, profileKey } from "@/lib/profile";
 
 // Agent-only (protected by middleware): upload/replace the profile headshot.
 
@@ -29,16 +30,15 @@ export async function POST(req: NextRequest) {
     .upload(path, buf, { contentType: file.type, cacheControl: "31536000" });
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
-  const { data: existing } = await db()
-    .from("agent_profile")
-    .select("id")
-    .eq("account_id", account.id)
-    .maybeSingle();
+  // Their face on their row. A producer uploading a photo used to replace the
+  // agency owner's headshot for everyone.
+  const existing = await ownProfileRow(account);
+  const key = profileKey(account);
   const { error } = await db()
     .from("agent_profile")
     .upsert({
-      id: existing?.id ?? account.id,
-      account_id: account.id,
+      id: existing?.id ?? key,
+      account_id: key,
       headshot_path: path,
       updated_at: new Date().toISOString(),
     });

@@ -63,6 +63,12 @@ export default function ProfilePage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // A producer on an agency plan owns their name, phone, email and photo.
+  // Everything else on this page is the agency's, and is shown read-only
+  // rather than hidden — knowing the review link exists and who controls it
+  // beats wondering why the field vanished.
+  const [isTeamMember, setIsTeamMember] = useState(false);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [theme, setTheme] = useState("default");
   const [themeSaving, setThemeSaving] = useState(false);
   // Color strip: arrows for mouse users (a vertical wheel won't scroll a
@@ -86,7 +92,9 @@ export default function ProfilePage() {
   useEffect(() => {
     fetch("/api/profile").then(async (res) => {
       if (res.ok) {
-        const { profile, headshotUrl } = await res.json();
+        const { profile, headshotUrl, isTeamMember: member, ownerEmail: owner } = await res.json();
+        setIsTeamMember(Boolean(member));
+        setOwnerEmail(owner ?? null);
         if (profile) {
           const loaded = {
             display_name: profile.display_name ?? "",
@@ -397,20 +405,28 @@ export default function ProfilePage() {
     const isPhone = key === "phone";
     const isEmail = key === "email";
     const isOffice = key === "office";
+    // Name, phone and email are the person's. The rest belongs to the agency.
+    const mine = key === "display_name" || key === "phone" || key === "email";
+    const locked = isTeamMember && !mine;
     return (
       <label className="block">
         <span className="section-label">{label}</span>
         <input
-          className="input mt-1.5"
+          className="input mt-1.5 disabled:bg-slate-50 disabled:text-ink-muted disabled:cursor-not-allowed"
           type={isPhone ? "tel" : isEmail ? "email" : "text"}
           inputMode={isPhone ? "tel" : isEmail ? "email" : undefined}
           autoComplete={isOffice ? "street-address" : undefined}
           placeholder={placeholder}
+          disabled={locked}
+          title={locked ? "Set by your agency owner" : undefined}
           value={form[key] ?? ""}
           onChange={(e) =>
             setForm({ ...form, [key]: isPhone ? formatPhoneInput(e.target.value) : e.target.value })
           }
         />
+        {locked && (
+          <span className="text-[11px] text-ink-muted mt-1 block">Set by your agency owner.</span>
+        )}
       </label>
     );
   };
@@ -621,6 +637,13 @@ export default function ProfilePage() {
             </section>
 
             <form onSubmit={save} className="card p-6 space-y-4">
+              {isTeamMember && (
+                <p className="text-xs text-ink-secondary bg-brand-light/50 border border-brand-200 rounded-lg px-3 py-2">
+                  Your name, phone, email and photo are yours — they go on the emails you
+                  send. The agency details below are set by{" "}
+                  {ownerEmail ?? "your agency owner"}.
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {field("display_name", "Your name", "David Falden")}
                 {field("agency_name", "Agency name", "Your agency")}
@@ -637,6 +660,8 @@ export default function ProfilePage() {
                   type="url"
                   inputMode="url"
                   placeholder="https://g.page/r/…/review"
+                  disabled={isTeamMember}
+                  title={isTeamMember ? "Set by your agency owner" : undefined}
                   value={form.google_review_url ?? ""}
                   onChange={(e) => setForm({ ...form, google_review_url: e.target.value })}
                 />

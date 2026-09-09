@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccount, visibleReferral } from "@/lib/account";
+import { agentProfile } from "@/lib/profile";
 import { DOC_KINDS } from "@/lib/config";
 import { sendEmail, plainBodyEmail, statusUpdateEmail } from "@/lib/email";
 import { renderVoice, STOCK_TEMPLATES, type NotifyTemplates } from "@/lib/voice";
@@ -86,11 +87,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Add the client's email address first" }, { status: 400 });
   }
 
-  const { data: prof } = await db()
-    .from("agent_profile")
-    .select("notify_templates, display_name, agency_name, phone, email, google_review_url")
-    .eq("account_id", account.id)
-    .maybeSingle();
+  // Merged: agency name, review link and voice templates stay the agency's;
+  // the name, phone and email in the signature are whoever is actually
+  // sending this. A producer's welcome email signed by their manager is how a
+  // client ends up calling the wrong person.
+  const prof = await agentProfile(account);
   const voice = (prof?.notify_templates ?? {}) as NotifyTemplates;
 
   // Documents ride as links, same as everywhere else — an inbox is not a

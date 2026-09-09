@@ -70,6 +70,11 @@ export async function DELETE(req: NextRequest) {
     }
 
     await db().from("agent_profile").delete().eq("account_id", account.id);
+  } else {
+    // A team member owns no shared data, but since producers got their own
+    // identity row they do own one thing: their name, phone and photo. Clean
+    // it up with the login rather than leaving it pointing at a dead account.
+    await db().from("agent_profile").delete().eq("account_id", account.selfId);
   }
 
   const { error } = await db().from("accounts").delete().eq("id", account.selfId);

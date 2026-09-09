@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccount, visibleReferral } from "@/lib/account";
+import { agentProfile } from "@/lib/profile";
 import {
   cleanDealLender,
   matchExistingPartner,
@@ -103,11 +104,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Add who's handling the loan first" }, { status: 400 });
   }
 
-  const { data: prof } = await db()
-    .from("agent_profile")
-    .select("display_name, agency_name")
-    .eq("account_id", account.id)
-    .maybeSingle();
+  // Producer's name, agency's name — an intro to a loan officer has to be
+  // from a person, on the agency's behalf.
+  const prof = await agentProfile(account);
   const agentName = prof?.display_name || "your insurance agent";
   const agencyName = prof?.agency_name || "";
   const realtorName = (referral as any).partners?.name ?? "your realtor";

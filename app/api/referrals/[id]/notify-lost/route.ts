@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAccount, visibleReferral } from "@/lib/account";
+import { agentProfile } from "@/lib/profile";
 import { sendEmail, plainBodyEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 
@@ -42,11 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!message) {
     const contact = (referral as any).partner_contacts;
     const first = contact?.name ? String(contact.name).split(" ")[0] : "";
-    const { data: prof } = await db()
-      .from("agent_profile")
-      .select("display_name")
-      .eq("account_id", account.id)
-      .maybeSingle();
+    const prof = await agentProfile(account);
     return NextResponse.json({
       draft:
         `${first ? `${first} — ` : ""}wanted to close the loop on ${referral.client_name}. ` +

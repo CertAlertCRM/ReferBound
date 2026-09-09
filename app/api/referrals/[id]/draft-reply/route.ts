@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { askClaude } from "@/lib/ai";
 import { STATUS_LABELS } from "@/lib/config";
 import { getAccount, visibleReferral } from "@/lib/account";
+import { agentProfile } from "@/lib/profile";
 
 // Agent-only (protected by middleware): draft a short partner update grounded
 // ONLY in this referral's real data. The agent reviews/edits before sending.
@@ -44,7 +45,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       .eq("referral_id", params.id)
       .order("created_at", { ascending: false })
       .limit(6),
-    db().from("agent_profile").select("display_name").eq("account_id", account.id).maybeSingle(),
+    agentProfile(account).then((p) => ({ data: p })),
   ]);
 
   if (!referral) return NextResponse.json({ error: "referral not found" }, { status: 404 });
