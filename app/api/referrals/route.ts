@@ -2,22 +2,48 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { normalizePhone, normalizeEmail } from "@/lib/format";
-import { getAccount } from "@/lib/account";
+import { getAccount, teamMembers } from "@/lib/account";
+import { resolveScope, scopeQuery } from "@/lib/scope";
 import { STATUSES } from "@/lib/config";
 import { cleanLines } from "@/lib/lines";
 import { maybeRewardReferrer } from "@/lib/referral";
 import { fireWebhook } from "@/lib/webhook";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const { data, error } = await db()
+
+  // Who else is on this account decides both what comes back and whether the
+  // client gets tabs at all. A producer never needs the roster — their scope is
+  // fixed before the query string is read — so skip the lookup for them.
+  const roster = account.isTeamMember ? [] : await teamMembers(account.id);
+  const ctx = resolveScope(
+    account,
+    req.nextUrl.searchParams.get("who"),
+    account.isTeamMember || roster.length > 0
+  );
+
+  let q = db()
     .from("referrals")
     .select("*, partners!referrals_partner_id_fkey(name, partner_type), partner_contacts(name), documents(id, kind, file_name, uploaded_by, purged_at)")
-    .eq("account_id", account.id)
-    .order("created_at", { ascending: false });
+    .eq("account_id", account.id);
+  q = scopeQuery(q, ctx);
+
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ referrals: data });
+
+  // The client is told the scope it actually GOT, not the one it asked for.
+  // Anything else lets a stale tab render a producer's own book under a "My
+  // team" heading, which is how people start mistrusting a number.
+  return NextResponse.json({
+    referrals: data,
+    scope: ctx.scope,
+    canSeeTeam: ctx.canSeeTeam,
+    isTeam: ctx.isTeam,
+    producers: ctx.canSeeTeam
+      ? roster.map((m) => ({ id: m.id, name: m.display_name || m.email }))
+      : [],
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -108,14 +134,43 @@ export async function POST(req: NextRequest) {
   const premiumRaw = Number(String(body.premium ?? "").replace(/[^0-9.]/g, ""));
   const premiumValue = Number.isFinite(premiumRaw) && premiumRaw > 0 ? premiumRaw : null;
 
+  // ── Hand-off ──────────────────────────────────────────────────────────────
+  //
+  // An owner takes a referral call in a parking lot and has no intention of
+  // working it — somebody in the office will. Logging it under their own name
+  // and hoping the producer notices is how a good lead goes cold, so the owner
+  // says who it's for at the moment they type it.
+  //
+  // Validated against the roster rather than trusted, and open to owners only.
+  // A producer sending producer_id is ignored rather than rejected: their own
+  // id is the only correct answer and there is nothing for them to fix.
+  let producerId = account.selfId;
+  let assignedTo: string | null = null;
+  if (
+    !account.isTeamMember &&
+    typeof body.producer_id === "string" &&
+    body.producer_id !== account.selfId
+  ) {
+    const roster = await teamMembers(account.id);
+    if (!roster.some((m) => m.id === body.producer_id)) {
+      return NextResponse.json({ error: "That producer is not on this account." }, { status: 400 });
+    }
+    producerId = body.producer_id;
+    assignedTo = body.producer_id;
+  }
+
   const row = {
     account_id: account.id,
     partner_id: partnerId,
     parent_referral_id: parentReferralId,
+    // Set only when this was handed to somebody. A producer logging their own
+    // lead leaves these null, which is what keeps "waiting for you" honest.
+    assigned_at: assignedTo ? new Date().toISOString() : null,
+    assigned_by: assignedTo ? account.selfId : null,
     // Who logged it. On a solo account this is the same as account_id; on an
     // agency it is the difference between "the office wrote 40" and knowing
     // which producer actually converts wins into the next referral.
-    producer_id: account.selfId,
+    producer_id: producerId,
     client_name: String(body.client_name).trim(),
     coborrower_name: String(body.coborrower_name ?? "").trim() || null,
     client_phone: normalizePhone(body.client_phone),
@@ -146,6 +201,12 @@ export async function POST(req: NextRequest) {
   // first "new" and the first "bound".
   await db().from("status_events").insert({ referral_id: data.id, status: data.status });
   await logActivity(data.id, "lead_logged", `Lead logged for ${data.client_name}`, "agent");
+  if (assignedTo) {
+    // The permanent record of the hand-off. assigned_at clears when the
+    // producer opens the deal; this line does not, so six months later the
+    // file still says where the lead came from.
+    await logActivity(data.id, "producer_assigned", "Assigned to a producer to work", "agent");
+  }
   if (parentReferralId) {
     await logActivity(
       parentReferralId,

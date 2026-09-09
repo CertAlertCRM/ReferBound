@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
       // this row to the referral it became.
       ref: String(r.ref ?? ""),
       account_id: account.id,
+      // A backfilled book belongs to whoever backfilled it. Without this every
+      // imported row lands unattributed and shows up in nobody's leads.
+      producer_id: account.selfId,
       partner_id,
       client_name,
       client_phone: r.client_phone ? normalizePhone(String(r.client_phone)) : null,

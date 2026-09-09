@@ -61,7 +61,9 @@ function ago(days: number | null): string {
   return m === 1 ? "bound about a month ago" : `bound about ${m} months ago`;
 }
 
-export function GrowCard() {
+// `who` is the dashboard's tab. Default "mine" so every existing call site —
+// and every solo account, which has no tabs — behaves exactly as before.
+export function GrowCard({ who = "mine" }: { who?: string }) {
   const { toast } = useUI();
   const [d, setD] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
@@ -74,7 +76,7 @@ export function GrowCard() {
 
   async function load() {
     try {
-      const res = await fetch("/api/grow");
+      const res = await fetch(`/api/grow?who=${who}`);
       if (!res.ok) return;
       const j = await res.json();
       if (j?.unavailable) return;
@@ -86,7 +88,9 @@ export function GrowCard() {
 
   useEffect(() => {
     load();
-  }, []);
+    // The queue belongs to whoever the tab is about. An owner reviewing the
+    // team should see what their producers haven't asked, not their own list.
+  }, [who]);
 
   // Clear a promise that came to nothing. The queue only keeps trust if the
   // producer can take something off it.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners, teamMembers } from "@/lib/account";
+import { resolveScope, scopeRows } from "@/lib/scope";
 import { SAFE_STATUSES } from "@/lib/config";
 import { earnedShare, readyToPromote, type SourceKind } from "@/lib/sources";
 import {
@@ -103,7 +104,7 @@ export type QueueItem = {
   claimWentWell: boolean;
 };
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
@@ -113,7 +114,7 @@ export async function GET(_req: NextRequest) {
     [referrals, partners] = await Promise.all([
       fetchAllRows(
         "referrals",
-        "id, client_name, partner_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, thanked_at, lapsed_at, claim_went_well_at, policy_lines, updated_at, created_at",
+        "id, client_name, partner_id, producer_id, status, asked_at, review_asked_at, parent_referral_id, lines, xsell_asked_at, xsell_target_date, promised_note, thanked_at, lapsed_at, claim_went_well_at, policy_lines, updated_at, created_at",
         account.id
       ),
       fetchAllRows("partners", "id, name, source_kind", account.id),
@@ -125,6 +126,23 @@ export async function GET(_req: NextRequest) {
     console.error("grow: read failed", e?.message);
     return NextResponse.json({ unavailable: true });
   }
+
+  // Whose queue this is.
+  //
+  // Filtered in memory rather than in the query because this endpoint has to
+  // page the whole book in before it can rank anything. lib/scope holds the
+  // in-memory rule and the SQL rule together so they cannot drift.
+  //
+  // The queue is the reason to scope this at all: "ask Maria's client for a
+  // referral" is a useless prompt for a producer who has never met Maria, and
+  // the fastest possible way to make the card feel like noise.
+  const roster = account.isTeamMember ? [] : await teamMembers(account.id);
+  const ctx = resolveScope(
+    account,
+    req.nextUrl.searchParams.get("who"),
+    account.isTeamMember || roster.length > 0
+  );
+  referrals = scopeRows(referrals, ctx);
 
   const partnerById = new Map<string, any>(partners.map((p) => [p.id, p] as [string, any]));
   const kindOf = (partnerId: string | null): SourceKind =>
@@ -321,6 +339,10 @@ export async function GET(_req: NextRequest) {
       : null;
 
   return NextResponse.json({
+    // Echoed so the card can title itself honestly. An owner looking at the
+    // team should not be told "you asked 4 this week".
+    scope: ctx.scope,
+    canSeeTeam: ctx.canSeeTeam,
     earned,
     queue: queue.slice(0, 25),
     queueTotal: queue.length,

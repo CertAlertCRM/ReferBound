@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, teamMembers } from "@/lib/account";
+import { resolveScope, scopeQuery } from "@/lib/scope";
 import { STATUS_LABELS } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,16 @@ export async function GET(req: NextRequest) {
     .eq("account_id", account.id)
     .order("created_at", { ascending: false });
   if (scope === "new") query = query.is("exported_at", null);
+
+  // Same collision as the stats route: ?scope= is already spoken for here, so
+  // whose leads to export rides on ?who=. Without this a producer could export
+  // the agency's entire book to a spreadsheet, which is the one leak that
+  // leaves the building.
+  const roster = account.isTeamMember ? [] : await teamMembers(account.id);
+  query = scopeQuery(
+    query,
+    resolveScope(account, req.nextUrl.searchParams.get("who"), account.isTeamMember || roster.length > 0)
+  );
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

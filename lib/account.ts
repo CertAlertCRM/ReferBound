@@ -130,6 +130,50 @@ export async function ownedReferral(accountId: string, referralId: string, selec
   return data as any;
 }
 
+// The same check, one level finer: a referral this SIGNED-IN PERSON may touch.
+//
+// ownedReferral answers "is this the agency's deal", which is the right
+// question on a solo account and the wrong one on an agency. Every producer
+// reads and writes against the OWNER's account_id — that is what makes the
+// book shared — so without this, changing the id in the URL lets one producer
+// open, edit, delete, or email the client of any other producer's deal.
+//
+// This is the enforcement point. Filtering a list is presentation; a route
+// that calls this is the part that actually holds.
+//
+// Not symmetrical, deliberately: the owner reaches everything on their own
+// account, including a producer's deal and the unattributed backlog. That is
+// the entire reason they get a team tab.
+export async function visibleReferral(
+  account: Account,
+  referralId: string,
+  select = "id"
+) {
+  let q = db()
+    .from("referrals")
+    .select(select)
+    .eq("id", referralId)
+    .eq("account_id", account.id);
+  // Rows with no producer recorded predate attribution. They stay with the
+  // owner rather than going to whoever asks for them first.
+  if (account.isTeamMember) q = q.eq("producer_id", account.selfId);
+  const { data } = await q.maybeSingle();
+  return data as any;
+}
+
+// The producers on an owner's account. Owner-only by construction rather than
+// by a flag: the query is "accounts whose team_owner_id is me", so a producer
+// asking gets an empty roster, because nobody has a producer as their owner.
+// There is no branch to forget.
+export async function teamMembers(ownerId: string) {
+  const { data } = await db()
+    .from("accounts")
+    .select("id, email, display_name")
+    .eq("team_owner_id", ownerId)
+    .order("display_name", { ascending: true });
+  return (data ?? []) as { id: string; email: string; display_name: string | null }[];
+}
+
 export const PLAN_LABELS: Record<string, string> = {
   free: "Free",
   pro: "Pro",

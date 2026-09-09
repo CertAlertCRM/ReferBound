@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { sendEmail, reviewRequestEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const referral = await ownedReferral(account.id, params.id, "id, client_name, client_email, status");
+  const referral = await visibleReferral(account, params.id, "id, client_name, client_email, status");
   if (!referral) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (!referral.client_email) {
     return NextResponse.json({ error: "This client has no email on file — add one first." }, { status: 400 });

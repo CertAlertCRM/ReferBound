@@ -26,6 +26,7 @@ import { LINE_ORDER, LINE_KINDS, cleanLines, effectiveLines, roundOutSuggestions
 import { SkeletonPanels } from "../../skeleton";
 import { ClientTrack } from "./client-track";
 import { LenderLink } from "./lender-link";
+import { AssignInline, markSeen } from "../../assign";
 
 type Doc = { id: string; kind: string; file_name: string; created_at: string; uploaded_by?: string; purged_at?: string | null };
 type Activity = { id: number; event_type: string; detail: string; actor: string; created_at: string };
@@ -47,6 +48,8 @@ type Referral = {
   log_seconds: number | null;
   created_at: string;
   partners: { name: string; partner_type?: string } | null;
+  producer_id?: string | null;
+  assigned_at?: string | null;
   documents: Doc[];
   closing_date_was?: string | null;
   closing_date_changed_at?: string | null;
@@ -176,7 +179,7 @@ export default function DealPage() {
 
   async function load() {
     const [res, actRes, msgRes] = await Promise.all([
-      fetch(`/api/referrals`),
+      fetch(`/api/referrals?who=all`),
       fetch(`/api/referrals/${id}/activity`),
       fetch(`/api/referrals/${id}/messages`),
     ]);
@@ -185,6 +188,9 @@ export default function DealPage() {
         (await res.json()).referrals ?? [];
       const found = all.find((x) => x.id === id) ?? null;
       setR(found);
+      // Opening it is what clears "waiting for you". No-op for anyone who
+      // isn't the person it was handed to.
+      if (found && (found as any).assigned_at) markSeen(found.id);
       if (found) {
         const p = found.premium != null ? String(found.premium) : "";
         const l = found.policy_lines ?? "";
@@ -517,6 +523,14 @@ export default function DealPage() {
                 )}
                 {r.source === "partner" && " · via portal"}
               </p>
+              {/* Owner-only, and only on an account with producers. */}
+              <div className="mt-2">
+                <AssignInline
+                  referralId={r.id}
+                  producerId={r.producer_id ?? null}
+                  onMoved={() => load()}
+                />
+              </div>
             </div>
             <StatusBadge status={r.status} />
           </div>

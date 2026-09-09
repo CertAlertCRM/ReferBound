@@ -5,7 +5,7 @@ import { normalizeRequirements, requirementLines } from "@/lib/requirements";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { DOC_KINDS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +93,7 @@ PO Box 12, Richmond VA 23220".`;
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!(await ownedReferral(account.id, params.id))) {
+  if (!(await visibleReferral(account, params.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 

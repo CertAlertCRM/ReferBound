@@ -4,12 +4,12 @@ import { DOC_KINDS, shouldPersistDoc } from "@/lib/config";
 import { extractFromAttachment, applyExtractedToReferral } from "@/lib/inbound-docs";
 import { autoMatchClause } from "@/lib/clauses";
 import { logActivity } from "@/lib/activity";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!(await ownedReferral(account.id, params.id))) {
+  if (!(await visibleReferral(account, params.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   const form = await req.formData().catch(() => null);

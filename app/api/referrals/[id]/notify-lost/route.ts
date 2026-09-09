@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { sendEmail, plainBodyEmail } from "@/lib/email";
 import { logActivity } from "@/lib/activity";
 
@@ -20,6 +20,12 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Telling a partner their referral was lost is their-reputation territory —
+  // not something a producer should be able to send about someone else's deal.
+  if (!(await visibleReferral(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => null);
   const message = String(body?.message ?? "").trim();

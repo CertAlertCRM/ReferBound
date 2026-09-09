@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { DOC_KINDS } from "@/lib/config";
 import { sendEmail, plainBodyEmail, statusUpdateEmail } from "@/lib/email";
 import { renderVoice, STOCK_TEMPLATES, type NotifyTemplates } from "@/lib/voice";
@@ -58,6 +58,14 @@ const DOC_KINDS_FOR: Record<Action, string[]> = {
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // The highest-stakes gate in the product: this route is one of only two that
+  // can put a message in front of a client. Without it a producer could send a
+  // welcome or a referral ask to someone who has never spoken to them, under
+  // the agency's name, with no way to recall it.
+  if (!(await visibleReferral(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => null);
   const action = String(body?.action ?? "") as Action;

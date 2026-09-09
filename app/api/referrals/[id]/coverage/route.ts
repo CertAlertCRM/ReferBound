@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { logActivity } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ const OUTCOMES: Record<string, string> = {
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!(await ownedReferral(account.id, params.id))) {
+  if (!(await visibleReferral(account, params.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!(await ownedReferral(account.id, params.id))) {
+  if (!(await visibleReferral(account, params.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   const at = req.nextUrl.searchParams.get("at");

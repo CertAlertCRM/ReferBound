@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { askClaude } from "@/lib/ai";
 import { STATUS_LABELS } from "@/lib/config";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 
 // Agent-only (protected by middleware): draft a short partner update grounded
 // ONLY in this referral's real data. The agent reviews/edits before sending.
@@ -23,7 +23,7 @@ Hard rules:
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!(await ownedReferral(account.id, params.id))) {
+  if (!(await visibleReferral(account, params.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   const [{ data: referral }, { data: msgs }, { data: activity }, { data: prof }] = await Promise.all([

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, teamMembers } from "@/lib/account";
+import { resolveScope, scopeRows } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,18 @@ export async function GET(req: NextRequest) {
 
   const { data: referrals } = await s
     .from("referrals")
-    .select("id, status, source, log_seconds, created_at, premium, partner_id, backfilled, partners!referrals_partner_id_fkey(name)")
+    .select("id, status, source, log_seconds, created_at, premium, partner_id, producer_id, backfilled, partners!referrals_partner_id_fkey(name)")
     .eq("account_id", account.id);
-  const allRefs = referrals ?? [];
+  // Producer scope rides on ?who=, NOT ?scope= — this route already spends
+  // that parameter on live/history/all, and quietly overloading it would make
+  // a producer's history view silently show the whole agency.
+  const roster = account.isTeamMember ? [] : await teamMembers(account.id);
+  const who = resolveScope(
+    account,
+    req.nextUrl.searchParams.get("who"),
+    account.isTeamMember || roster.length > 0
+  );
+  const allRefs = scopeRows((referrals ?? []) as any[], who);
   const liveCount = allRefs.filter((r) => !(r as any).backfilled).length;
   const historyCount = allRefs.length - liveCount;
   const refs =

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import {
   cleanDealLender,
   matchExistingPartner,
@@ -34,6 +34,11 @@ export const dynamic = "force-dynamic";
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Drafting to a deal's lender is partner-facing mail. Same gate as the rest.
+  if (!(await visibleReferral(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => null);
   const lender = cleanDealLender({ ...(body?.lender ?? {}), source: body?.lender?.source ?? "agent" });
@@ -69,6 +74,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Drafting to a deal's lender is partner-facing mail. Same gate as the rest.
+  if (!(await visibleReferral(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => null);
   const kind = String(body?.kind ?? "");

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/session";
 import { verifyDocSig } from "@/lib/doclink";
+import { getAccount, visibleReferral } from "@/lib/account";
 
 // Public route guarded three ways: the partner token (?t=...) for partners, a
 // signed-in account that OWNS the referral for agents, or a per-document
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: doc, error } = await db()
     .from("documents")
-    .select("id, storage_path, file_name, referrals(account_id, partners!referrals_partner_id_fkey(token))")
+    .select("id, storage_path, file_name, referral_id, referrals(account_id, partners!referrals_partner_id_fkey(token))")
     .eq("id", params.id)
     .single();
   if (error || !doc) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -28,7 +29,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     req.nextUrl.searchParams.get("s")
   );
   const sessionAccountId = verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
-  const agentOk = !!sessionAccountId && sessionAccountId === ownerAccountId;
+  // The fast path, and the only one a solo account ever takes: the signed-in
+  // id IS the account that owns the referral.
+  let agentOk = !!sessionAccountId && sessionAccountId === ownerAccountId;
+
+  // A producer on an agency plan signs in as themselves, so their session id
+  // never equals the owner's account_id and the check above always failed —
+  // meaning producers could not download their OWN clients' paperwork. This
+  // fixes that, and scopes it at the same time: they get the documents on
+  // deals they can see, and nothing from a colleague's file.
+  if (!agentOk && sessionAccountId) {
+    const account = await getAccount();
+    if (account) {
+      agentOk = Boolean(await visibleReferral(account, (doc as any).referral_id));
+    }
+  }
 
   if (!tokenOk && !agentOk && !linkOk) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

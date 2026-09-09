@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { STATUSES, STATUS_LABELS, nextStatusFor, statusLabel, isFullTrack } from "@/lib/config";
 import { formatPhoneInput } from "@/lib/format";
@@ -11,6 +11,8 @@ import { LeadPrefillBox } from "./lead-prefill";
 import { InstallPrompt } from "./install-prompt";
 import { EmptyStart } from "./empty-start";
 import { GrowCard } from "./grow-card";
+import ScopeTabs, { useScope } from "./scope-tabs";
+import { AssignField, useProducers } from "./assign";
 import { useUI } from "./ui";
 import { LINE_ORDER, LINE_KINDS, type LineKind } from "@/lib/lines";
 
@@ -29,7 +31,21 @@ type Referral = {
   property_address: string | null;
   partners: { name: string; partner_type?: string } | null;
   documents: { id: string; kind: string }[];
+  // Whose lead, and whether it was handed to them and not yet opened.
+  producer_id?: string | null;
+  assigned_at?: string | null;
 };
+
+// Whose row is this?
+//
+// Threaded by context rather than as a prop because Section is rendered in
+// four places and only ever needs this on an owner's team view. A prop would
+// mean touching every call site to pass something that is null most of the
+// time.
+const RowMeta = createContext<{ names: Map<string, string>; show: boolean }>({
+  names: new Map(),
+  show: false,
+});
 
 type Partner = { id: string; name: string; source_kind?: string | null };
 
@@ -118,10 +134,24 @@ export default function Dashboard() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Agency scoping. All three of these collapse to nothing on a solo account:
+  // useProducers returns canAssign false, ScopeTabs renders null, and `who`
+  // stays "mine", which the server treats as no filter at all when there is
+  // no team.
+  const { canAssign, owner, members, unassigned, reload: reloadProducers } = useProducers();
+  const [who, setWho] = useScope(owner?.id ?? "me");
+  const [assignTo, setAssignTo] = useState("");
+  const producerNames = useMemo(() => {
+    const m = new Map<string, string>();
+    if (owner) m.set(owner.id, `${owner.name} (me)`);
+    for (const p of members) m.set(p.id, p.name);
+    return m;
+  }, [owner, members]);
+
   async function load() {
     setLoadError(false);
     const [rRes, pRes, profRes, aRes] = await Promise.all([
-      fetch("/api/referrals"),
+      fetch(`/api/referrals?who=${who}`),
       fetch("/api/partners"),
       fetch("/api/profile"),
       fetch("/api/activity"),
@@ -149,7 +179,10 @@ export default function Dashboard() {
   }
   useEffect(() => {
     load();
-  }, []);
+    // Refetching on `who` is the whole mechanism: the server decides what the
+    // tab is allowed to contain, so switching tabs asks it again rather than
+    // filtering something already in the browser.
+  }, [who]);
 
   // Landing here from a promise on the dashboard ("Sarah said she'd tell
   // Megan"). The name and the credit come with it so nobody has to remember
@@ -208,7 +241,7 @@ export default function Dashboard() {
     const res = await fetch("/api/referrals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(assignTo ? { ...payload, producer_id: assignTo } : payload),
     });
     if (!res.ok) {
       setSaving(false);
@@ -225,6 +258,8 @@ export default function Dashboard() {
     }
     setSaving(false);
     setForm({ ...EMPTY_LEAD, partner_id: form.partner_id });
+    // Deliberately NOT reset: an owner logging three leads for the same
+    // producer in a row shouldn't have to pick the name three times.
     setAlreadyWorked(false);
     setWritten([]);
     setClientMode(false);
@@ -357,7 +392,25 @@ export default function Dashboard() {
         {/* Growth — the ask queue and earned share.
             Placed above the pipeline deliberately: everything below this line
             is work already in flight, and this is the next piece of work. */}
-        <GrowCard />
+        <GrowCard who={who} />
+
+        {/* Whose book these numbers describe. Renders nothing unless this is
+            an owner with producers on the account. */}
+        {canAssign && (
+          <div className="flex items-center justify-between gap-3">
+            <ScopeTabs
+              canSeeTeam={canAssign}
+              scope={who}
+              onChange={setWho}
+              unassignedCount={unassigned}
+            />
+            {who === "unassigned" && (
+              <p className="text-xs text-ink-muted max-w-xs text-right">
+                Logged before the app recorded who logged it. Open one to assign it.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Stat tiles */}
         <div className="flex items-start justify-between gap-3">
@@ -647,6 +700,13 @@ export default function Dashboard() {
                 </p>
               </div>
             )}
+            <AssignField
+              value={assignTo}
+              onChange={setAssignTo}
+              owner={owner}
+              members={members}
+              canAssign={canAssign}
+            />
             <button className="btn-primary w-full" disabled={saving}>
               {saving ? "Saving…" : "Save lead"}
             </button>
@@ -667,7 +727,7 @@ export default function Dashboard() {
         ) : referrals.length === 0 ? (
           <GettingStarted profileDone={Boolean(profileName)} partnerDone={partners.length > 0} />
         ) : (
-          <>
+          <RowMeta.Provider value={{ names: producerNames, show: canAssign && who !== "mine" }}>
             {inboxPending > 0 && (
               <Link
                 href="/inbox"
@@ -689,7 +749,7 @@ export default function Dashboard() {
             <Section title="Active" items={groups.active} advance={advance} markLost={markLost} busyId={busyId} />
             <Section title="Bound & delivered" items={groups.done} advance={advance} markLost={markLost} busyId={busyId} collapsible />
             <Section title="Not written" items={groups.lost} advance={advance} markLost={markLost} busyId={busyId} collapsible />
-          </>
+          </RowMeta.Provider>
         )}
         </div>
 
@@ -934,6 +994,7 @@ function Section({
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(!collapsible);
+  const meta = useContext(RowMeta);
   if (items.length === 0) return null;
   if (collapsible && !open) {
     return (
@@ -980,6 +1041,16 @@ function Section({
                       {r.client_name}
                     </Link>
                     <StatusBadge status={r.status} partnerType={r.partners?.partner_type} />
+                    {meta.show && (
+                      <span className="badge bg-slate-100 text-slate-700">
+                        {meta.names.get(r.producer_id ?? "") ?? "Unassigned"}
+                      </span>
+                    )}
+                    {r.assigned_at && (
+                      <span className="badge bg-brand-light text-brand-700" title="Handed over and not opened yet">
+                        Not opened
+                      </span>
+                    )}
                     {atRisk(r) && <AtRiskBadge />}
                     {r.source === "partner" && (
                       <span className="badge bg-brand-light text-brand-700">via portal</span>

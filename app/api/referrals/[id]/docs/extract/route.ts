@@ -4,7 +4,7 @@ import { db, DOCS_BUCKET } from "@/lib/db";
 import { askClaude, parseJsonLoose, mediaTypeFor } from "@/lib/ai";
 import { logActivity } from "@/lib/activity";
 import { DOC_KINDS } from "@/lib/config";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { recordContactFromDoc } from "@/lib/partner-gaps";
 import { ORIGINATOR_DOC_KINDS } from "@/lib/config";
 import { autoMatchClause } from "@/lib/clauses";
@@ -77,7 +77,7 @@ const norm = (v: unknown) =>
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!(await ownedReferral(account.id, params.id))) {
+  if (!(await visibleReferral(account, params.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   const body = await req.json().catch(() => null);

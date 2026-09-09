@@ -22,6 +22,9 @@ export async function logActivity(
     | "ask_recorded"
     | "ask_cleared"
     | "referral_received"
+    // Bookkeeping on an agency account: who this lead belongs to changed.
+    // Sends nothing and touches nothing client-facing.
+    | "producer_assigned"
     | "note",
   detail: string,
   actor: ActivityActor = "agent"

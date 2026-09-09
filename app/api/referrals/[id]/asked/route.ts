@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount, ownedReferral } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { logActivity } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const owned = await ownedReferral(account.id, params.id, "id, client_name");
+  const owned = await visibleReferral(account, params.id, "id, client_name");
   if (!owned) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));

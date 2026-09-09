@@ -6,7 +6,7 @@ import { renderVoice, type NotifyTemplates } from "@/lib/voice";
 import { appUrl } from "@/lib/helpers";
 import { DOC_KINDS, STATUS_LABELS } from "@/lib/config";
 import { logActivity } from "@/lib/activity";
-import { getAccount } from "@/lib/account";
+import { getAccount, visibleReferral } from "@/lib/account";
 import { fireWebhook } from "@/lib/webhook";
 import { sendSms } from "@/lib/sms";
 import { cleanLines } from "@/lib/lines";
@@ -21,6 +21,13 @@ const NOTIFY_STATUSES = new Set(["quoted", "docs_delivered"]);
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Not the list filter — the actual gate. On an agency account every producer
+  // shares the owner's account_id, so `.eq("account_id", …)` alone lets one
+  // producer edit or delete another's deal by changing the id in the URL.
+  if (!(await visibleReferral(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
@@ -223,6 +230,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Not the list filter — the actual gate. On an agency account every producer
+  // shares the owner's account_id, so `.eq("account_id", …)` alone lets one
+  // producer edit or delete another's deal by changing the id in the URL.
+  if (!(await visibleReferral(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { error } = await db().from("referrals").delete().eq("id", params.id).eq("account_id", account.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
