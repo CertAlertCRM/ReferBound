@@ -59,8 +59,38 @@ export async function POST(req: NextRequest) {
 
   // …and move their book into the agency pool. Magic links and portals keep
   // working — only the owning account changes.
-  await db().from("partners").update({ account_id: owner.id }).eq("account_id", account.selfId);
-  await db().from("referrals").update({ account_id: owner.id }).eq("account_id", account.selfId);
+  //
+  // producer_id is stamped in the SAME statement, and that is the whole point.
+  // Moving account_id alone was silently laundering a joining agent's entire
+  // history into the owner's unattributed pile: the rows survived, but nothing
+  // recorded whose they were, so the moment scoping arrived the person who
+  // brought that book looked brand new inside it. There is no way to undo that
+  // afterwards — once the rows are mixed in with the owner's own untagged
+  // history, no query can tell them apart again.
+  //
+  // Rows that already carry a producer_id keep it. On a book this agent worked
+  // alone that is their own id anyway, and overwriting would be wrong if they
+  // ever had help.
+  await db()
+    .from("referrals")
+    .update({ account_id: owner.id, producer_id: account.selfId })
+    .eq("account_id", account.selfId)
+    .is("producer_id", null);
+  // Anything already attributed just changes hands.
+  await db()
+    .from("referrals")
+    .update({ account_id: owner.id })
+    .eq("account_id", account.selfId);
+
+  // Partners move too, and carry a note of whose relationship they were.
+  // Nothing reads owner_producer_id yet — the shared-directory-with-an-owner
+  // model isn't built — but the fact has to be recorded at the one moment it
+  // is still knowable. Six months from now, "which of these fourteen realtors
+  // did Chalyn bring" is a question nobody can answer.
+  await db()
+    .from("partners")
+    .update({ account_id: owner.id, owner_producer_id: account.selfId })
+    .eq("account_id", account.selfId);
 
   await db().from("team_invites").delete().eq("code", invite.code);
 
