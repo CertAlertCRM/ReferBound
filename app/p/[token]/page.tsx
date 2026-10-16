@@ -14,6 +14,8 @@ import { ClosingDateEdit } from "./closing-date";
 import { FeedbackWidget } from "../../feedback-widget";
 import { PartnerSubmitForm } from "./submit-form";
 import { AutoRefresh } from "./auto-refresh";
+import { LangToggle } from "./lang-toggle";
+import { normalizeLocale, translator, statusLabelFor, type Locale } from "@/lib/i18n";
 import { ReferralMessages } from "./referral-messages";
 import { IntroEmail } from "./intro-email";
 import { DOCS_BUCKET } from "@/lib/db";
@@ -78,14 +80,20 @@ function Progress({ status, partnerType }: { status: string; partnerType?: strin
   );
 }
 
-export default async function PartnerPortal({ params }: { params: { token: string } }) {
+export default async function PartnerPortal({
+  params,
+  searchParams,
+}: {
+  params: { token: string };
+  searchParams: { lang?: string };
+}) {
   noStore(); // opt this render out of every Next.js cache layer — always live data
   // Accept both the original long token and the compact short code — old
   // links a partner already bookmarked keep working forever.
   const slug = params.token.replace(/[^a-zA-Z0-9]/g, "");
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, token, logo_path, partner_type, account_id, requirements")
+    .select("id, name, token, logo_path, partner_type, account_id, requirements, locale")
     .or(`token.eq.${slug},short_code.eq.${slug}`)
     .maybeSingle();
   if (!partner) notFound();
@@ -95,6 +103,19 @@ export default async function PartnerPortal({ params }: { params: { token: strin
   // the full pipeline.
   const partnerType: string = partner.partner_type ?? "lender";
   const fullTrack = isFullTrack(partnerType);
+
+  // Which language this partner reads in.
+  //
+  // The URL wins, because that is how the agent sends a Spanish link and how
+  // the toggle takes effect on this render. Otherwise their saved choice, and
+  // English only if neither says anything. Deliberately NOT Accept-Language
+  // here: once a partner has a stored preference it should beat whatever phone
+  // they happen to be holding.
+  const locale: Locale = searchParams?.lang
+    ? normalizeLocale(searchParams.lang)
+    : normalizeLocale(partner.locale);
+  const tr = translator(locale);
+  const label = (status: string) => statusLabelFor(locale, status, !fullTrack);
 
   let partnerLogoUrl: string | null = null;
   if (partner.logo_path) {
@@ -275,11 +296,14 @@ export default async function PartnerPortal({ params }: { params: { token: strin
               </Link>
             </div>
           )}
+          <div className="flex justify-end -mb-1">
+            <LangToggle token={partner.token} locale={locale} />
+          </div>
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-100">
                 <span className="live-dot" aria-hidden />
-                Live referral tracking
+                {tr("portal.liveTracking")}
               </div>
               {partnerLogoUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -297,13 +321,13 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                 {partner.name} <span className="font-normal text-brand-200">×</span> {agencyName}
               </h1>
               <p className="text-sm text-brand-100 mt-2 max-w-md">
-                {fullTrack
-                  ? `Every client you've referred to ${agentName}, updated in real time. Insurance documents post here once they're issued after binding.`
-                  : `Every client you've referred to ${agentName}, updated in real time — so you always know where they stand.`}
+                {tr(fullTrack ? "portal.subFull" : "portal.subSimple", {
+                  agent: agentName ?? "",
+                })}
               </p>
               {(prof?.phone || prof?.email) && (
                 <p className="text-xs text-brand-100 mt-3 flex items-center flex-wrap gap-x-3 gap-y-1">
-                  <span>Reach {agentName?.split(" ")[0]} directly:</span>
+                  <span>{tr("portal.reach", { first: agentName?.split(" ")[0] ?? "" })}</span>
                   {prof?.phone && (
                     <span className="font-semibold inline-flex items-center gap-1">
                       <IconPhone size={12} /> {prof.phone}
@@ -417,7 +441,7 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                   </div>
                   <span className={`badge ${style.pill}`}>
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                    {statusLabel(r.status, partnerType)}
+                    {label(r.status)}
                   </span>
                 </div>
 
@@ -438,16 +462,16 @@ export default async function PartnerPortal({ params }: { params: { token: strin
                     <p className="mt-1.5 text-[11px] text-ink-muted">
                       {SAFE_STATUSES.includes(r.status) ? (
                         <span className="text-emerald-600 font-semibold">
-                          {statusLabel(r.status, partnerType)} — all set
+                          {label(r.status)} — all set
                         </span>
                       ) : (
                         <>
                           Now:{" "}
                           <span className="font-semibold text-ink-secondary">
-                            {statusLabel(r.status, partnerType)}
+                            {label(r.status)}
                           </span>
                           {nextStatusFor(r.status, partnerType) && (
-                            <> · Next: {statusLabel(nextStatusFor(r.status, partnerType)!, partnerType)}</>
+                            <> · Next: {label(nextStatusFor(r.status, partnerType)!)}</>
                           )}
                         </>
                       )}

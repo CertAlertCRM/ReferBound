@@ -4,6 +4,7 @@ import { getAccount } from "@/lib/account";
 import { askClaude, parseJsonLoose } from "@/lib/ai";
 import { sendEmail, plainBodyEmail } from "@/lib/email";
 import { appUrl } from "@/lib/helpers";
+import { normalizeLocale, type Locale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -31,20 +32,45 @@ Hard rules:
 
 Respond with ONLY a JSON object (no fences): {"subject": string, "body": string}`;
 
+// The agent chooses the language; the model writes in it.
+//
+// Note what is NOT happening here: nothing translates the agent's own saved
+// voice templates. This draft is generated fresh and the agent reads and edits
+// every word before it sends, which is the only reason it's acceptable for a
+// machine to write in a language the agent may not read. A bilingual agent
+// gets Spanish they can check; a monolingual one should not be sending Spanish
+// they can't.
+const LANGUAGE_RULE: Record<Locale, string> = {
+  en: "Write in English.",
+  es:
+    "Write ENTIRELY in Spanish (neutral Latin American Spanish, usted form — " +
+    "this is a professional relationship, not a casual one). Keep the agency " +
+    "name, the person's name and the link exactly as supplied, untranslated.",
+};
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { data: partner } = await db()
     .from("partners")
-    .select("id, name, partner_type, emails, token, short_code")
+    .select("id, name, partner_type, emails, token, short_code, locale")
     .eq("id", params.id)
     .eq("account_id", account.id)
     .maybeSingle();
   if (!partner) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const link = `${appUrl()}/p/${partner.short_code || partner.token}`;
   const body = await req.json().catch(() => ({}));
+
+  // Which language to draft in: what the agent picked on the modal, otherwise
+  // whatever this partner already reads in. A partner who switched their
+  // portal to Spanish should not get the next invite in English.
+  const lang: Locale = body?.locale ? normalizeLocale(body.locale) : normalizeLocale(partner.locale);
+
+  // The link carries the language, so the portal opens in it on first click
+  // rather than making them find the toggle.
+  const base = `${appUrl()}/p/${partner.short_code || partner.token}`;
+  const link = lang === "en" ? base : `${base}?lang=${lang}`;
 
   // ── Send the (edited) draft ────────────────────────────────────────────────
   if (body?.action === "send") {
@@ -88,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let draft: string;
   try {
     const raw = await askClaude({
-      system: SYSTEM,
+      system: `${SYSTEM}\n\n${LANGUAGE_RULE[lang]}`,
       content: [{ type: "text", text: JSON.stringify(facts) }],
       maxTokens: 600,
     });
@@ -97,8 +123,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     draft = String(parsed.body ?? "").trim();
     if (!subject || !draft) throw new Error("empty");
   } catch {
-    subject = `Your live referral portal with ${agencyName}`;
-    draft = `Hi ${partner.name} team,\n\nI set up a live portal for the clients you send my way — real-time status on every referral, and the insurance documents posted right after binding. No login, no password; this link is all you need:\n\n${link}\n\nBookmark it, and feel free to send your next referral straight through it — takes about 30 seconds.\n\nThanks for the partnership,\n${agentName}`;
+    // The deterministic fallback, in both languages. A hand-written Spanish
+    // version rather than a machine-translated one, because this is the path
+    // that runs when the model is unavailable — exactly when there is nothing
+    // to fall back to.
+    if (lang === "es") {
+      subject = `Su portal de referencias con ${agencyName}`;
+      draft = `Hola ${partner.name},\n\nLe preparé un portal en vivo para los clientes que me envía: el estado de cada referencia en tiempo real, y los documentos del seguro publicados justo después de emitir la póliza. Sin contraseña y sin aplicación; este enlace es todo lo que necesita:\n\n${link}\n\nGuárdelo en sus favoritos, y si quiere puede enviarme su próxima referencia directamente desde ahí — toma unos 30 segundos. Si prefiere llamarme como siempre, también está perfecto.\n\nGracias por la confianza,\n${agentName}`;
+    } else {
+      subject = `Your live referral portal with ${agencyName}`;
+      draft = `Hi ${partner.name} team,\n\nI set up a live portal for the clients you send my way — real-time status on every referral, and the insurance documents posted right after binding. No login, no password; this link is all you need:\n\n${link}\n\nBookmark it, and feel free to send your next referral straight through it — takes about 30 seconds.\n\nThanks for the partnership,\n${agentName}`;
+    }
   }
 
   return NextResponse.json({ subject, body: draft, link, recipients: partner.emails ?? [] });

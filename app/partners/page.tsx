@@ -8,6 +8,7 @@ import { money } from "@/lib/sources";
 import { IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
 import { PartnerGaps } from "../partner-gaps";
+import { PartnerRequests } from "../partner-requests";
 import { prepareLogo, sharpnessNote } from "@/lib/image";
 import { useUI } from "../ui";
 
@@ -465,6 +466,10 @@ export default function PartnersPage() {
             <p className="text-xs text-ink">{logoNote}</p>
           </div>
         )}
+
+        {/* People who added themselves through the public link, and the
+            link itself. Renders nothing until there is a link or a request. */}
+        <PartnerRequests onApproved={load} />
 
         <PartnerGaps onConvert={fromProspect} />
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IconMail, IconCheck } from "./icons";
+import { LOCALES, LOCALE_NAMES, type Locale } from "@/lib/i18n";
 
 // "Email the link" — AI drafts a warm portal introduction, the agent edits,
 // then sends it from ReferBound (to the partner's notification emails) or
@@ -24,16 +25,21 @@ export function PartnerInviteButton({
   const [recipients, setRecipients] = useState<string[]>([]);
   const [state, setState] = useState<"edit" | "sending" | "sent">("edit");
   const [error, setError] = useState("");
+  // Which language this draft is written in. Starts null so the server can
+  // answer from the partner's own saved preference rather than this component
+  // guessing English.
+  const [lang, setLang] = useState<Locale | null>(null);
 
-  async function openModal() {
+  async function openModal(forLang?: Locale) {
     setOpen(true);
     setLoading(true);
     setState("edit");
     setError("");
+    if (forLang) setLang(forLang);
     const res = await fetch(`/api/partners/${partnerId}/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "draft" }),
+      body: JSON.stringify({ action: "draft", locale: forLang ?? lang ?? undefined }),
     });
     setLoading(false);
     if (res.ok) {
@@ -77,7 +83,7 @@ export function PartnerInviteButton({
 
   return (
     <>
-      <button type="button" className={className} onClick={openModal}>
+      <button type="button" className={className} onClick={() => openModal()}>
         <IconMail size={12} /> Email the link
       </button>
 
@@ -104,6 +110,30 @@ export function PartnerInviteButton({
                     💡 Log their in-flight referrals first — their first look should show live deals,
                     not an empty page.
                   </p>
+                </div>
+                {/* Re-drafts in the chosen language. A whole new draft rather
+                    than a translation of the one on screen — translating the
+                    agent's edits would hand back Spanish they never wrote. */}
+                <div className="flex items-center gap-1.5">
+                  <span className="section-label">Language</span>
+                  {LOCALES.map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => openModal(l)}
+                      aria-pressed={(lang ?? "en") === l}
+                      className={
+                        (lang ?? "en") === l
+                          ? "rounded-md bg-brand-light px-2 py-1 text-[11px] font-semibold text-brand-700"
+                          : "rounded-md px-2 py-1 text-[11px] font-medium text-ink-muted hover:text-ink"
+                      }
+                    >
+                      {LOCALE_NAMES[l]}
+                    </button>
+                  ))}
+                  {lang === "es" && (
+                    <span className="text-[11px] text-ink-muted">· read it before you send</span>
+                  )}
                 </div>
                 <input className="input text-sm" value={subject} onChange={(e) => setSubject(e.target.value)} />
                 <textarea

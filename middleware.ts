@@ -30,6 +30,13 @@ const PUBLIC_PREFIXES = [
   "/share/",
   // Sample portals are handed to prospects who have no account by definition.
   "/demo/",
+  // The universal share link. Posted publicly, so by definition reached by
+  // people with no account — without these two the whole feature redirects a
+  // stranger to a login page for an account they were never going to have.
+  // The page reads nothing but the agency's name; the POST writes only a
+  // request row and is rate limited per IP and per code.
+  "/join/",
+  "/api/join/",
   "/_next",
   "/favicon.ico",
   "/icon.svg",
