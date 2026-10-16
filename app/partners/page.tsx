@@ -9,6 +9,7 @@ import { IconCopy, IconCheck, IconPlus, IconTrash } from "../icons";
 import { PartnerInviteButton } from "../partner-invite";
 import { PartnerGaps } from "../partner-gaps";
 import { PartnerRequests } from "../partner-requests";
+import ScopeTabs, { useScope } from "../scope-tabs";
 import { prepareLogo, sharpnessNote } from "@/lib/image";
 import { useUI } from "../ui";
 
@@ -35,6 +36,10 @@ type Partner = {
   monthly_summary: boolean;
   thankyou_cadence: string;
   short_code: string | null;
+  // Whose relationship this is. Null means a house account — the agency's big
+  // lender that everybody works — which is also every partner that predates
+  // migration 54.
+  owner_producer_id?: string | null;
   created_at?: string | null;
   referrals: { count: number }[];
   stats?: PartnerStats;
@@ -114,6 +119,11 @@ export default function PartnersPage() {
   // relationships into a page of controls; everything but the one action an
   // agent actually repeats now lives behind this.
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  const [isTeamMember, setIsTeamMember] = useState(false);
+  const [isTeam, setIsTeam] = useState(false);
+  const [producers, setProducers] = useState<{ id: string; name: string }[]>([]);
+  const [who, setWho] = useScope(`partners.${me ?? "me"}`);
   // The add form is a task, not the point of the page — collapsed until wanted.
   const [addOpen, setAddOpen] = useState(false);
   // What kind of source this is. A lead vendor is not a "partner type" — it is
@@ -144,7 +154,65 @@ export default function PartnersPage() {
 
   async function load() {
     const res = await fetch("/api/partners");
-    if (res.ok) setPartners((await res.json()).partners ?? []);
+    if (!res.ok) return;
+    const j = await res.json();
+    setPartners(j.partners ?? []);
+    setMe(j.me ?? null);
+    setIsTeamMember(Boolean(j.isTeamMember));
+    setIsTeam(Boolean(j.isTeam));
+    setProducers(j.producers ?? []);
+  }
+
+  // Agency scoping. All of this collapses to nothing on a solo account:
+  // isTeam stays false, the tabs render null, and `scoped` is the full list.
+  //
+  // Unlike the leads page, Team here is a filter rather than a wall. Everyone
+  // in the office can see every partner and who works them — that is what
+  // stops two producers cold-calling the same realtor in one week. What they
+  // can't do is touch one that isn't theirs, which is enforced on the server
+  // by writablePartner, not by hiding a button.
+  const scopedPartners = useMemo(() => {
+    if (!isTeam) return partners;
+    const mine = (p: Partner) => {
+      const owner = p.owner_producer_id ?? null;
+      // A house partner is in everybody's "mine" because everybody may work
+      // one. For the agency owner that also covers the whole legacy book.
+      return owner === null || owner === me;
+    };
+    return who === "team" ? partners.filter((p) => !mine(p)) : partners.filter(mine);
+  }, [partners, isTeam, who, me]);
+
+  const teamCount = useMemo(() => {
+    if (!isTeam) return 0;
+    return partners.filter((p) => {
+      const owner = p.owner_producer_id ?? null;
+      return owner !== null && owner !== me;
+    }).length;
+  }, [partners, isTeam, me]);
+
+  const producerName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const pr of producers) m.set(pr.id, pr.name);
+    return m;
+  }, [producers]);
+
+  // Hand a relationship to a producer, or put it back in the house.
+  //
+  // Optimistic: the select shouldn't sit there looking unchanged while a round
+  // trip happens. On failure the list reloads, which puts the truth back.
+  async function setPartnerOwner(p: Partner, ownerId: string | null) {
+    setPartners((ps) =>
+      ps.map((x) => (x.id === p.id ? { ...x, owner_producer_id: ownerId } : x))
+    );
+    const res = await fetch(`/api/partners/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ owner_producer_id: ownerId }),
+    });
+    if (!res.ok) {
+      toast((await res.json().catch(() => ({})))?.error ?? "Couldn't reassign", "error");
+      load();
+    }
   }
 
   // Lead sources first.
@@ -156,20 +224,20 @@ export default function PartnersPage() {
   // nothing to say.
   const ordered = useMemo(() => {
     const rank = (p: Partner) => ((p.source_kind ?? "partner") === "paid" ? 0 : 1);
-    return [...partners].sort((a, b) => {
+    return [...scopedPartners].sort((a, b) => {
       if (rank(a) !== rank(b)) return rank(a) - rank(b);
       const at = a.stats?.total ?? 0;
       const bt = b.stats?.total ?? 0;
       if (at !== bt) return bt - at;
       return (a.created_at ?? "").localeCompare(b.created_at ?? "");
     });
-  }, [partners]);
+  }, [scopedPartners]);
 
   const mixed = useMemo(
     () =>
-      partners.some((p) => (p.source_kind ?? "partner") === "paid") &&
-      partners.some((p) => (p.source_kind ?? "partner") !== "paid"),
-    [partners]
+      scopedPartners.some((p) => (p.source_kind ?? "partner") === "paid") &&
+      scopedPartners.some((p) => (p.source_kind ?? "partner") !== "paid"),
+    [scopedPartners]
   );
 
   // Close the action menu on any click outside it, or on Escape. A fixed
@@ -598,6 +666,23 @@ export default function PartnersPage() {
         </form>
         )}
 
+        {isTeam && (
+          <div className="flex items-center justify-between gap-3">
+            <ScopeTabs
+              canSeeTeam
+              scope={who}
+              onChange={setWho}
+              teamCount={teamCount}
+            />
+            {who === "team" && isTeamMember && (
+              <p className="text-xs text-ink-muted text-right max-w-xs">
+                Who else in the office works these. Read-only — so nobody
+                calls the same realtor twice in a week.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="space-y-3">
           {ordered.map((p, i) => {
             const s = p.stats ?? EMPTY_STATS;
@@ -606,6 +691,12 @@ export default function PartnersPage() {
             // Offering one a magic link would be absurd, so the whole portal
             // surface disappears for them.
             const isPaid = (p.source_kind ?? "partner") === "paid";
+            // Mirrors writablePartner on the server. The server is what
+            // actually enforces this; hiding the controls just stops a
+            // producer clicking something that was going to 404.
+            const owner = p.owner_producer_id ?? null;
+            const canEdit = !isTeamMember || owner === null || owner === me;
+            const worker = owner ? producerName.get(owner) ?? "another producer" : null;
             // Section heading on the first card of each kind. Only when both
             // kinds exist — a single unlabelled list needs no labels.
             const prev = i > 0 ? (ordered[i - 1].source_kind ?? "partner") === "paid" : null;
@@ -818,12 +909,38 @@ export default function PartnersPage() {
                           <span>{money(p.monthly_spend_cents)}/mo</span>
                         )}
                         {since && <span>{since}</span>}
+                        {isTeam && worker && (
+                          <span className="badge bg-slate-100 text-slate-700">
+                            {owner === me ? "You work this" : `Worked by ${worker}`}
+                          </span>
+                        )}
                       </p>
+                      {isTeam && !isTeamMember && !isPaid && (
+                        <select
+                          aria-label={`Who works ${p.name}`}
+                          value={owner ?? ""}
+                          onChange={(e) => setPartnerOwner(p, e.target.value || null)}
+                          className="mt-1.5 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] text-ink-secondary focus:border-brand focus:outline-none"
+                        >
+                          {/* Null is a real choice, not an empty one: a house
+                              account is the agency's, and anybody may work it. */}
+                          <option value="">House — anyone</option>
+                          <option value={me ?? ""}>You</option>
+                          {producers.map((pr) => (
+                            <option key={pr.id} value={pr.id}>
+                              {pr.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
 
-                    {/* One repeated action, one menu for the rest. */}
+                    {/* One repeated action, one menu for the rest. Hidden on a
+                        colleague's partner — the server would refuse anyway,
+                        and a button that only ever 404s is worse than no
+                        button. */}
                     <div className="flex items-center gap-1.5 shrink-0" data-partner-menu>
-                      {!isPaid && (
+                      {!isPaid && canEdit && (
                         <button
                           className="btn-primary !px-3 !py-1.5 text-xs"
                           onClick={() => copy(p)}
@@ -840,6 +957,7 @@ export default function PartnersPage() {
                           )}
                         </button>
                       )}
+                      {canEdit && (
                       <div className="relative">
                         <button
                           className="w-8 h-8 rounded-lg text-ink-muted hover:text-ink hover:bg-slate-100 transition-colors flex items-center justify-center"
@@ -956,6 +1074,7 @@ export default function PartnersPage() {
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, writablePartner } from "@/lib/account";
 import { sendSms, toE164 } from "@/lib/sms";
 import { appUrl } from "@/lib/helpers";
 
@@ -14,6 +14,11 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => null);
   const contactId = String(body?.contactId ?? "");

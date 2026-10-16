@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, writablePartner } from "@/lib/account";
 import { EMAIL_RE, normalizeEmail } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +35,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   if (!(await ownedPartner(account.id, params.id))) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -68,6 +73,11 @@ const CHANNELS = new Set(["email", "sms", "both"]);
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   if (!(await ownedPartner(account.id, params.id))) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -111,6 +121,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   if (!(await ownedPartner(account.id, params.id))) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const cid = req.nextUrl.searchParams.get("cid");

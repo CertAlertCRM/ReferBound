@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, writablePartner } from "@/lib/account";
 import { logActivity } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,11 @@ export const dynamic = "force-dynamic";
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const newToken = randomBytes(32).toString("hex");
   const newShort = randomBytes(9).toString("hex").slice(0, 12);

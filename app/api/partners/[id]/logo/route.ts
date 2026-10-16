@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
-import { getAccount } from "@/lib/account";
+import { getAccount, writablePartner } from "@/lib/account";
 
 // Agent-only (protected by middleware): upload/replace a partner's logo.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { data: owned } = await db()
     .from("partners")
     .select("id")

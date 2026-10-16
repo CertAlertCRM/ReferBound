@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
-import { getAccount, partnerCapacity, countPartners } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners, writablePartner } from "@/lib/account";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,11 @@ export const dynamic = "force-dynamic";
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
 
   const { data: src } = await db()
     .from("partners")

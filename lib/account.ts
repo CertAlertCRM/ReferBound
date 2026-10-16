@@ -161,6 +161,42 @@ export async function visibleReferral(
   return data as any;
 }
 
+// A partner this signed-in person may CHANGE.
+//
+// The partners page is deliberately not a wall the way the leads page is.
+// Everyone in an agency can see every partner, and who works them, because the
+// failure this prevents is two producers cold-calling the same realtor in one
+// week and making the office look disorganised. What's scoped is the ability
+// to touch: edit the record, rotate the portal link, send the invitation,
+// message through it.
+//
+// Three cases:
+//   - The agency owner may change anything on their own account.
+//   - A producer may change a partner assigned to them.
+//   - A producer may change a HOUSE partner — owner_producer_id null — which
+//     is the agency's big lender that everybody works. Null has meant exactly
+//     this since migration 54, including for every partner that predates it.
+//
+// Everything else is readable and not writable.
+export async function writablePartner(
+  account: Account,
+  partnerId: string,
+  select = "id"
+) {
+  const cols = select.includes("owner_producer_id") ? select : `${select}, owner_producer_id`;
+  const { data } = await db()
+    .from("partners")
+    .select(cols)
+    .eq("id", partnerId)
+    .eq("account_id", account.id)
+    .maybeSingle();
+  if (!data) return null;
+  if (!account.isTeamMember) return data as any;
+  const owner = (data as any).owner_producer_id;
+  if (owner == null || owner === account.selfId) return data as any;
+  return null;
+}
+
 // The producers on an owner's account. Owner-only by construction rather than
 // by a flag: the query is "accounts whose team_owner_id is me", so a producer
 // asking gets an empty roster, because nobody has a producer as their owner.

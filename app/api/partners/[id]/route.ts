@@ -2,17 +2,47 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES } from "@/lib/config";
-import { getAccount, partnerCapacity, countPartners, isLenderType } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners, isLenderType, writablePartner, teamMembers } from "@/lib/account";
 import { normalizeRequirements } from "@/lib/requirements";
 
 // Agent-only (protected by middleware): edit a partner's name / notification emails.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
   const patch: Record<string, unknown> = {};
+
+  // Handing a relationship to a producer, or back to the house.
+  //
+  // Owner-only, and validated against the roster rather than trusted. A
+  // producer reassigning partners is how the commission argument this feature
+  // exists to prevent starts in the first place.
+  if ("owner_producer_id" in body) {
+    if (account.isTeamMember) {
+      return NextResponse.json(
+        { error: "Only the agency owner can change who works a partner." },
+        { status: 403 }
+      );
+    }
+    const target = typeof body.owner_producer_id === "string" ? body.owner_producer_id : null;
+    if (target && target !== account.selfId) {
+      const roster = await teamMembers(account.id);
+      if (!roster.some((m) => m.id === target)) {
+        return NextResponse.json({ error: "That producer is not on this account." }, { status: 400 });
+      }
+    }
+    // Null is deliberate and meaningful: back to a house account that anyone
+    // in the office can work.
+    patch.owner_producer_id = target;
+  }
+
   if ("name" in body) {
     const name = String(body.name ?? "").trim();
     if (!name) return NextResponse.json({ error: "Name can't be empty" }, { status: 400 });
@@ -91,6 +121,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const account = await getAccount();
   if (!account) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  // Visible to the whole office, changeable only by whoever works them.
+  if (!(await writablePartner(account, params.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { error } = await db()
     .from("partners")
     .delete()

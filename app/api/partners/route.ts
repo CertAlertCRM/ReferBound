@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, DOCS_BUCKET } from "@/lib/db";
 import { EMAIL_RE } from "@/lib/format";
 import { PARTNER_TYPES, SAFE_STATUSES } from "@/lib/config";
-import { getAccount, partnerCapacity, countPartners, paidSourceCapacity } from "@/lib/account";
+import { getAccount, partnerCapacity, countPartners, paidSourceCapacity, teamMembers } from "@/lib/account";
 import { SOURCE_KINDS, type SourceKind } from "@/lib/sources";
 
 export async function GET() {
@@ -12,9 +12,9 @@ export async function GET() {
   // feature, and a feature must not be able to take the partners list down.
   // Try the full select, fall back to the set that has always existed.
   const BASE =
-    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, created_at, referrals!referrals_partner_id_fkey(count)";
+    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, owner_producer_id, created_at, referrals!referrals_partner_id_fkey(count)";
   const WITH_SOURCES =
-    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, source_kind, monthly_spend_cents, created_at, referrals!referrals_partner_id_fkey(count)";
+    "id, name, token, short_code, emails, logo_path, partner_type, type_label, monthly_summary, thankyou_cadence, requirements, source_kind, monthly_spend_cents, owner_producer_id, created_at, referrals!referrals_partner_id_fkey(count)";
 
   let { data, error } = await db()
     .from("partners")
@@ -86,7 +86,21 @@ export async function GET() {
       };
     })
   );
-  return NextResponse.json({ partners });
+  // Everyone on the account gets the whole list — seeing that a colleague
+  // already works a realtor is the point. What the client does with it is
+  // filter into tabs and hide the controls it isn't allowed to use; what stops
+  // a producer actually touching somebody else's partner is writablePartner on
+  // every mutation route, not this.
+  const roster = account.isTeamMember ? [] : await teamMembers(account.id);
+  return NextResponse.json({
+    partners,
+    me: account.selfId,
+    isTeamMember: account.isTeamMember,
+    // Tabs appear for anyone on a team — including producers, who get a
+    // read-only view of the rest of the office.
+    isTeam: account.isTeamMember || roster.length > 0,
+    producers: roster.map((m) => ({ id: m.id, name: m.display_name || m.email })),
+  });
 }
 
 export async function POST(req: NextRequest) {
